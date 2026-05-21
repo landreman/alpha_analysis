@@ -36,10 +36,10 @@ class BoozerField:
         self.source_kind: str | None = None
         self.s_full: np.ndarray | None = None
         self.s_bmnc: np.ndarray | None = None
-        self.G_grid: np.ndarray | None = None
-        self.I_grid: np.ndarray | None = None
-        self.iota_grid: np.ndarray | None = None
-        self.bmnc_grid: np.ndarray | None = None
+        self.G_data: np.ndarray | None = None
+        self.I_data: np.ndarray | None = None
+        self.iota_data: np.ndarray | None = None
+        self.bmnc_data: np.ndarray | None = None
         self.mode_m: np.ndarray | None = None
         self.mode_n: np.ndarray | None = None
         self.asym: bool | None = None
@@ -78,11 +78,11 @@ class BoozerField:
             self.s_full = np.linspace(0.0, 1.0, ns)
             self.ds = self.s_full[1] - self.s_full[0]
             self.s_half = self.s_full[1:] - 0.5 * self.ds
-            self.iota_grid = f.variables["iota_b"][()][1:]
-            self.I_grid = f.variables["buco_b"][()][1:]
-            self.G_grid = f.variables["bvco_b"][()][1:]
-            self.bmnc = f.variables["bmnc_b"][()]
-            print("bmnc.shape", self.bmnc.shape)
+            self.iota_data = f.variables["iota_b"][()][1:]
+            self.I_data = f.variables["buco_b"][()][1:]
+            self.G_data = f.variables["bvco_b"][()][1:]
+            self.bmnc_data = f.variables["bmnc_b"][()]
+            print("bmnc_data.shape", self.bmnc_data.shape)
 
             self._build_splines()
         finally:
@@ -103,10 +103,10 @@ class BoozerField:
         self.source_kind = "wout"
 
         self.asym = bool(getattr(bx, "asym", False))
-        self.iota_grid = self._read_xform_1d(bx, ("iota", "iota_b"))
-        self.I_grid = self._read_xform_1d(bx, ("Boozer_I_all", "buco_b", "I"))
-        self.G_grid = self._read_xform_1d(bx, ("Boozer_G_all", "bvco_b", "G"))
-        self.bmnc_grid = self._read_xform_2d(bx, ("bmnc_b",))
+        self.iota_data = self._read_xform_1d(bx, ("iota", "iota_b"))
+        self.I_data = self._read_xform_1d(bx, ("Boozer_I_all", "buco_b", "I"))
+        self.G_data = self._read_xform_1d(bx, ("Boozer_G_all", "bvco_b", "G"))
+        self.bmnc_data = self._read_xform_2d(bx, ("bmnc_b",))
         self.mode_m = self._read_xform_1d(bx, ("xm_b", "ixm_b"), allow_missing=True)
         self.mode_n = self._read_xform_1d(bx, ("xn_b", "ixn_b"), allow_missing=True)
 
@@ -114,9 +114,9 @@ class BoozerField:
         if s_bmnc is not None:
             self.s_bmnc = np.asarray(s_bmnc, dtype=float).copy()
         else:
-            self.s_bmnc = np.linspace(0.0, 1.0, self.bmnc_grid.shape[1])
+            self.s_bmnc = np.linspace(0.0, 1.0, self.bmnc_data.shape[1])
 
-        self.s_full = np.linspace(0.0, 1.0, self.iota_grid.size)
+        self.s_full = np.linspace(0.0, 1.0, self.iota_data.size)
 
         self._build_splines()
         return self
@@ -134,13 +134,13 @@ class BoozerField:
         return self._evaluate_spline(self._bmnc_spline, s)
 
     def _build_splines(self) -> None:
-        if self.s_full is None or self.G_grid is None or self.I_grid is None or self.iota_grid is None:
+        if self.s_full is None or self.G_data is None or self.I_data is None or self.iota_data is None:
             raise ValueError("Full-grid profiles are not loaded")
 
-        self._G_spline = CubicSpline(self.s_half, self.G_grid, axis=0, extrapolate=True)
-        self._I_spline = CubicSpline(self.s_half, self.I_grid, axis=0, extrapolate=True)
-        self._iota_spline = CubicSpline(self.s_half, self.iota_grid, axis=0, extrapolate=True)
-        self._bmnc_spline = CubicSpline(self.s_half, self.bmnc, axis=0, extrapolate=True)
+        self._G_spline = CubicSpline(self.s_half, self.G_data, axis=0, extrapolate=True)
+        self._I_spline = CubicSpline(self.s_half, self.I_data, axis=0, extrapolate=True)
+        self._iota_spline = CubicSpline(self.s_half, self.iota_data, axis=0, extrapolate=True)
+        self._bmnc_spline = CubicSpline(self.s_half, self.bmnc_data, axis=0, extrapolate=True)
 
     @staticmethod
     def _evaluate_spline(spline: CubicSpline | None, s: np.ndarray | float) -> np.ndarray | float:
@@ -181,8 +181,8 @@ class BoozerField:
         value = np.array(dataset.variables[name][:], dtype=float, copy=True)
         return float(value.reshape(-1)[0])
 
-    def _read_bmnc_grid(self, dataset: Any, expected_count: int) -> np.ndarray:
-        bmnc_grid = self._read_2d_variable(dataset, "bmnc_b")
+    def _read_bmnc_data(self, dataset: Any, expected_count: int) -> np.ndarray:
+        bmnc_data = self._read_2d_variable(dataset, "bmnc_b")
 
         if "jlist" in dataset.variables:
             jlist = np.array(dataset.variables["jlist"][:], dtype=int, copy=True)
