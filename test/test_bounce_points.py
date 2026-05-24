@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import matplotlib.pyplot as plt
+import alpha_analysis.bounce_points as bounce_points_module
 
 from alpha_analysis import DATA_DIR, BoozerField, BoozerSurface, find_bounce_points, plot_bounce_points
 
@@ -52,3 +53,43 @@ def test_plot_bounce_points_doesnt_crash():
                 refine=refine,
                 show=False,
             )
+
+
+def test_plot_bounce_points_cli_forwards_args(monkeypatch):
+    captured = {}
+
+    def _fake_plot_bounce_points(filename, s, B_bounce, n_alpha, n_phi, phi_margin, refine, show=True):
+        captured["filename"] = filename
+        captured["s"] = s
+        captured["B_bounce"] = B_bounce
+        captured["n_alpha"] = n_alpha
+        captured["n_phi"] = n_phi
+        captured["phi_margin"] = phi_margin
+        captured["refine"] = refine
+        captured["show"] = show
+
+    monkeypatch.setattr(bounce_points_module, "plot_bounce_points", _fake_plot_bounce_points)
+    exit_code = bounce_points_module.plot_bounce_points_cli(
+        [
+            boozmn_file_name,
+            "0.25",
+            "2.7",
+            "--n_alpha",
+            "12",
+            "--n_phi",
+            "301",
+            "--phi_margin",
+            "4.5",
+            "--no-refine",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured["filename"] == boozmn_file_name
+    assert captured["s"] == 0.25
+    assert captured["B_bounce"] == 2.7
+    assert captured["n_alpha"] == 12
+    assert captured["n_phi"] == 301
+    assert captured["phi_margin"] == 4.5
+    assert captured["refine"] is False
+    assert captured["show"] is True

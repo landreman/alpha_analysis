@@ -1,4 +1,5 @@
 import os
+import argparse
 import numpy as np
 from scipy.optimize import root_scalar
 import matplotlib.pyplot as plt
@@ -156,6 +157,7 @@ def _plot_bounce_points(
 
     plt.figure(figsize=(8, 8.1))
     plt.contour(phi2d, theta2d, B, levels=50)
+    plt.colorbar()
     for alpha, data in zip(alphas, bounce_data):
         phi_left = data["phi_left"]
         phi_right = data["phi_right"]
@@ -198,3 +200,45 @@ def plot_bounce_points(
         bottom_text=bottom_text,
         show=show,
     )
+
+
+def plot_bounce_points_cli(argv=None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="plot_bounce_points",
+        description="Plot trapped-particle bounce points for a boozmn file.",
+    )
+    parser.add_argument("boozmn_file", help="Path to boozmn netCDF file")
+    parser.add_argument("s", type=float, help="Normalized toroidal flux (surface label)")
+    parser.add_argument("B_bounce", type=float, help="Bounce-field threshold")
+    parser.add_argument("--n_alpha", type=int, default=50, help="Number of alpha values")
+    parser.add_argument("--n_phi", type=int, default=501, help="Number of phi grid points")
+    parser.add_argument("--phi_margin", type=float, default=5.0, help="Phi margin in field periods")
+    parser.add_argument(
+        "--refine",
+        dest="refine",
+        action="store_true",
+        default=True,
+        help="Refine bounce points with root finding (default)",
+    )
+    parser.add_argument(
+        "--no-refine",
+        dest="refine",
+        action="store_false",
+        help="Disable root refinement",
+    )
+
+    args = parser.parse_args(argv)
+    plot_bounce_points(
+        args.boozmn_file,
+        s=args.s,
+        B_bounce=args.B_bounce,
+        n_alpha=args.n_alpha,
+        n_phi=args.n_phi,
+        phi_margin=args.phi_margin,
+        refine=args.refine,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(plot_bounce_points_cli())
