@@ -142,40 +142,8 @@ class BoozerField:
     def bmnc(self, s: np.ndarray | float) -> np.ndarray | float:
         return self._evaluate_spline(self._bmnc_spline, s)
 
-    def compute_B(
-        self,
-        s: np.ndarray | float,
-        theta: np.ndarray,
-        phi: np.ndarray,
-    ) -> np.ndarray:
-        theta_arr = np.asarray(theta, dtype=float)
-        phi_arr = np.asarray(phi, dtype=float)
-        if theta_arr.shape != phi_arr.shape:
-            raise ValueError("theta and phi must have the same shape")
-        if theta_arr.ndim not in (1, 2):
-            raise ValueError("theta and phi must be 1d or 2d arrays")
-
-        theta_flat = theta_arr.reshape(-1)
-        phi_flat = phi_arr.reshape(-1)
-
-        # xm = np.asarray(self.xm, dtype=float).reshape(-1)
-        # xn = np.asarray(self.xn, dtype=float).reshape(-1)
-        xm = self.xm
-        xn = self.xn
-        bmnc_eval = np.asarray(self.bmnc(s), dtype=float)
-        if bmnc_eval.ndim == 1:
-            bmnc_eval = bmnc_eval[np.newaxis, :]
-        if bmnc_eval.shape[1] != xm.size:
-            raise ValueError(
-                f"bmnc mode count ({bmnc_eval.shape[1]}) does not match xm/xn length ({xm.size})"
-            )
-
-        phase = xm[:, np.newaxis] * theta_flat[np.newaxis, :] - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
-        B_flat = bmnc_eval @ np.cos(phase)
-
-        if theta_arr.ndim == 1:
-            return B_flat
-        return B_flat.reshape((B_flat.shape[0],) + theta_arr.shape)
+    def surface(self, s: float) -> "BoozerSurface":
+        return BoozerSurface(self, s)
 
     def _build_splines(self) -> None:
         if (
@@ -186,7 +154,7 @@ class BoozerField:
             or self.iota_data is None
             or self.bmnc_data is None
         ):
-            raise ValueError("Full-grid profiles are not loaded")
+            raise ValueError("Data has not been loaded")
 
         self._G_spline = CubicSpline(self.s_half, self.G_data, axis=0, extrapolate=True)
         self._I_spline = CubicSpline(self.s_half, self.I_data, axis=0, extrapolate=True)
@@ -223,3 +191,48 @@ class BoozerField:
         if self.source is None:
             return "BoozerField(unloaded)"
         return f"BoozerField(source_kind={self.source_kind!r}, source={str(self.source)!r})"
+
+
+class BoozerSurface:
+    """A Boozer-coordinate flux surface with interpolated field data."""
+
+    def __init__(self, booz: BoozerField, s: float) -> None:
+        self.booz = booz
+        self.s = s
+        self.G = booz.G(s)
+        self.I = booz.I(s)
+        self.iota = booz.iota(s)
+        self.bmnc = booz.bmnc(s)
+        self.nfp = booz.nfp
+
+    def compute_B(
+        self,
+        theta: np.ndarray,
+        phi: np.ndarray,
+    ) -> np.ndarray:
+        theta_arr = np.asarray(theta, dtype=float)
+        phi_arr = np.asarray(phi, dtype=float)
+        if theta_arr.shape != phi_arr.shape:
+            raise ValueError("theta and phi must have the same shape")
+        if theta_arr.ndim not in (1, 2):
+            raise ValueError("theta and phi must be 1d or 2d arrays")
+
+        theta_flat = theta_arr.reshape(-1)
+        phi_flat = phi_arr.reshape(-1)
+
+        xm = self.booz.xm
+        xn = self.booz.xn
+        bmnc_eval = np.asarray(self.bmnc, dtype=float)
+        if bmnc_eval.ndim != 1:
+            raise ValueError("BoozerSurface bmnc data must be one-dimensional")
+        if bmnc_eval.size != xm.size:
+            raise ValueError(
+                f"bmnc mode count ({bmnc_eval.size}) does not match xm/xn length ({xm.size})"
+            )
+
+        phase = xm[:, np.newaxis] * theta_flat[np.newaxis, :] - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
+        B_flat = bmnc_eval @ np.cos(phase)
+
+        if theta_arr.ndim == 1:
+            return B_flat
+        return B_flat.reshape(theta_arr.shape)
