@@ -5,3 +5,4 @@
 * When generating new code, prefer simple and short. For example, when making a
   new standalone script, don't add capability for command-line arguments unless
   asked to.
+* Formatting of new code should be consistent with black.
