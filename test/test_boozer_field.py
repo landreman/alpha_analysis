@@ -97,3 +97,19 @@ def test_B_reference():
         # print(B)
         np.testing.assert_allclose(B, B_reference, rtol=1e-13, atol=1e-13)
 
+def test_get_min_max():
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    B_min, B_max = booz.get_min_max()
+    print("B_min, B_max:", B_min, B_max)
+
+    # Reference values from a W7-X boozmn file:
+    B_min_ref = 2.293715871749871
+    B_max_ref = 3.370464075302584
+
+    np.testing.assert_allclose(B_min, B_min_ref, rtol=1e-13, atol=1e-13)
+    np.testing.assert_allclose(B_max, B_max_ref, rtol=1e-13, atol=1e-13)
+
+    # Try a different resolution:
+    B_min, B_max = booz.get_min_max(n_s=20, n_theta=32, n_phi=33)
+    np.testing.assert_allclose(B_min, B_min_ref, rtol=2e-4)
+    np.testing.assert_allclose(B_max, B_max_ref, rtol=1e-13, atol=1e-13)

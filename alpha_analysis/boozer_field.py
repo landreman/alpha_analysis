@@ -144,6 +144,27 @@ class BoozerField:
 
     def surface(self, s: float) -> "BoozerSurface":
         return BoozerSurface(self, s)
+    
+    def get_min_max(
+        self,
+        n_s: int = 10,
+        n_theta: int = 64,
+        n_phi: int = 65,
+    ):
+        """Get the global minimum and maximum |B| throughout the volume."""
+        s = np.linspace(0.0, 1.0, n_s)
+        theta = np.linspace(0.0, 2.0 * np.pi, n_theta, endpoint=False)
+        phi = np.linspace(0.0, 2.0 * np.pi / self.nfp, n_phi, endpoint=False)
+        phi2d, theta2d = np.meshgrid(phi, theta)
+        B_min = np.inf
+        B_max = -np.inf
+        for s_val in s:
+            surf = self.surface(s_val)
+            B = surf.compute_B(theta2d, phi2d)
+            B_min = min(B_min, np.min(B))
+            B_max = max(B_max, np.max(B))
+            
+        return B_min, B_max
 
     def _build_splines(self) -> None:
         if (

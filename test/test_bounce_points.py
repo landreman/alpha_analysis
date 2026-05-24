@@ -1,7 +1,6 @@
 import os
 
 import numpy as np
-from scipy.io import netcdf_file
 import matplotlib.pyplot as plt
 
 from alpha_analysis import DATA_DIR, BoozerField, BoozerSurface, find_bounce_points, plot_bounce_points
