@@ -1,13 +1,11 @@
 import os
 
 import numpy as np
-import matplotlib.pyplot as plt
 import alpha_analysis.bounce_points as bounce_points_module
 
 from alpha_analysis import DATA_DIR, BoozerField, BoozerSurface, find_bounce_points, plot_bounce_points
 
 boozmn_file_name = os.path.join(DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc")
-wout_file_name = os.path.join(DATA_DIR, "wout_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc")
 
 def test_refine_doesnt_change_too_much():
     """The bounce points found with refine=True should be close to those found with refine=False."""
@@ -41,6 +39,64 @@ def test_refine_doesnt_change_too_much():
 
         for key in ["phi_left", "phi_right", "theta_left", "theta_right"]:
             np.testing.assert_allclose(data_refined[key], data_unrefined[key], atol=0.03, rtol=0.03)
+
+def test_bounce_points_off_edges():
+    """Make sure find_bounce_points works as expected when the well crosses the edges of the phi grid."""
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    s = 0.5
+    surf = BoozerSurface(booz, s)
+
+    B_bounce = 5.0  # Larger than B_max
+    alphas = [0, np.pi]
+    phi_center = np.pi / surf.nfp
+    n_phi = 101
+
+    for alpha in alphas:
+        for refine in [True, False]:
+            data = find_bounce_points(
+                surf,
+                B_bounce,
+                alpha,
+                phi_center,
+                n_phi=n_phi,
+                phi_margin=1.1,
+                refine=refine,
+            )
+
+            assert data["well_crosses_left_edge"]
+            assert data["well_crosses_right_edge"]
+            np.testing.assert_equal(data["left_index"], 0)
+            np.testing.assert_equal(data["right_index"], n_phi - 1)
+
+
+def test_bounce_points_none():
+    """Make sure find_bounce_points works as expected when there are no allowed points."""
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    s = 0.5
+    surf = BoozerSurface(booz, s)
+
+    B_bounce = 0.9  # Smaller than B_min
+    alphas = [0, np.pi]
+    phi_center = np.pi / surf.nfp
+    n_phi = 101
+
+    for alpha in alphas:
+        for refine in [True, False]:
+            data = find_bounce_points(
+                surf,
+                B_bounce,
+                alpha,
+                phi_center,
+                n_phi=n_phi,
+                phi_margin=1.1,
+                refine=refine,
+            )
+            assert not np.any(data["allowed"])
+            assert np.isnan(data["left_index"])
+            assert np.isnan(data["right_index"])
+            assert np.isnan(data["phi_left"])
+            assert np.isnan(data["phi_right"])
+
 
 def test_plot_bounce_points_doesnt_crash():
     """Make a plot of bounce points for a W7-X boozmn file."""
