@@ -1,8 +1,9 @@
+import os
 import numpy as np
 from scipy.optimize import root_scalar
 import matplotlib.pyplot as plt
 
-from alpha_analysis.boozer_field import BoozerSurface
+from alpha_analysis.boozer_field import BoozerField, BoozerSurface
 
 def find_bounce_points(
     surf: BoozerSurface,
@@ -117,20 +118,83 @@ def find_bounce_points(
     } | args
     return data
 
-def _plot_bounce_points(*args, **kwargs):
-    data = find_bounce_points(*args, **kwargs)
-    surf = data["surf"]
-    phi_field_period = 2.0 * np.pi / surf.nfp
+def _plot_bounce_points(
+    surf: BoozerSurface,
+    B_bounce: float,
+    n_alpha: int,
+    phi_center: float,
+    n_phi: float = 501,
+    phi_margin: float = 5.0,
+    refine: bool = True,
+    top_text: str = "",
+    bottom_text: str = "",
+    show: bool = True
+):
+    alphas = np.linspace(0.0, 2.0 * np.pi, n_alpha)
+    bounce_data = []
+    for alpha in alphas:
+        data = find_bounce_points(
+            surf,
+            B_bounce,
+            alpha,
+            phi_center,
+            n_phi=n_phi,
+            phi_margin=phi_margin,
+            refine=refine,
+        )
+        bounce_data.append(data)
 
-    ntheta = 80
-    nphi = 101
-    theta = np.linspace(0.0, 2.0 * np.pi, ntheta)
-    phi = np.linspace(-1 * phi_field_period, 2 * phi_field_period, nphi)
+    ntheta_contours = 180
+    nphi_contours = 201
+    phi_field_period = 2.0 * np.pi / surf.nfp
+    theta_margin = 1.0
+    theta = np.linspace(-theta_margin, theta_margin + 2.0 * np.pi, ntheta_contours)
+    phi = np.linspace(-0.5 * phi_field_period, 1.5 * phi_field_period, nphi_contours)
     phi2d, theta2d = np.meshgrid(phi, theta)
 
     B = surf.compute_B(theta2d, phi2d)
 
     plt.figure(figsize=(8, 8.1))
-    plt.contourf(phi2d, theta2d, B, levels=50)
+    plt.contour(phi2d, theta2d, B, levels=50)
+    for alpha, data in zip(alphas, bounce_data):
+        phi_left = data["phi_left"]
+        phi_right = data["phi_right"]
+        theta_left = data["theta_left"]
+        theta_right = data["theta_right"]
+        plt.plot([phi_left, phi_right], [theta_left, theta_right], "-", color="k", linewidth=1.5)
+        plt.plot(phi_left, theta_left, "o", color="r", markersize=2)
+        plt.plot(phi_right, theta_right, "o", color="b", markersize=2)
+
     plt.tight_layout()
-    plt.show()
+    plt.figtext(0.5, 0.995, top_text, ha="center", va="top", fontsize=7)
+    plt.figtext(0.5, 0.005, bottom_text, ha="center", va="bottom", fontsize=7)
+    if show:
+        plt.show()
+
+def plot_bounce_points(
+    filename: str,
+    s: float,
+    B_bounce: float,
+    n_alpha: int = 50,
+    n_phi: float = 501,
+    phi_margin: float = 5.0,
+    refine: bool = True,
+    show: bool = True
+):
+    booz = BoozerField.from_boozmn(filename)
+    surf = BoozerSurface(booz, s)
+    phi_center = np.pi / surf.nfp
+    top_text = f"B_bounce={B_bounce:.3f}, s={s:.3f}, n_alpha={n_alpha}, n_phi={n_phi}, phi_margin={phi_margin}, refine={refine}"
+    bottom_text = f"{os.path.abspath(filename)}"
+    _plot_bounce_points(
+        surf,
+        B_bounce,
+        n_alpha,
+        phi_center,
+        n_phi=n_phi,
+        phi_margin=phi_margin,
+        refine=refine,
+        top_text=top_text,
+        bottom_text=bottom_text,
+        show=show,
+    )
