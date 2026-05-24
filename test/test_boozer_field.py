@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 from scipy.io import netcdf_file
+import matplotlib.pyplot as plt
 
 from alpha_analysis import DATA_DIR, BoozerField
 
@@ -29,3 +30,67 @@ def test_load_boozmn():
     assert np.isfinite(b.I(s)).all()
     assert np.isfinite(b.iota(s)).all() 
     assert np.isfinite(b.bmnc(s)).all()
+
+
+def test_compute_B_1d_shape_and_values():
+    b = BoozerField.from_boozmn(boozmn_file_name)
+
+    s = b.s_half
+    nthetaphi = 9
+    theta = np.zeros(nthetaphi)
+    phi = np.zeros(nthetaphi)
+
+    B = b.compute_B(s, theta, phi)
+    assert B.shape == (s.size, nthetaphi)
+
+    expected = np.sum(b.bmnc_data, axis=1, keepdims=True)
+    np.testing.assert_allclose(B, np.repeat(expected, nthetaphi, axis=1), rtol=1e-13, atol=1e-13)
+
+
+def test_compute_B_2d_shape_matches_flattened():
+    b = BoozerField.from_boozmn(boozmn_file_name)
+
+    s = b.s_half
+    n1, n2 = 3, 4
+    theta_2d = np.linspace(0.0, 2.0 * np.pi, n1 * n2, endpoint=False).reshape(n1, n2)
+    phi_2d = np.linspace(0.0, np.pi, n1 * n2, endpoint=False).reshape(n1, n2)
+
+    B_2d = b.compute_B(s, theta_2d, phi_2d)
+    assert B_2d.shape == (s.size, n1, n2)
+
+    B_flat = b.compute_B(s, theta_2d.reshape(-1), phi_2d.reshape(-1))
+    np.testing.assert_allclose(B_2d.reshape(s.size, -1), B_flat, rtol=1e-13, atol=1e-13)
+
+def test_B_reference():
+    """Compare B to reference values from a W7-X boozmn file."""
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+
+    make_plot = False
+
+    if make_plot:
+        ntheta = 30; nphi = 31
+    else:
+        ntheta = 3; nphi = 4
+
+    theta = np.linspace(0.0, 2.0 * np.pi, ntheta, endpoint=False)
+    phi = np.linspace(0.0, 2.0 * np.pi / booz.nfp, nphi, endpoint=False)
+    phi2d, theta2d = np.meshgrid(phi, theta)
+    s = 0.5
+    B = booz.compute_B(s, theta2d, phi2d)
+    B_reference = np.array(
+        [
+            [2.743048654229539, 2.566500171993845, 2.421530030838217, 2.566500171993845],
+            [3.067412946539301, 2.576178573264619, 2.339680548217751, 2.852598410500511],
+            [3.0674129465393, 2.852598410500511, 2.339680548217752, 2.576178573264619]
+        ]
+    )
+
+    if make_plot:
+        plt.contourf(phi2d, theta2d, B[0, :, :], levels=25)
+        plt.colorbar()
+        plt.show()
+    else:
+        # np.set_printoptions(precision=15)
+        # print(B)
+        np.testing.assert_allclose(B, B_reference[np.newaxis, :, :], rtol=1e-13, atol=1e-13)
+

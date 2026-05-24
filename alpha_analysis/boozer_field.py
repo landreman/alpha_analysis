@@ -36,13 +36,15 @@ class BoozerField:
         self.source_kind: str | None = None
         self.s_full: np.ndarray | None = None
         self.s_bmnc: np.ndarray | None = None
+        self.s_half: np.ndarray | None = None
         self.G_data: np.ndarray | None = None
         self.I_data: np.ndarray | None = None
         self.iota_data: np.ndarray | None = None
         self.bmnc_data: np.ndarray | None = None
-        self.mode_m: np.ndarray | None = None
-        self.mode_n: np.ndarray | None = None
+        self.xm: np.ndarray | None = None
+        self.xn: np.ndarray | None = None
         self.asym: bool | None = None
+        self.nfp: int | None = None
 
         self._G_spline: CubicSpline | None = None
         self._I_spline: CubicSpline | None = None
@@ -82,7 +84,9 @@ class BoozerField:
             self.I_data = f.variables["buco_b"][()][1:]
             self.G_data = f.variables["bvco_b"][()][1:]
             self.bmnc_data = f.variables["bmnc_b"][()]
-            print("bmnc_data.shape", self.bmnc_data.shape)
+            self.xm = f.variables["ixm_b"][()]
+            self.xn = f.variables["ixn_b"][()]
+            self.nfp = int(f.variables["nfp_b"][()])
 
             self._build_splines()
         finally:
@@ -107,8 +111,8 @@ class BoozerField:
         self.I_data = self._read_xform_1d(bx, ("Boozer_I_all", "buco_b", "I"))
         self.G_data = self._read_xform_1d(bx, ("Boozer_G_all", "bvco_b", "G"))
         self.bmnc_data = self._read_xform_2d(bx, ("bmnc_b",))
-        self.mode_m = self._read_xform_1d(bx, ("xm_b", "ixm_b"), allow_missing=True)
-        self.mode_n = self._read_xform_1d(bx, ("xn_b", "ixn_b"), allow_missing=True)
+        self.xm = self._read_xform_1d(bx, ("xm_b", "ixm_b"), allow_missing=True)
+        self.xn = self._read_xform_1d(bx, ("xn_b", "ixn_b"), allow_missing=True)
 
         s_bmnc = getattr(bx, "s_b", None)
         if s_bmnc is not None:
@@ -117,6 +121,11 @@ class BoozerField:
             self.s_bmnc = np.linspace(0.0, 1.0, self.bmnc_data.shape[1])
 
         self.s_full = np.linspace(0.0, 1.0, self.iota_data.size)
+        if self.iota_data.size > 1:
+            ds = self.s_full[1] - self.s_full[0]
+            self.s_half = self.s_full[1:] - 0.5 * ds
+        else:
+            self.s_half = self.s_full.copy()
 
         self._build_splines()
         return self
@@ -133,8 +142,50 @@ class BoozerField:
     def bmnc(self, s: np.ndarray | float) -> np.ndarray | float:
         return self._evaluate_spline(self._bmnc_spline, s)
 
+    def compute_B(
+        self,
+        s: np.ndarray | float,
+        theta: np.ndarray,
+        phi: np.ndarray,
+    ) -> np.ndarray:
+        theta_arr = np.asarray(theta, dtype=float)
+        phi_arr = np.asarray(phi, dtype=float)
+        if theta_arr.shape != phi_arr.shape:
+            raise ValueError("theta and phi must have the same shape")
+        if theta_arr.ndim not in (1, 2):
+            raise ValueError("theta and phi must be 1d or 2d arrays")
+
+        theta_flat = theta_arr.reshape(-1)
+        phi_flat = phi_arr.reshape(-1)
+
+        # xm = np.asarray(self.xm, dtype=float).reshape(-1)
+        # xn = np.asarray(self.xn, dtype=float).reshape(-1)
+        xm = self.xm
+        xn = self.xn
+        bmnc_eval = np.asarray(self.bmnc(s), dtype=float)
+        if bmnc_eval.ndim == 1:
+            bmnc_eval = bmnc_eval[np.newaxis, :]
+        if bmnc_eval.shape[1] != xm.size:
+            raise ValueError(
+                f"bmnc mode count ({bmnc_eval.shape[1]}) does not match xm/xn length ({xm.size})"
+            )
+
+        phase = xm[:, np.newaxis] * theta_flat[np.newaxis, :] - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
+        B_flat = bmnc_eval @ np.cos(phase)
+
+        if theta_arr.ndim == 1:
+            return B_flat
+        return B_flat.reshape((B_flat.shape[0],) + theta_arr.shape)
+
     def _build_splines(self) -> None:
-        if self.s_full is None or self.G_data is None or self.I_data is None or self.iota_data is None:
+        if (
+            self.s_full is None
+            or self.s_half is None
+            or self.G_data is None
+            or self.I_data is None
+            or self.iota_data is None
+            or self.bmnc_data is None
+        ):
             raise ValueError("Full-grid profiles are not loaded")
 
         self._G_spline = CubicSpline(self.s_half, self.G_data, axis=0, extrapolate=True)
@@ -151,52 +202,6 @@ class BoozerField:
         if value.ndim == 0:
             return value.item()
         return value
-
-    @staticmethod
-    def _read_1d_variable(dataset: Any, name: str) -> np.ndarray:
-        variable = dataset.variables[name]
-        value = np.array(variable[:], dtype=float, copy=True)
-        if value.ndim != 1:
-            raise ValueError(f"{name} must be one-dimensional")
-        return value
-
-    @staticmethod
-    def _read_2d_variable(dataset: Any, name: str) -> np.ndarray:
-        variable = dataset.variables[name]
-        value = np.array(variable[:], dtype=float, copy=True)
-        if value.ndim != 2:
-            raise ValueError(f"{name} must be two-dimensional")
-        return value
-
-    @staticmethod
-    def _read_optional_1d_variable(dataset: Any, name: str) -> np.ndarray | None:
-        if name not in dataset.variables:
-            return None
-        return BoozerField._read_1d_variable(dataset, name)
-
-    @staticmethod
-    def _read_optional_scalar(dataset: Any, name: str, default: float | int) -> float:
-        if name not in dataset.variables:
-            return float(default)
-        value = np.array(dataset.variables[name][:], dtype=float, copy=True)
-        return float(value.reshape(-1)[0])
-
-    def _read_bmnc_data(self, dataset: Any, expected_count: int) -> np.ndarray:
-        bmnc_data = self._read_2d_variable(dataset, "bmnc_b")
-
-        if "jlist" in dataset.variables:
-            jlist = np.array(dataset.variables["jlist"][:], dtype=int, copy=True)
-            compute_surfs = jlist - 2
-            if compute_surfs.size != expected_count:
-                raise ValueError("jlist and bmnc_b have incompatible radial sizes")
-
-            ns_b = self._read_optional_scalar(dataset, "ns_b", default=0)
-            if ns_b <= 1:
-                raise ValueError("ns_b must be greater than 1 to reconstruct the bmnc grid")
-
-            return (compute_surfs + 0.5) / (ns_b - 1.0)
-
-        return np.linspace(0.0, 1.0, expected_count)
 
     @staticmethod
     def _read_xform_1d(xform: Any, names: tuple[str, ...], allow_missing: bool = False) -> np.ndarray:
