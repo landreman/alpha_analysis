@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 plot_bounce_points = "alpha_analysis.bounce_points:plot_bounce_points_cli"
+plot_J_invariant = "alpha_analysis.J_invariant:plot_J_invariant_cli"
 
 [project.optional-dependencies]
 test = [

@@ -45,6 +45,7 @@ class BoozerField:
         self.xn: np.ndarray | None = None
         self.asym: bool | None = None
         self.nfp: int | None = None
+        self.R00: float | None = None
 
         self._G_spline: CubicSpline | None = None
         self._I_spline: CubicSpline | None = None
@@ -89,6 +90,7 @@ class BoozerField:
             self.xm = f.variables["ixm_b"][()]
             self.xn = f.variables["ixn_b"][()]
             self.nfp = int(f.variables["nfp_b"][()])
+            self.R00 = float(f.variables["rmnc_b"][()][0, 0])
 
             self._build_splines()
         finally:
@@ -275,6 +277,7 @@ class BoozerSurface:
         self.iota = booz.iota(s)
         self.bmnc = booz.bmnc(s)
         self.nfp = booz.nfp
+        self.R00 = booz.R00
 
     def compute_B(
         self,
