@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 from alpha_analysis.boozer_field import BoozerField, BoozerSurface
 
+
 def find_bounce_points(
     surf: BoozerSurface,
     B_bounce: float,
@@ -15,7 +16,7 @@ def find_bounce_points(
     phi_margin: float = 5.0,
     refine: bool = True,
 ) -> dict:
-    
+
     args = {
         "surf": surf,
         "B_bounce": B_bounce,
@@ -28,7 +29,10 @@ def find_bounce_points(
 
     # Create grid of theta and phi values.
     phi_field_period = 2.0 * np.pi / surf.nfp
-    phi = phi_center + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
+    phi = (
+        phi_center
+        + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
+    )
     dphi = phi[1] - phi[0]
     theta = theta_center + surf.iota * (phi - phi_center)
     all_indices = np.arange(n_phi)
@@ -52,7 +56,7 @@ def find_bounce_points(
             "theta_right": np.nan,
         } | args
         return data
-    
+
     # Find the allowed point closest to the center point.
     center_index = np.argmin(np.abs(phi - phi_center))
     allowed_indices = np.where(allowed)[0]
@@ -81,12 +85,14 @@ def find_bounce_points(
         theta_val = theta_center + surf.iota * (phi_val - phi_center)
         B_val = surf.compute_B([theta_val], [phi_val])[0]
         return B_val - B_bounce
-    
+
     if well_crosses_left_edge or (not refine):
         phi_left = phi[left_index]
     else:
         root_solution = root_scalar(
-            B_residual, x0=phi[left_index], x1=phi[left_index] - dphi,
+            B_residual,
+            x0=phi[left_index],
+            x1=phi[left_index] - dphi,
         )
         phi_left = root_solution.root
 
@@ -119,6 +125,7 @@ def find_bounce_points(
     } | args
     return data
 
+
 def _plot_bounce_points(
     surf: BoozerSurface,
     B_bounce: float,
@@ -129,7 +136,7 @@ def _plot_bounce_points(
     refine: bool = True,
     top_text: str = "",
     bottom_text: str = "",
-    show: bool = True
+    show: bool = True,
 ):
     alphas = np.linspace(0.0, 2.0 * np.pi, n_alpha)
     bounce_data = []
@@ -163,7 +170,13 @@ def _plot_bounce_points(
         phi_right = data["phi_right"]
         theta_left = data["theta_left"]
         theta_right = data["theta_right"]
-        plt.plot([phi_left, phi_right], [theta_left, theta_right], "-", color="k", linewidth=1.5)
+        plt.plot(
+            [phi_left, phi_right],
+            [theta_left, theta_right],
+            "-",
+            color="k",
+            linewidth=1.5,
+        )
         plt.plot(phi_left, theta_left, "o", color="r", markersize=2)
         plt.plot(phi_right, theta_right, "o", color="b", markersize=2)
 
@@ -173,6 +186,7 @@ def _plot_bounce_points(
     if show:
         plt.show()
 
+
 def plot_bounce_points(
     filename: str,
     s: float,
@@ -181,7 +195,7 @@ def plot_bounce_points(
     n_phi: float = 501,
     phi_margin: float = 5.0,
     refine: bool = True,
-    show: bool = True
+    show: bool = True,
 ):
     booz = BoozerField.from_boozmn(filename)
     surf = BoozerSurface(booz, s)
@@ -208,11 +222,19 @@ def plot_bounce_points_cli(argv=None) -> int:
         description="Plot trapped-particle bounce points for a boozmn file.",
     )
     parser.add_argument("boozmn_file", help="Path to boozmn netCDF file")
-    parser.add_argument("s", type=float, help="Normalized toroidal flux (surface label)")
+    parser.add_argument(
+        "s", type=float, help="Normalized toroidal flux (surface label)"
+    )
     parser.add_argument("B_bounce", type=float, help="Bounce-field threshold")
-    parser.add_argument("--n_alpha", type=int, default=50, help="Number of alpha values")
-    parser.add_argument("--n_phi", type=int, default=501, help="Number of phi grid points")
-    parser.add_argument("--phi_margin", type=float, default=5.0, help="Phi margin in field periods")
+    parser.add_argument(
+        "--n_alpha", type=int, default=50, help="Number of alpha values"
+    )
+    parser.add_argument(
+        "--n_phi", type=int, default=501, help="Number of phi grid points"
+    )
+    parser.add_argument(
+        "--phi_margin", type=float, default=5.0, help="Phi margin in field periods"
+    )
     parser.add_argument(
         "--refine",
         dest="refine",

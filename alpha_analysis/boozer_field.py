@@ -75,7 +75,9 @@ class BoozerField:
             ns = len(iota_b)
             jlist_should_be = np.arange(2, ns + 1)
             if not np.array_equal(jlist, jlist_should_be):
-                raise ValueError(f"boozmn file must contain all surfaces. Found jlist={jlist}, expected {jlist_should_be}")
+                raise ValueError(
+                    f"boozmn file must contain all surfaces. Found jlist={jlist}, expected {jlist_should_be}"
+                )
 
             self.s_full = np.linspace(0.0, 1.0, ns)
             self.ds = self.s_full[1] - self.s_full[0]
@@ -96,6 +98,7 @@ class BoozerField:
 
     def load_wout(self, wout_file: str | Path, mboz=32, nboz=32) -> "BoozerField":
         import booz_xform
+
         bx = booz_xform.Booz_xform()
         bx.read_wout(str(wout_file))
         bx.mboz = mboz
@@ -144,7 +147,7 @@ class BoozerField:
 
     def surface(self, s: float) -> "BoozerSurface":
         return BoozerSurface(self, s)
-    
+
     def get_min_max(
         self,
         n_s: int = 10,
@@ -163,7 +166,7 @@ class BoozerField:
             B = surf.compute_B(theta2d, phi2d)
             B_min = min(B_min, np.min(B))
             B_max = max(B_max, np.max(B))
-            
+
         return B_min, B_max
 
     def _build_splines(self) -> None:
@@ -179,11 +182,17 @@ class BoozerField:
 
         self._G_spline = CubicSpline(self.s_half, self.G_data, axis=0, extrapolate=True)
         self._I_spline = CubicSpline(self.s_half, self.I_data, axis=0, extrapolate=True)
-        self._iota_spline = CubicSpline(self.s_half, self.iota_data, axis=0, extrapolate=True)
-        self._bmnc_spline = CubicSpline(self.s_half, self.bmnc_data, axis=0, extrapolate=True)
+        self._iota_spline = CubicSpline(
+            self.s_half, self.iota_data, axis=0, extrapolate=True
+        )
+        self._bmnc_spline = CubicSpline(
+            self.s_half, self.bmnc_data, axis=0, extrapolate=True
+        )
 
     @staticmethod
-    def _evaluate_spline(spline: CubicSpline | None, s: np.ndarray | float) -> np.ndarray | float:
+    def _evaluate_spline(
+        spline: CubicSpline | None, s: np.ndarray | float
+    ) -> np.ndarray | float:
         if spline is None:
             raise ValueError("The requested field has not been loaded")
 
@@ -193,7 +202,9 @@ class BoozerField:
         return value
 
     @staticmethod
-    def _read_xform_1d(xform: Any, names: tuple[str, ...], allow_missing: bool = False) -> np.ndarray:
+    def _read_xform_1d(
+        xform: Any, names: tuple[str, ...], allow_missing: bool = False
+    ) -> np.ndarray:
         for name in names:
             if hasattr(xform, name):
                 return np.asarray(getattr(xform, name), dtype=float).copy()
@@ -251,7 +262,10 @@ class BoozerSurface:
                 f"bmnc mode count ({bmnc_eval.size}) does not match xm/xn length ({xm.size})"
             )
 
-        phase = xm[:, np.newaxis] * theta_flat[np.newaxis, :] - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
+        phase = (
+            xm[:, np.newaxis] * theta_flat[np.newaxis, :]
+            - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
+        )
         B_flat = bmnc_eval @ np.cos(phase)
 
         if theta_arr.ndim == 1:

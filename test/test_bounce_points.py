@@ -3,9 +3,18 @@ import os
 import numpy as np
 import alpha_analysis.bounce_points as bounce_points_module
 
-from alpha_analysis import DATA_DIR, BoozerField, BoozerSurface, find_bounce_points, plot_bounce_points
+from alpha_analysis import (
+    DATA_DIR,
+    BoozerField,
+    BoozerSurface,
+    find_bounce_points,
+    plot_bounce_points,
+)
 
-boozmn_file_name = os.path.join(DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc")
+boozmn_file_name = os.path.join(
+    DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
+)
+
 
 def test_refine_doesnt_change_too_much():
     """The bounce points found with refine=True should be close to those found with refine=False."""
@@ -34,11 +43,21 @@ def test_refine_doesnt_change_too_much():
             refine=False,
         )
 
-        for key in ["left_index", "right_index", "B", "allowed", "well_crosses_left_edge", "well_crosses_right_edge"]:
+        for key in [
+            "left_index",
+            "right_index",
+            "B",
+            "allowed",
+            "well_crosses_left_edge",
+            "well_crosses_right_edge",
+        ]:
             np.testing.assert_array_equal(data_refined[key], data_unrefined[key])
 
         for key in ["phi_left", "phi_right", "theta_left", "theta_right"]:
-            np.testing.assert_allclose(data_refined[key], data_unrefined[key], atol=0.03, rtol=0.03)
+            np.testing.assert_allclose(
+                data_refined[key], data_unrefined[key], atol=0.03, rtol=0.03
+            )
+
 
 def test_bounce_points_off_edges():
     """Make sure find_bounce_points works as expected when the well crosses the edges of the phi grid."""
@@ -114,7 +133,9 @@ def test_plot_bounce_points_doesnt_crash():
 def test_plot_bounce_points_cli_forwards_args(monkeypatch):
     captured = {}
 
-    def _fake_plot_bounce_points(filename, s, B_bounce, n_alpha, n_phi, phi_margin, refine, show=True):
+    def _fake_plot_bounce_points(
+        filename, s, B_bounce, n_alpha, n_phi, phi_margin, refine, show=True
+    ):
         captured["filename"] = filename
         captured["s"] = s
         captured["B_bounce"] = B_bounce
@@ -124,7 +145,9 @@ def test_plot_bounce_points_cli_forwards_args(monkeypatch):
         captured["refine"] = refine
         captured["show"] = show
 
-    monkeypatch.setattr(bounce_points_module, "plot_bounce_points", _fake_plot_bounce_points)
+    monkeypatch.setattr(
+        bounce_points_module, "plot_bounce_points", _fake_plot_bounce_points
+    )
     exit_code = bounce_points_module.plot_bounce_points_cli(
         [
             boozmn_file_name,
