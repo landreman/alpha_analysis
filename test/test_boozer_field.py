@@ -45,34 +45,62 @@ def test_load_boozmn():
 
 def test_compute_B_1d_shape_and_values():
     booz = BoozerField.from_boozmn(boozmn_file_name)
-    s = 0.5
-    surf = BoozerSurface(booz, s)
+    s = booz.s_half
 
     nthetaphi = 9
     theta = np.zeros(nthetaphi)
     phi = np.zeros(nthetaphi)
 
-    B = surf.compute_B(theta, phi)
-    assert B.shape == (nthetaphi,)
+    B = booz.compute_B(s, theta, phi)
+    assert B.shape == (s.size, nthetaphi)
 
-    expected = np.sum(surf.bmnc)
-    np.testing.assert_allclose(B, np.full(nthetaphi, expected), rtol=1e-13, atol=1e-13)
+    expected = np.sum(booz.bmnc_data, axis=1, keepdims=True)
+    np.testing.assert_allclose(B, np.repeat(expected, nthetaphi, axis=1), rtol=1e-13, atol=1e-13)
 
 
 def test_compute_B_2d_shape_matches_flattened():
     booz = BoozerField.from_boozmn(boozmn_file_name)
-    s = 0.5
-    surf = booz.surface(s)
+    s = booz.s_half
 
     n1, n2 = 3, 4
     theta_2d = np.linspace(0.0, 2.0 * np.pi, n1 * n2, endpoint=False).reshape(n1, n2)
     phi_2d = np.linspace(0.0, np.pi, n1 * n2, endpoint=False).reshape(n1, n2)
 
-    B_2d = surf.compute_B(theta_2d, phi_2d)
-    assert B_2d.shape == (n1, n2)
+    B_2d = booz.compute_B(s, theta_2d, phi_2d)
+    assert B_2d.shape == (s.size, n1, n2)
 
-    B_flat = surf.compute_B(theta_2d.reshape(-1), phi_2d.reshape(-1))
-    np.testing.assert_allclose(B_2d.reshape(-1), B_flat, rtol=1e-13, atol=1e-13)
+    B_flat = booz.compute_B(s, theta_2d.reshape(-1), phi_2d.reshape(-1))
+    np.testing.assert_allclose(B_2d.reshape(s.size, -1), B_flat, rtol=1e-13, atol=1e-13)
+
+
+def test_compute_B_field_surface_agree_scalar_s():
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    s = 0.5
+    surf = booz.surface(s)
+
+    theta = np.linspace(0.0, 2.0 * np.pi, 12, endpoint=False)
+    phi = np.linspace(0.0, 2.0 * np.pi / booz.nfp, 12, endpoint=False)
+    B_field = booz.compute_B(s, theta, phi)
+    B_surf = surf.compute_B(theta, phi)
+    np.testing.assert_allclose(B_field, B_surf, rtol=1e-13, atol=1e-13)
+
+    phi2d, theta2d = np.meshgrid(phi, theta)
+    B_field_2d = booz.compute_B(s, theta2d, phi2d)
+    B_surf_2d = surf.compute_B(theta2d, phi2d)
+    np.testing.assert_allclose(B_field_2d, B_surf_2d, rtol=1e-13, atol=1e-13)
+
+
+def test_compute_B_field_surface_agree_multiple_s():
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    s_vals = np.array([0.2, 0.5, 0.8])
+    theta = np.linspace(0.0, 2.0 * np.pi, 7, endpoint=False)
+    phi = np.linspace(0.0, 2.0 * np.pi / booz.nfp, 7, endpoint=False)
+
+    B_field = booz.compute_B(s_vals, theta, phi)
+    for j, s in enumerate(s_vals):
+        surf = booz.surface(float(s))
+        B_surf = surf.compute_B(theta, phi)
+        np.testing.assert_allclose(B_field[j], B_surf, rtol=1e-13, atol=1e-13)
 
 
 def test_B_reference():

@@ -145,6 +145,51 @@ class BoozerField:
     def bmnc(self, s: np.ndarray | float) -> np.ndarray | float:
         return self._evaluate_spline(self._bmnc_spline, s)
 
+    def compute_B(
+        self,
+        s: np.ndarray | float,
+        theta: np.ndarray,
+        phi: np.ndarray,
+    ) -> np.ndarray:
+        theta_arr = np.asarray(theta, dtype=float)
+        phi_arr = np.asarray(phi, dtype=float)
+        if theta_arr.shape != phi_arr.shape:
+            raise ValueError("theta and phi must have the same shape")
+        if theta_arr.ndim not in (1, 2):
+            raise ValueError("theta and phi must be 1d or 2d arrays")
+
+        theta_flat = theta_arr.reshape(-1)
+        phi_flat = phi_arr.reshape(-1)
+
+        xm = self.xm
+        xn = self.xn
+        bmnc_eval = np.asarray(self.bmnc(s), dtype=float)
+        if bmnc_eval.ndim == 1:
+            bmnc_eval = bmnc_eval[np.newaxis, :]
+            scalar_s = True
+        else:
+            scalar_s = False
+        if bmnc_eval.shape[1] != xm.size:
+            raise ValueError(
+                f"bmnc mode count ({bmnc_eval.shape[1]}) does not match xm/xn length ({xm.size})"
+            )
+
+        phase = (
+            xm[:, np.newaxis] * theta_flat[np.newaxis, :]
+            - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
+        )
+        B_flat = bmnc_eval @ np.cos(phase)
+
+        if theta_arr.ndim == 1:
+            if scalar_s:
+                return B_flat[0]
+            return B_flat
+
+        B = B_flat.reshape((B_flat.shape[0],) + theta_arr.shape)
+        if scalar_s:
+            return B[0]
+        return B
+
     def surface(self, s: float) -> "BoozerSurface":
         return BoozerSurface(self, s)
 
@@ -156,18 +201,12 @@ class BoozerField:
     ):
         """Get the global minimum and maximum |B| throughout the volume."""
         s = np.linspace(0.0, 1.0, n_s)
+        # It is best if n_theta is even since B_max is often at theta=pi.
         theta = np.linspace(0.0, 2.0 * np.pi, n_theta, endpoint=False)
         phi = np.linspace(0.0, 2.0 * np.pi / self.nfp, n_phi, endpoint=False)
         phi2d, theta2d = np.meshgrid(phi, theta)
-        B_min = np.inf
-        B_max = -np.inf
-        for s_val in s:
-            surf = self.surface(s_val)
-            B = surf.compute_B(theta2d, phi2d)
-            B_min = min(B_min, np.min(B))
-            B_max = max(B_max, np.max(B))
-
-        return B_min, B_max
+        B = self.compute_B(s, theta2d, phi2d)
+        return np.min(B), np.max(B)
 
     def _build_splines(self) -> None:
         if (
