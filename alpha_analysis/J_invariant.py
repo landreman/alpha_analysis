@@ -126,6 +126,7 @@ def _compute_unrefined_j_from_cached_B(
     all_indices: np.ndarray,
     clipped_well_nan: bool = True,
 ) -> float:
+    """Compute J for ``refine=False`` from precomputed ``B(theta, phi)`` samples."""
     allowed = B <= B_bounce
     if not np.any(allowed):
         return np.nan
