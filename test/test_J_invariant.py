@@ -161,3 +161,22 @@ def test_plot_J_invariant_cli_forwards_args(monkeypatch):
     assert captured["contour_levels"] == 27
     assert captured["refine"] is False
     assert captured["show"] is True
+
+
+def test_compute_j_grids_refine_false_reuses_B_evaluations(monkeypatch):
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    alpha_values = np.linspace(0.0, 2.0 * np.pi, 4, endpoint=False)
+    s_values = np.array([0.2, 0.6])
+
+    count = 0
+    original_compute_B = BoozerSurface.compute_B
+
+    def _counted_compute_B(self, theta, phi):
+        nonlocal count
+        count += 1
+        return original_compute_B(self, theta, phi)
+
+    monkeypatch.setattr(BoozerSurface, "compute_B", _counted_compute_B)
+    J_invariant_module._compute_j_grids(booz, alpha_values, s_values, refine=False)
+
+    assert count == len(alpha_values) * len(s_values)
