@@ -8,6 +8,7 @@ from alpha_analysis import (
     BoozerField,
     BoozerSurface,
     compute_J_invariant,
+    find_bounce_points,
 )
 
 boozmn_file_name = os.path.join(
@@ -161,3 +162,95 @@ def test_plot_J_invariant_cli_forwards_args(monkeypatch):
     assert captured["contour_levels"] == 27
     assert captured["refine"] is False
     assert captured["show"] is True
+
+
+def test_compute_j_grids_refine_false_reuses_B_evaluations(monkeypatch):
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    alpha_values = np.linspace(0.0, 2.0 * np.pi, 4, endpoint=False)
+    s_values = np.array([0.2, 0.6])
+
+    count = 0
+    original_compute_B = BoozerSurface.compute_B
+
+    def _counted_compute_B(self, theta, phi):
+        nonlocal count
+        count += 1
+        return original_compute_B(self, theta, phi)
+
+    monkeypatch.setattr(BoozerSurface, "compute_B", _counted_compute_B)
+    J_invariant_module._compute_j_grids(booz, alpha_values, s_values, refine=False)
+
+    assert count == len(alpha_values) * len(s_values)
+
+
+def test_cached_unrefined_j_matches_public_unrefined_paths():
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    surf = BoozerSurface(booz, s=0.5)
+
+    phi_center = np.pi / surf.nfp
+    n_phi = 501
+    phi_margin = 5.0
+    phi_field_period = 2.0 * np.pi / surf.nfp
+    phi = (
+        phi_center
+        + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
+    )
+
+    b_bounces = [2.4, 2.7, 5.1]
+    alphas = np.linspace(0.0, 2.0 * np.pi, 6, endpoint=False)
+
+    for b_bounce in b_bounces:
+        for alpha in alphas:
+            theta_center = alpha + surf.iota * phi_center
+            theta = theta_center + surf.iota * (phi - phi_center)
+            B = surf.compute_B(theta, phi)
+
+            cached_data = J_invariant_module._compute_unrefined_j_from_cached_B(
+                surf=surf,
+                B=B,
+                phi=phi,
+                B_bounce=b_bounce,
+                clipped_well_nan=True,
+                return_data=True,
+            )
+
+            bounce_data = find_bounce_points(
+                surf,
+                b_bounce,
+                theta_center,
+                phi_center,
+                n_phi=n_phi,
+                phi_margin=phi_margin,
+                refine=False,
+            )
+
+            j_data = compute_J_invariant(
+                surf,
+                b_bounce,
+                theta_center,
+                phi_center,
+                n_phi=n_phi,
+                phi_margin=phi_margin,
+                refine=False,
+                clipped_well_nan=True,
+            )
+
+            np.testing.assert_array_equal(cached_data["allowed"], bounce_data["allowed"])
+            np.testing.assert_array_equal(cached_data["well_mask"], bounce_data["well_mask"])
+            np.testing.assert_equal(
+                cached_data["well_crosses_left_edge"],
+                bounce_data["well_crosses_left_edge"],
+            )
+            np.testing.assert_equal(
+                cached_data["well_crosses_right_edge"],
+                bounce_data["well_crosses_right_edge"],
+            )
+            np.testing.assert_equal(cached_data["left_index"], bounce_data["left_index"])
+            np.testing.assert_equal(cached_data["right_index"], bounce_data["right_index"])
+            np.testing.assert_allclose(
+                cached_data["J"],
+                j_data["J"],
+                atol=1e-14,
+                rtol=1e-14,
+                equal_nan=True,
+            )

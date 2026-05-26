@@ -18,6 +18,7 @@ from scipy.integrate import quad
 from .boozer_field import BoozerSurface
 from .boozer_field import BoozerField
 from .bounce_points import find_bounce_points
+from .bounce_points import _find_well_bounds_from_allowed
 
 # Defaults for plot_J_invariant:
 LAMBDA_N_VALUES = np.arange(0.1, 1.0, 0.05).tolist()
@@ -117,6 +118,48 @@ def _build_coordinate_arrays(ns: int, n_alpha: int, n_rho: int):
     return alpha_values, rho_values, s_values
 
 
+def _compute_unrefined_j_from_cached_B(
+    surf: BoozerSurface,
+    B: np.ndarray,
+    phi: np.ndarray,
+    B_bounce: float,
+    clipped_well_nan: bool = True,
+    return_data: bool = False,
+):
+    """Compute J for ``refine=False`` from precomputed ``B(theta, phi)`` samples."""
+    allowed = B <= B_bounce
+    (
+        has_allowed,
+        well_crosses_left_edge,
+        well_crosses_right_edge,
+        left_index,
+        right_index,
+        well_mask,
+    ) = _find_well_bounds_from_allowed(allowed)
+
+    if not has_allowed:
+        J = np.nan
+    elif clipped_well_nan and (well_crosses_left_edge or well_crosses_right_edge):
+        J = np.nan
+    else:
+        integrand_on_grid = np.sqrt(np.maximum(0, 1 - B / B_bounce)) / B
+        constant = np.abs(surf.G + surf.I * surf.iota) / (surf.R00 * 2 * np.pi / surf.nfp)
+        J = trapezoid(np.where(well_mask, integrand_on_grid, 0.0), phi) * constant
+
+    if return_data:
+        return {
+            "J": J,
+            "allowed": allowed,
+            "well_crosses_left_edge": well_crosses_left_edge,
+            "well_crosses_right_edge": well_crosses_right_edge,
+            "left_index": left_index,
+            "right_index": right_index,
+            "well_mask": well_mask,
+        }
+
+    return J
+
+
 def _compute_j_grids(
     booz: BoozerField,
     alpha_values: np.ndarray,
@@ -127,23 +170,53 @@ def _compute_j_grids(
     phi_center = np.pi / booz.nfp
     j_grids = {}
 
+    if refine:
+        for lambda_n in LAMBDA_N_VALUES:
+            print(f"Processing lambda_n = {lambda_n}")
+            b_bounce = b_min + lambda_n * (b_max - b_min)
+            j_grid = np.full((len(alpha_values), len(s_values)), np.nan)
+            for s_idx, s in enumerate(s_values):
+                surf = BoozerSurface(booz, s)
+                for a_idx, alpha in enumerate(alpha_values):
+                    # alpha = theta - iota * phi, so theta_center = alpha + iota * phi_center.
+                    theta_center = alpha + surf.iota * phi_center
+                    data = compute_J_invariant(
+                        surf,
+                        b_bounce,
+                        theta_center,
+                        phi_center,
+                        refine=refine,
+                    )
+                    j_grid[a_idx, s_idx] = data["J"]
+            j_grids[lambda_n] = j_grid
+        return j_grids
+
+    n_phi = 501
+    phi_margin = 5.0
+    phi_field_period = 2.0 * np.pi / booz.nfp
+    phi = phi_center + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
+
+    surfaces = [BoozerSurface(booz, s) for s in s_values]
+    B_cache = np.empty((len(alpha_values), len(s_values), n_phi))
+    for s_idx, surf in enumerate(surfaces):
+        for a_idx, alpha in enumerate(alpha_values):
+            theta_center = alpha + surf.iota * phi_center
+            theta = theta_center + surf.iota * (phi - phi_center)
+            B_cache[a_idx, s_idx, :] = surf.compute_B(theta, phi)
+
     for lambda_n in LAMBDA_N_VALUES:
         print(f"Processing lambda_n = {lambda_n}")
         b_bounce = b_min + lambda_n * (b_max - b_min)
         j_grid = np.full((len(alpha_values), len(s_values)), np.nan)
-        for s_idx, s in enumerate(s_values):
-            surf = BoozerSurface(booz, s)
-            for a_idx, alpha in enumerate(alpha_values):
-                # alpha = theta - iota * phi, so theta_center = alpha + iota * phi_center.
-                theta_center = alpha + surf.iota * phi_center
-                data = compute_J_invariant(
-                    surf,
-                    b_bounce,
-                    theta_center,
-                    phi_center,
-                    refine=refine,
+        for s_idx, surf in enumerate(surfaces):
+            for a_idx in range(len(alpha_values)):
+                j_grid[a_idx, s_idx] = _compute_unrefined_j_from_cached_B(
+                    surf=surf,
+                    B=B_cache[a_idx, s_idx, :],
+                    phi=phi,
+                    B_bounce=b_bounce,
+                    clipped_well_nan=True,
                 )
-                j_grid[a_idx, s_idx] = data["J"]
         j_grids[lambda_n] = j_grid
 
     return j_grids
