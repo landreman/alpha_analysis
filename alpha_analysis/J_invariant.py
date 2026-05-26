@@ -18,6 +18,7 @@ from scipy.integrate import quad
 from .boozer_field import BoozerSurface
 from .boozer_field import BoozerField
 from .bounce_points import find_bounce_points
+from .bounce_points import _find_well_bounds_from_allowed
 
 # Defaults for plot_J_invariant:
 LAMBDA_N_VALUES = np.arange(0.1, 1.0, 0.05).tolist()
@@ -122,39 +123,41 @@ def _compute_unrefined_j_from_cached_B(
     B: np.ndarray,
     phi: np.ndarray,
     B_bounce: float,
-    center_index: int,
-    all_indices: np.ndarray,
     clipped_well_nan: bool = True,
-) -> float:
+    return_data: bool = False,
+):
     """Compute J for ``refine=False`` from precomputed ``B(theta, phi)`` samples."""
     allowed = B <= B_bounce
-    if not np.any(allowed):
-        return np.nan
+    (
+        has_allowed,
+        well_crosses_left_edge,
+        well_crosses_right_edge,
+        left_index,
+        right_index,
+        well_mask,
+    ) = _find_well_bounds_from_allowed(allowed)
 
-    allowed_indices = np.where(allowed)[0]
-    interior_index = allowed_indices[np.argmin(np.abs(allowed_indices - center_index))]
-
-    temp = np.argwhere(np.logical_and(~allowed, all_indices > interior_index))
-    well_crosses_right_edge = len(temp) == 0
-    if well_crosses_right_edge:
-        right_index = len(allowed) - 1
+    if not has_allowed:
+        J = np.nan
+    elif clipped_well_nan and (well_crosses_left_edge or well_crosses_right_edge):
+        J = np.nan
     else:
-        right_index = temp[0, 0] - 1
+        integrand_on_grid = np.sqrt(np.maximum(0, 1 - B / B_bounce)) / B
+        constant = np.abs(surf.G + surf.I * surf.iota) / (surf.R00 * 2 * np.pi / surf.nfp)
+        J = trapezoid(np.where(well_mask, integrand_on_grid, 0.0), phi) * constant
 
-    temp = np.argwhere(np.logical_and(~allowed, all_indices < interior_index))
-    well_crosses_left_edge = len(temp) == 0
-    if well_crosses_left_edge:
-        left_index = 0
-    else:
-        left_index = temp[-1, 0] + 1
+    if return_data:
+        return {
+            "J": J,
+            "allowed": allowed,
+            "well_crosses_left_edge": well_crosses_left_edge,
+            "well_crosses_right_edge": well_crosses_right_edge,
+            "left_index": left_index,
+            "right_index": right_index,
+            "well_mask": well_mask,
+        }
 
-    if clipped_well_nan and (well_crosses_left_edge or well_crosses_right_edge):
-        return np.nan
-
-    well_mask = np.logical_and(all_indices >= left_index, all_indices <= right_index)
-    integrand_on_grid = np.sqrt(np.maximum(0, 1 - B / B_bounce)) / B
-    constant = np.abs(surf.G + surf.I * surf.iota) / (surf.R00 * 2 * np.pi / surf.nfp)
-    return trapezoid(np.where(well_mask, integrand_on_grid, 0.0), phi) * constant
+    return J
 
 
 def _compute_j_grids(
@@ -192,8 +195,6 @@ def _compute_j_grids(
     phi_margin = 5.0
     phi_field_period = 2.0 * np.pi / booz.nfp
     phi = phi_center + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
-    all_indices = np.arange(n_phi)
-    center_index = np.argmin(np.abs(phi - phi_center))
 
     surfaces = [BoozerSurface(booz, s) for s in s_values]
     B_cache = np.empty((len(alpha_values), len(s_values), n_phi))
@@ -214,8 +215,6 @@ def _compute_j_grids(
                     B=B_cache[a_idx, s_idx, :],
                     phi=phi,
                     B_bounce=b_bounce,
-                    center_index=center_index,
-                    all_indices=all_indices,
                     clipped_well_nan=True,
                 )
         j_grids[lambda_n] = j_grid

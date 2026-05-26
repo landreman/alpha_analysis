@@ -7,6 +7,61 @@ import matplotlib.pyplot as plt
 from alpha_analysis.boozer_field import BoozerField, BoozerSurface
 
 
+def _find_well_bounds_from_allowed(
+    allowed: np.ndarray,
+):
+    """Locate the contiguous trapped well containing ``center_index``.
+
+    Returns:
+        tuple:
+            has_allowed,
+            well_crosses_left_edge,
+            well_crosses_right_edge,
+            left_index,
+            right_index,
+            well_mask
+    """
+    if not np.any(allowed):
+        return (
+            False,
+            np.nan,
+            np.nan,
+            np.nan,
+            np.nan,
+            np.full(len(allowed), False),
+        )
+
+    all_indices = np.arange(len(allowed))
+    center_index = (len(allowed) + 1) // 2
+
+    allowed_indices = np.where(allowed)[0]
+    interior_index = allowed_indices[np.argmin(np.abs(allowed_indices - center_index))]
+
+    temp = np.argwhere(np.logical_and(~allowed, all_indices > interior_index))
+    well_crosses_right_edge = len(temp) == 0
+    if well_crosses_right_edge:
+        right_index = len(allowed) - 1
+    else:
+        right_index = temp[0, 0] - 1
+
+    temp = np.argwhere(np.logical_and(~allowed, all_indices < interior_index))
+    well_crosses_left_edge = len(temp) == 0
+    if well_crosses_left_edge:
+        left_index = 0
+    else:
+        left_index = temp[-1, 0] + 1
+
+    well_mask = np.logical_and(all_indices >= left_index, all_indices <= right_index)
+    return (
+        True,
+        well_crosses_left_edge,
+        well_crosses_right_edge,
+        left_index,
+        right_index,
+        well_mask,
+    )
+
+
 def find_bounce_points(
     surf: BoozerSurface,
     B_bounce: float,
@@ -39,7 +94,15 @@ def find_bounce_points(
 
     B = surf.compute_B(theta, phi)
     allowed = B <= B_bounce
-    if not np.any(allowed):
+    (
+        has_allowed,
+        well_crosses_left_edge,
+        well_crosses_right_edge,
+        left_index,
+        right_index,
+        well_mask,
+    ) = _find_well_bounds_from_allowed(allowed)
+    if not has_allowed:
         data = {
             "B": B,
             "theta": theta,
@@ -56,29 +119,6 @@ def find_bounce_points(
             "theta_right": np.nan,
         } | args
         return data
-
-    # Find the allowed point closest to the center point.
-    center_index = np.argmin(np.abs(phi - phi_center))
-    allowed_indices = np.where(allowed)[0]
-    interior_index = allowed_indices[np.argmin(np.abs(allowed_indices - center_index))]
-
-    # Find the first non-allowed points to the right of the interior point:
-    temp = np.argwhere(np.logical_and(~allowed, all_indices > interior_index))
-    well_crosses_right_edge = len(temp) == 0
-    if well_crosses_right_edge:
-        right_index = len(allowed) - 1
-    else:
-        right_index = temp[0, 0] - 1
-
-    # Find the first non-allowed points to the left of the interior point:
-    temp = np.argwhere(np.logical_and(~allowed, all_indices < interior_index))
-    well_crosses_left_edge = len(temp) == 0
-    if well_crosses_left_edge:
-        left_index = 0
-    else:
-        left_index = temp[-1, 0] + 1
-
-    well_mask = np.logical_and(all_indices >= left_index, all_indices <= right_index)
 
     # Function for finding the roots exactly:
     def B_residual(phi_val):
