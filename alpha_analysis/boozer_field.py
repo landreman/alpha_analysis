@@ -313,3 +313,31 @@ class BoozerSurface:
         if theta_arr.ndim == 1:
             return B_flat
         return B_flat.reshape(theta_arr.shape)
+    
+    def compute_B_tensor_alpha_phi(
+        self,
+        alpha: np.ndarray,
+        phi: np.ndarray,
+    ) -> np.ndarray:
+        """Compute B(alpha, phi) optimized for a tensor product of 1d alpha and
+        1d phi arrays."""
+        phi_arr = np.asarray(phi, dtype=float)
+        alpha_arr = np.asarray(alpha, dtype=float)
+        xm = self.booz.xm
+        xn = self.booz.xn
+        bmnc_eval = np.asarray(self.bmnc, dtype=float)
+        if bmnc_eval.ndim != 1:
+            raise ValueError("BoozerSurface bmnc data must be one-dimensional")
+        if bmnc_eval.size != xm.size:
+            raise ValueError(
+                f"bmnc mode count ({bmnc_eval.size}) does not match xm/xn length ({xm.size})"
+            )
+        k = xm * self.iota - xn
+        k_phi = np.outer(k, phi_arr)
+        cos_k_phi = np.cos(k_phi)
+        sin_k_phi = np.sin(k_phi)
+
+        xm_alpha = np.outer(alpha_arr, xm)
+        cos_xm_alpha = np.cos(xm_alpha) * bmnc_eval[np.newaxis, :]
+        sin_xm_alpha = np.sin(xm_alpha) * bmnc_eval[np.newaxis, :]
+        return cos_xm_alpha @ cos_k_phi - sin_xm_alpha @ sin_k_phi

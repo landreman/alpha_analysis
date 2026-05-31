@@ -103,6 +103,23 @@ def test_compute_B_field_surface_agree_multiple_s():
         np.testing.assert_allclose(B_field[j], B_surf, rtol=1e-13, atol=1e-13)
 
 
+def test_compute_B_tensor_alpha_phi_matches_compute_B():
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    surf = booz.surface(0.5)
+
+    alpha = np.linspace(0.0, 2.0 * np.pi, 8, endpoint=False)
+    phi = np.linspace(0.0, 2.0 * np.pi / booz.nfp, 9, endpoint=False)
+
+    phi2d, alpha2d = np.meshgrid(phi, alpha)
+    theta2d = alpha2d + surf.iota * phi2d
+
+    B_reference = surf.compute_B(theta2d, phi2d)
+    B_tensor = surf.compute_B_tensor_alpha_phi(alpha, phi)
+
+    assert B_tensor.shape == (alpha.size, phi.size)
+    np.testing.assert_allclose(B_tensor, B_reference, rtol=1e-13, atol=1e-13)
+
+
 def test_B_reference():
     """Compare B to reference values from a W7-X boozmn file."""
     booz = BoozerField.from_boozmn(boozmn_file_name)
