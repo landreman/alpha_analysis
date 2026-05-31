@@ -164,6 +164,110 @@ def test_plot_J_invariant_cli_forwards_args(monkeypatch):
     assert captured["show"] is True
 
 
+def test_plot_J_invariant_single_lambda_cli_forwards_args(monkeypatch):
+    captured = {}
+
+    def _fake_plot_J_invariant_single_lambda(
+        boozmn_file,
+        lambda_n,
+        n_alpha,
+        n_rho,
+        contour_levels,
+        refine,
+        show=True,
+    ):
+        captured["boozmn_file"] = boozmn_file
+        captured["lambda_n"] = lambda_n
+        captured["n_alpha"] = n_alpha
+        captured["n_rho"] = n_rho
+        captured["contour_levels"] = contour_levels
+        captured["refine"] = refine
+        captured["show"] = show
+
+    monkeypatch.setattr(
+        J_invariant_module,
+        "plot_J_invariant_single_lambda",
+        _fake_plot_J_invariant_single_lambda,
+    )
+    exit_code = J_invariant_module.plot_J_invariant_single_lambda_cli(
+        [
+            boozmn_file_name,
+            "0.35",
+            "--n_alpha",
+            "12",
+            "--n_rho",
+            "15",
+            "--contour_levels",
+            "27",
+            "--refine",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured["boozmn_file"] == boozmn_file_name
+    assert captured["lambda_n"] == 0.35
+    assert captured["n_alpha"] == 12
+    assert captured["n_rho"] == 15
+    assert captured["contour_levels"] == 27
+    assert captured["refine"] is True
+    assert captured["show"] is True
+
+
+def test_get_subplot_contour_data_uses_requested_linear_range():
+    j_plot = np.array([[1.0, 2.0], [3.0, 4.0]])
+
+    plot_data, levels, norm = J_invariant_module._get_subplot_contour_data(
+        j_plot,
+        "linear",
+        5,
+        vmin=1.5,
+        vmax=3.5,
+    )
+
+    np.testing.assert_array_equal(plot_data, j_plot)
+    np.testing.assert_allclose(levels, np.linspace(1.5, 3.5, 5))
+    assert norm is None
+
+
+def test_plot_single_lambda_gui_keeps_widgets_and_uses_cartesian_axis_labels():
+    alpha_values = np.linspace(0.0, 2.0 * np.pi, 4, endpoint=False)
+    rho_values = np.array([0.2, 0.6, 1.0])
+    j_grid = np.array(
+        [
+            [1.0, 2.0, 3.0],
+            [1.5, 2.5, 3.5],
+            [2.0, 3.0, 4.0],
+            [2.5, 3.5, 4.5],
+        ]
+    )
+
+    fig = J_invariant_module._plot_single_lambda_gui(
+        alpha_values,
+        rho_values,
+        j_grid,
+        contour_levels=7,
+        boozmn_path=os.path.abspath(boozmn_file_name),
+        lambda_n=0.35,
+        n_alpha=4,
+        n_rho=3,
+        refine=False,
+    )
+
+    assert hasattr(fig, "_single_lambda_widgets")
+    assert fig._single_lambda_widgets["contour_slider"].val == 7
+    assert fig._single_lambda_widgets["filled_toggle"].get_status() == [True]
+    assert fig.axes[0].get_title() == ""
+    assert "linear color scale" not in fig._suptitle.get_text()
+    assert r"\lambda_n=0.35" in fig._suptitle.get_text()
+    assert not fig.axes[0].xaxis.get_gridlines()[0].get_visible()
+    assert fig.axes[0].get_xlabel() == r"$x=\rho\cos\alpha$"
+    assert fig.axes[0].get_ylabel() == r"$y=\rho\sin\alpha$"
+    assert any(label.get_text() != "" for label in fig.axes[0].get_xticklabels())
+    assert any(label.get_text() != "" for label in fig.axes[0].get_yticklabels())
+
+    J_invariant_module.plt.close(fig)
+
+
 def test_compute_j_grids_refine_false_reuses_B_evaluations(monkeypatch):
     booz = BoozerField.from_boozmn(boozmn_file_name)
     alpha_values = np.linspace(0.0, 2.0 * np.pi, 4, endpoint=False)

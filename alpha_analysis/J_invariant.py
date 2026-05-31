@@ -6,6 +6,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib import ticker
+from matplotlib.widgets import CheckButtons
+from matplotlib.widgets import RangeSlider
+from matplotlib.widgets import Slider
 import numpy as np
 try:
     from numpy import trapezoid
@@ -166,60 +169,108 @@ def _compute_j_grids(
     s_values: np.ndarray,
     refine: bool,
 ):
-    b_min, b_max = booz.get_min_max()
-    phi_center = np.pi / booz.nfp
     j_grids = {}
 
-    if refine:
+    if not refine:
+        phi_center = np.pi / booz.nfp
+        phi, surfaces, b_cache = _build_unrefined_b_cache(booz, alpha_values, s_values, phi_center)
         for lambda_n in LAMBDA_N_VALUES:
-            print(f"Processing lambda_n = {lambda_n}")
-            b_bounce = b_min + lambda_n * (b_max - b_min)
-            j_grid = np.full((len(alpha_values), len(s_values)), np.nan)
-            for s_idx, s in enumerate(s_values):
-                surf = BoozerSurface(booz, s)
-                for a_idx, alpha in enumerate(alpha_values):
-                    # alpha = theta - iota * phi, so theta_center = alpha + iota * phi_center.
-                    theta_center = alpha + surf.iota * phi_center
-                    data = compute_J_invariant(
-                        surf,
-                        b_bounce,
-                        theta_center,
-                        phi_center,
-                        refine=refine,
-                    )
-                    j_grid[a_idx, s_idx] = data["J"]
-            j_grids[lambda_n] = j_grid
+            j_grids[lambda_n] = _compute_single_j_grid(
+                booz,
+                alpha_values,
+                s_values,
+                lambda_n=lambda_n,
+                refine=refine,
+                phi_center=phi_center,
+                phi=phi,
+                surfaces=surfaces,
+                b_cache=b_cache,
+            )
         return j_grids
 
+    for lambda_n in LAMBDA_N_VALUES:
+        j_grids[lambda_n] = _compute_single_j_grid(
+            booz,
+            alpha_values,
+            s_values,
+            lambda_n=lambda_n,
+            refine=refine,
+        )
+
+    return j_grids
+
+
+def _build_unrefined_b_cache(
+    booz: BoozerField,
+    alpha_values: np.ndarray,
+    s_values: np.ndarray,
+    phi_center: float,
+):
     n_phi = 501
     phi_margin = 5.0
     phi_field_period = 2.0 * np.pi / booz.nfp
     phi = phi_center + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
 
     surfaces = [BoozerSurface(booz, s) for s in s_values]
-    B_cache = np.empty((len(alpha_values), len(s_values), n_phi))
+    b_cache = np.empty((len(alpha_values), len(s_values), n_phi))
     for s_idx, surf in enumerate(surfaces):
         for a_idx, alpha in enumerate(alpha_values):
             theta_center = alpha + surf.iota * phi_center
             theta = theta_center + surf.iota * (phi - phi_center)
-            B_cache[a_idx, s_idx, :] = surf.compute_B(theta, phi)
+            b_cache[a_idx, s_idx, :] = surf.compute_B(theta, phi)
 
-    for lambda_n in LAMBDA_N_VALUES:
-        print(f"Processing lambda_n = {lambda_n}")
-        b_bounce = b_min + lambda_n * (b_max - b_min)
+    return phi, surfaces, b_cache
+
+
+def _compute_single_j_grid(
+    booz: BoozerField,
+    alpha_values: np.ndarray,
+    s_values: np.ndarray,
+    lambda_n: float,
+    refine: bool,
+    phi_center: float | None = None,
+    phi: np.ndarray | None = None,
+    surfaces: list[BoozerSurface] | None = None,
+    b_cache: np.ndarray | None = None,
+):
+    b_min, b_max = booz.get_min_max()
+    if phi_center is None:
+        phi_center = np.pi / booz.nfp
+    print(f"Processing lambda_n = {lambda_n}")
+    b_bounce = b_min + lambda_n * (b_max - b_min)
+
+    if refine:
         j_grid = np.full((len(alpha_values), len(s_values)), np.nan)
-        for s_idx, surf in enumerate(surfaces):
-            for a_idx in range(len(alpha_values)):
-                j_grid[a_idx, s_idx] = _compute_unrefined_j_from_cached_B(
-                    surf=surf,
-                    B=B_cache[a_idx, s_idx, :],
-                    phi=phi,
-                    B_bounce=b_bounce,
-                    clipped_well_nan=True,
+        for s_idx, s in enumerate(s_values):
+            surf = BoozerSurface(booz, s)
+            for a_idx, alpha in enumerate(alpha_values):
+                # alpha = theta - iota * phi, so theta_center = alpha + iota * phi_center.
+                theta_center = alpha + surf.iota * phi_center
+                data = compute_J_invariant(
+                    surf,
+                    b_bounce,
+                    theta_center,
+                    phi_center,
+                    refine=refine,
                 )
-        j_grids[lambda_n] = j_grid
+                j_grid[a_idx, s_idx] = data["J"]
+        return j_grid
 
-    return j_grids
+    if phi is None or surfaces is None or b_cache is None:
+        phi, surfaces, b_cache = _build_unrefined_b_cache(booz, alpha_values, s_values, phi_center)
+
+    j_grid = np.full((len(alpha_values), len(s_values)), np.nan)
+    for s_idx, surf in enumerate(surfaces):
+        for a_idx in range(len(alpha_values)):
+            j_grid[a_idx, s_idx] = _compute_unrefined_j_from_cached_B(
+                surf=surf,
+                B=b_cache[a_idx, s_idx, :],
+                phi=phi,
+                B_bounce=b_bounce,
+                clipped_well_nan=True,
+            )
+
+    return j_grid
 
 
 def _make_closed_alpha_grid(
@@ -285,6 +336,8 @@ def _get_subplot_contour_data(
     j_plot: np.ndarray,
     scale_kind: str,
     contour_levels: int,
+    vmin: float | None = None,
+    vmax: float | None = None,
 ):
     finite_values = j_plot[np.isfinite(j_plot)]
     if finite_values.size == 0:
@@ -302,8 +355,12 @@ def _get_subplot_contour_data(
         norm = colors.LogNorm(vmin=vmin, vmax=vmax)
         plot_data = np.ma.masked_less_equal(j_plot, 0)
     else:
-        vmin = finite_values.min()
-        vmax = finite_values.max()
+        if vmin is None:
+            vmin = finite_values.min()
+        if vmax is None:
+            vmax = finite_values.max()
+        if vmin > vmax:
+            vmin, vmax = vmax, vmin
         if math.isclose(vmin, vmax):
             vmax = vmin + 1e-12
         levels = np.linspace(vmin, vmax, contour_levels)
@@ -311,6 +368,128 @@ def _get_subplot_contour_data(
         plot_data = j_plot
 
     return plot_data, levels, norm
+
+
+def _build_single_plot_figure():
+    fig = plt.figure(figsize=(9.8, 8.1), constrained_layout=False)
+    fig.subplots_adjust(left=0.08, bottom=0.22, right=0.9, top=0.91)
+    ax = fig.add_subplot(111)
+    return fig, ax
+
+
+def _style_cartesian_polar_axis(ax):
+    tick_values = np.linspace(-1.0, 1.0, 5)
+    ax.set_xlabel(r"$x=\rho\cos\alpha$", fontsize=LABEL_FONT_SIZE)
+    ax.set_ylabel(r"$y=\rho\sin\alpha$", fontsize=LABEL_FONT_SIZE)
+    ax.set_aspect("equal")
+    ax.set_xlim(-1.0, 1.0)
+    ax.set_ylim(-1.0, 1.0)
+    ax.set_xticks(tick_values)
+    ax.set_yticks(tick_values)
+    ax.grid(False)
+    _style_axis(ax)
+
+
+def _plot_single_lambda_gui(
+    alpha_values: np.ndarray,
+    rho_values: np.ndarray,
+    j_grid: np.ndarray,
+    contour_levels: int,
+    boozmn_path: Path,
+    lambda_n: float,
+    n_alpha: int,
+    n_rho: int,
+    refine: bool,
+):
+    rho_mesh, alpha_mesh, j_plot = _make_closed_alpha_grid(alpha_values, rho_values, j_grid)
+    finite_values = j_plot[np.isfinite(j_plot)]
+    if finite_values.size == 0:
+        raise ValueError("Cannot plot an all-NaN J grid.")
+
+    data_min = float(finite_values.min())
+    data_max = float(finite_values.max())
+    if math.isclose(data_min, data_max):
+        data_max = data_min + 1e-12
+
+    fig, ax = _build_single_plot_figure()
+    _add_title_block(
+        fig,
+        rf"Interactive $J$ polar plot near $\phi=\pi/n_{{fp}}$ ($\lambda_n={lambda_n:.2f}$, n_alpha={n_alpha}, n_rho={n_rho}, refine={refine})",
+        boozmn_path,
+    )
+    _add_footer(fig)
+
+    range_ax = fig.add_axes([0.12, 0.11, 0.62, 0.035])
+    contour_ax = fig.add_axes([0.12, 0.055, 0.62, 0.035])
+    filled_ax = fig.add_axes([0.84, 0.012, 0.14, 0.08])
+    color_range = RangeSlider(
+        range_ax,
+        "J range",
+        data_min,
+        data_max,
+        valinit=(data_min, data_max),
+    )
+    contour_slider = Slider(
+        contour_ax,
+        "Contours",
+        valmin=2,
+        valmax=60,
+        valinit=int(contour_levels),
+        valstep=1,
+    )
+    filled_toggle = CheckButtons(filled_ax, ["Filled"], [True])
+
+    state = {"colorbar": None}
+    x_vals = rho_mesh * np.cos(alpha_mesh)
+    y_vals = rho_mesh * np.sin(alpha_mesh)
+
+    def _redraw(_=None):
+        if state["colorbar"] is not None:
+            state["colorbar"].remove()
+            state["colorbar"] = None
+
+        ax.clear()
+        plot_data, levels, _ = _get_subplot_contour_data(
+            j_plot,
+            "linear",
+            int(contour_slider.val),
+            vmin=float(color_range.val[0]),
+            vmax=float(color_range.val[1]),
+        )
+        if filled_toggle.get_status()[0]:
+            contour = ax.contourf(
+                x_vals,
+                y_vals,
+                plot_data,
+                levels=levels,
+                cmap="viridis",
+                extend="both",
+            )
+        else:
+            contour = ax.contour(
+                x_vals,
+                y_vals,
+                plot_data,
+                levels=levels,
+                cmap="viridis",
+                extend="both",
+            )
+        _style_cartesian_polar_axis(ax)
+        state["colorbar"] = fig.colorbar(contour, ax=ax, pad=0.12, shrink=0.9)
+        # _format_colorbar(state["colorbar"])
+        fig.canvas.draw_idle()
+
+    color_range.on_changed(_redraw)
+    contour_slider.on_changed(_redraw)
+    filled_toggle.on_clicked(_redraw)
+    fig._single_lambda_widgets = {
+        "color_range": color_range,
+        "contour_slider": contour_slider,
+        "filled_toggle": filled_toggle,
+        "state": state,
+    }
+    _redraw()
+    return fig
 
 
 def _plot_polar_figure(
@@ -348,13 +527,8 @@ def _plot_polar_figure(
             cmap="viridis",
             extend="both",
         )
-        ax.set_aspect("equal")
-        ax.set_xlim(-1.0, 1.0)
-        ax.set_ylim(-1.0, 1.0)
         ax.set_title(rf"$\lambda_n={lambda_n:.2f}$", fontsize=SUBPLOT_TITLE_FONT_SIZE)
-        ax.set_xlabel(r"$\rho\cos(\alpha)$", fontsize=LABEL_FONT_SIZE)
-        ax.set_ylabel(r"$\rho\sin(\alpha)$", fontsize=LABEL_FONT_SIZE)
-        _style_axis(ax)
+        _style_cartesian_polar_axis(ax)
         colorbar = fig.colorbar(contour, ax=ax, shrink=0.82, pad=0.02)
         _format_colorbar(colorbar)
 
@@ -499,6 +673,48 @@ def plot_J_invariant(
         plt.close(fig)
 
 
+def plot_J_invariant_single_lambda(
+    boozmn_file: str,
+    lambda_n: float,
+    n_alpha: int = DEFAULT_N_ALPHA,
+    n_rho: int = DEFAULT_N_RHO,
+    contour_levels: int = DEFAULT_CONTOUR_LEVELS,
+    refine: bool = True,
+    show: bool = True,
+):
+    boozmn_path = Path(boozmn_file).expanduser().resolve()
+    booz = BoozerField.from_boozmn(boozmn_path)
+    ns = len(booz.s_full)
+
+    alpha_values, rho_values, s_values = _build_coordinate_arrays(ns, n_alpha, n_rho)
+
+    print(f"Loading {boozmn_path}")
+    print(f"Computing J grid for lambda_n = {lambda_n}")
+    j_grid = _compute_single_j_grid(
+        booz,
+        alpha_values,
+        s_values,
+        lambda_n=lambda_n,
+        refine=refine,
+    )
+
+    fig = _plot_single_lambda_gui(
+        alpha_values,
+        rho_values,
+        j_grid,
+        contour_levels,
+        boozmn_path,
+        lambda_n,
+        n_alpha,
+        n_rho,
+        refine,
+    )
+
+    if show:
+        plt.show()
+    plt.close(fig)
+
+
 def plot_J_invariant_cli(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="plot_J_invariant",
@@ -540,6 +756,61 @@ def plot_J_invariant_cli(argv=None) -> int:
     args = parser.parse_args(argv)
     plot_J_invariant(
         args.boozmn_file,
+        n_alpha=args.n_alpha,
+        n_rho=args.n_rho,
+        contour_levels=args.contour_levels,
+        refine=args.refine,
+    )
+    return 0
+
+
+def plot_J_invariant_single_lambda_cli(argv=None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="plot_J_invariant_single_lambda",
+        description="Compute J for one lambda_n value and show an interactive polar contour plot.",
+    )
+    parser.add_argument("boozmn_file", help="Path to a boozmn*.nc file")
+    parser.add_argument(
+        "lambda_n",
+        type=float,
+        help="Normalized bounce-field parameter to plot",
+    )
+    parser.add_argument(
+        "--n_alpha",
+        type=int,
+        default=60,
+        help="Number of alpha values",
+    )
+    parser.add_argument(
+        "--n_rho",
+        type=int,
+        default=41,
+        help="Number of rho grid values",
+    )
+    parser.add_argument(
+        "--contour_levels",
+        type=int,
+        default=DEFAULT_CONTOUR_LEVELS,
+        help="Initial number of contour levels",
+    )
+    parser.add_argument(
+        "--refine",
+        dest="refine",
+        action="store_true",
+        default=False,
+        help="Refine bounce points with root finding",
+    )
+    parser.add_argument(
+        "--no-refine",
+        dest="refine",
+        action="store_false",
+        help="Disable root refinement (default)",
+    )
+
+    args = parser.parse_args(argv)
+    plot_J_invariant_single_lambda(
+        args.boozmn_file,
+        args.lambda_n,
         n_alpha=args.n_alpha,
         n_rho=args.n_rho,
         contour_levels=args.contour_levels,
