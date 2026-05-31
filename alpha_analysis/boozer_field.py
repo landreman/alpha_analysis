@@ -8,6 +8,26 @@ from scipy.io import netcdf_file
 from scipy.interpolate import CubicSpline
 
 
+# def _compute_b_from_alpha_phi(
+#     xm: np.ndarray,
+#     xn: np.ndarray,
+#     bmnc: np.ndarray,
+#     iota: float,
+#     alpha: np.ndarray,
+#     phi: np.ndarray,
+# ) -> np.ndarray:
+#     """Compute B(alpha, phi) for 1d alpha and 1d phi arrays."""
+#     k = xm * iota - xn
+#     k_phi = np.outer(k, phi)
+#     cos_k_phi = np.cos(k_phi)
+#     sin_k_phi = np.sin(k_phi)
+
+#     xm_alpha = np.outer(alpha, xm)
+#     cos_xm_alpha = np.cos(xm_alpha) * bmnc[np.newaxis, :]
+#     sin_xm_alpha = np.sin(xm_alpha) * bmnc[np.newaxis, :]
+#     return cos_xm_alpha @ cos_k_phi - sin_xm_alpha @ sin_k_phi
+
+
 class BoozerField:
     """Interpolated Boozer-coordinate field data.
 
@@ -176,11 +196,37 @@ class BoozerField:
                 f"bmnc mode count ({bmnc_eval.shape[1]}) does not match xm/xn length ({xm.size})"
             )
 
+        # if scalar_s and theta_arr.ndim == 2:
+        #     phi_1d = phi_arr[0]
+        #     if np.allclose(phi_arr, phi_1d[np.newaxis, :], rtol=0.0, atol=1e-14):
+        #         iota_scalar = float(np.asarray(self.iota(s), dtype=float))
+        #         alpha_2d = theta_arr - iota_scalar * phi_arr
+        #         if np.allclose(alpha_2d, alpha_2d[:, :1], rtol=0.0, atol=1e-12):
+        #             alpha_1d = alpha_2d[:, 0]
+        #             b_fast = _compute_b_from_alpha_phi(
+        #                 np.asarray(xm, dtype=float),
+        #                 np.asarray(xn, dtype=float),
+        #                 bmnc_eval[0],
+        #                 iota_scalar,
+        #                 alpha_1d,
+        #                 phi_1d,
+        #             )
+        #             return b_fast
+
         phase = (
             xm[:, np.newaxis] * theta_flat[np.newaxis, :]
             - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
         )
         B_flat = bmnc_eval @ np.cos(phase)
+
+        # xn_phi = np.outer(xn, phi_flat)
+        # cos_xn_phi = np.cos(xn_phi)
+        # sin_xn_phi = np.sin(xn_phi)
+
+        # xm_theta = np.outer(theta_flat, xm)
+        # bmnc_cos_xm_theta = np.cos(xm_theta) * bmnc_eval
+        # bmnc_sin_xm_theta = np.sin(xm_theta) * bmnc_eval
+        # B_flat = bmnc_cos_xm_theta @ cos_xn_phi + bmnc_sin_xm_theta @ sin_xn_phi
 
         if theta_arr.ndim == 1:
             if scalar_s:
@@ -304,11 +350,39 @@ class BoozerSurface:
                 f"bmnc mode count ({bmnc_eval.size}) does not match xm/xn length ({xm.size})"
             )
 
-        phase = (
-            xm[:, np.newaxis] * theta_flat[np.newaxis, :]
-            - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
-        )
-        B_flat = bmnc_eval @ np.cos(phase)
+        # if theta_arr.ndim == 2:
+        #     phi_1d = phi_arr[0]
+        #     if np.allclose(phi_arr, phi_1d[np.newaxis, :], rtol=0.0, atol=1e-14):
+        #         alpha_2d = theta_arr - float(self.iota) * phi_arr
+        #         if np.allclose(alpha_2d, alpha_2d[:, :1], rtol=0.0, atol=1e-12):
+        #             alpha_1d = alpha_2d[:, 0]
+        #             return _compute_b_from_alpha_phi(
+        #                 np.asarray(xm, dtype=float),
+        #                 np.asarray(xn, dtype=float),
+        #                 bmnc_eval,
+        #                 float(self.iota),
+        #                 alpha_1d,
+        #                 phi_1d,
+        #             )
+
+        # phase = (
+        #     xm[:, np.newaxis] * theta_flat[np.newaxis, :]
+        #     - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
+        # )
+        # B_flat = bmnc_eval @ np.cos(phase)
+
+        xn_phi = np.outer(xn, phi_flat)
+        cos_xn_phi = np.cos(xn_phi)
+        sin_xn_phi = np.sin(xn_phi)
+        print("cos_xn_phi.shape:", cos_xn_phi.shape)
+
+        xm_theta = np.outer(theta_flat, xm)
+        print("xm_theta.shape:", xm_theta.shape)
+        print("bmnc_eval.shape:", bmnc_eval.shape)
+        bmnc_cos_xm_theta = np.cos(xm_theta) * bmnc_eval
+        print("bmnc_cos_xm_theta.shape:", bmnc_cos_xm_theta.shape)
+        bmnc_sin_xm_theta = np.sin(xm_theta) * bmnc_eval
+        B_flat = bmnc_cos_xm_theta @ cos_xn_phi + bmnc_sin_xm_theta @ sin_xn_phi
 
         if theta_arr.ndim == 1:
             return B_flat

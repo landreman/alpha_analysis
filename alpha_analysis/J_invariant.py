@@ -123,6 +123,9 @@ def _compute_j_grids(
     s_values: np.ndarray,
     refine: bool,
 ):
+    n_phi = 501
+    phi_margin = 5.0
+    clipped_well_nan = True
     b_min, b_max = booz.get_min_max()
     phi_center = np.pi / booz.nfp
     j_grids = {}
@@ -133,20 +136,95 @@ def _compute_j_grids(
         j_grid = np.full((len(alpha_values), len(s_values)), np.nan)
         for s_idx, s in enumerate(s_values):
             surf = BoozerSurface(booz, s)
-            for a_idx, alpha in enumerate(alpha_values):
-                # alpha = theta - iota * phi, so theta_center = alpha + iota * phi_center.
-                theta_center = alpha + surf.iota * phi_center
-                data = compute_J_invariant(
+            if refine:
+                theta_centers = alpha_values + surf.iota * phi_center
+                for a_idx, theta_center in enumerate(theta_centers):
+                    data = compute_J_invariant(
+                        surf,
+                        b_bounce,
+                        theta_center,
+                        phi_center,
+                        refine=True,
+                        n_phi=n_phi,
+                        phi_margin=phi_margin,
+                        clipped_well_nan=clipped_well_nan,
+                    )
+                    j_grid[a_idx, s_idx] = data["J"]
+            else:
+                j_grid[:, s_idx] = _compute_j_values_unrefined_batched(
                     surf,
                     b_bounce,
-                    theta_center,
+                    alpha_values,
                     phi_center,
-                    refine=refine,
+                    n_phi=n_phi,
+                    phi_margin=phi_margin,
+                    clipped_well_nan=clipped_well_nan,
                 )
-                j_grid[a_idx, s_idx] = data["J"]
         j_grids[lambda_n] = j_grid
 
     return j_grids
+
+
+def _compute_j_values_unrefined_batched(
+    surf: BoozerSurface,
+    b_bounce: float,
+    alpha_values: np.ndarray,
+    phi_center: float,
+    n_phi: int = 501,
+    phi_margin: float = 5.0,
+    clipped_well_nan: bool = True,
+) -> np.ndarray:
+    """Compute J for many alpha values at once for the refine=False pathway."""
+    alpha_values = np.asarray(alpha_values, dtype=float)
+    n_alpha = len(alpha_values)
+
+    phi_field_period = 2.0 * np.pi / surf.nfp
+    phi = (
+        phi_center
+        + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
+    )
+    all_indices = np.arange(n_phi)
+    center_index = np.argmin(np.abs(phi - phi_center))
+
+    phi_2d = np.broadcast_to(phi, (n_alpha, n_phi))
+    theta_2d = alpha_values[:, np.newaxis] + surf.iota * (phi_2d - phi_center)
+    b_all = surf.compute_B(theta_2d, phi_2d)
+
+    constant = np.abs(surf.G + surf.I * surf.iota) / (surf.R00 * 2 * np.pi / surf.nfp)
+    j_values = np.full(n_alpha, np.nan)
+
+    for a_idx, b in enumerate(b_all):
+        allowed = b <= b_bounce
+        if not np.any(allowed):
+            continue
+
+        allowed_indices = np.where(allowed)[0]
+        interior_index = allowed_indices[np.argmin(np.abs(allowed_indices - center_index))]
+
+        right_disallowed = np.flatnonzero((~allowed) & (all_indices > interior_index))
+        well_crosses_right_edge = right_disallowed.size == 0
+        if well_crosses_right_edge:
+            right_index = n_phi - 1
+        else:
+            right_index = right_disallowed[0] - 1
+
+        left_disallowed = np.flatnonzero((~allowed) & (all_indices < interior_index))
+        well_crosses_left_edge = left_disallowed.size == 0
+        if well_crosses_left_edge:
+            left_index = 0
+        else:
+            left_index = left_disallowed[-1] + 1
+
+        if clipped_well_nan and (well_crosses_left_edge or well_crosses_right_edge):
+            continue
+
+        integrand = np.zeros_like(b)
+        interval = slice(left_index, right_index + 1)
+        b_slice = b[interval]
+        integrand[interval] = np.sqrt(np.maximum(0.0, 1.0 - b_slice / b_bounce)) / b_slice
+        j_values[a_idx] = trapezoid(integrand, phi) * constant
+
+    return j_values
 
 
 def _make_closed_alpha_grid(
