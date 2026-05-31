@@ -214,10 +214,11 @@ def _build_unrefined_b_cache(
     surfaces = [BoozerSurface(booz, s) for s in s_values]
     b_cache = np.empty((len(alpha_values), len(s_values), n_phi))
     for s_idx, surf in enumerate(surfaces):
-        for a_idx, alpha in enumerate(alpha_values):
-            theta_center = alpha + surf.iota * phi_center
-            theta = theta_center + surf.iota * (phi - phi_center)
-            b_cache[a_idx, s_idx, :] = surf.compute_B(theta, phi)
+        b_cache[:, s_idx, :] = surf.compute_B_tensor_alpha_phi(alpha_values, phi)
+        # for a_idx, alpha in enumerate(alpha_values):
+        #     theta_center = alpha + surf.iota * phi_center
+        #     theta = theta_center + surf.iota * (phi - phi_center)
+        #     b_cache[a_idx, s_idx, :] = surf.compute_B(theta, phi)
 
     return phi, surfaces, b_cache
 
@@ -778,13 +779,13 @@ def plot_J_invariant_single_lambda_cli(argv=None) -> int:
     parser.add_argument(
         "--n_alpha",
         type=int,
-        default=60,
+        default=120,
         help="Number of alpha values",
     )
     parser.add_argument(
         "--n_rho",
         type=int,
-        default=41,
+        default=61,
         help="Number of rho grid values",
     )
     parser.add_argument(
