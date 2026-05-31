@@ -10,7 +10,7 @@ from alpha_analysis.boozer_field import BoozerField, BoozerSurface
 def _find_well_bounds_from_allowed(
     allowed: np.ndarray,
 ):
-    """Locate the contiguous trapped well containing ``center_index``.
+    """Locate the contiguous trapped well closest to the center of the grid.
 
     Returns:
         tuple:
