@@ -274,17 +274,17 @@ def test_compute_j_grids_refine_false_reuses_B_evaluations(monkeypatch):
     s_values = np.array([0.2, 0.6])
 
     count = 0
-    original_compute_B = BoozerSurface.compute_B
+    original_compute_B = BoozerSurface.compute_B_tensor_alpha_phi
 
-    def _counted_compute_B(self, theta, phi):
+    def _counted_compute_B(self, alpha, phi):
         nonlocal count
         count += 1
-        return original_compute_B(self, theta, phi)
+        return original_compute_B(self, alpha, phi)
 
-    monkeypatch.setattr(BoozerSurface, "compute_B", _counted_compute_B)
+    monkeypatch.setattr(BoozerSurface, "compute_B_tensor_alpha_phi", _counted_compute_B)
     J_invariant_module._compute_j_grids(booz, alpha_values, s_values, refine=False)
 
-    assert count == len(alpha_values) * len(s_values)
+    assert count == len(s_values)
 
 
 def test_cached_unrefined_j_matches_public_unrefined_paths():
