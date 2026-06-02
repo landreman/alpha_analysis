@@ -457,12 +457,18 @@ def _plot_single_lambda_gui(
             vmin=float(color_range.val[0]),
             vmax=float(color_range.val[1]),
         )
+        clever_levels = np.quantile(
+            plot_data[np.isfinite(plot_data)],
+            np.linspace(0.0, 1.0, int(contour_slider.val)),
+        )
+        print("levels:", clever_levels)
         if filled_toggle.get_status()[0]:
             contour = ax.contourf(
                 x_vals,
                 y_vals,
                 plot_data,
-                levels=levels,
+                # levels=levels,
+                levels=clever_levels,
                 cmap="viridis",
                 extend="both",
             )
@@ -471,7 +477,8 @@ def _plot_single_lambda_gui(
                 x_vals,
                 y_vals,
                 plot_data,
-                levels=levels,
+                # levels=levels,
+                levels=clever_levels,
                 cmap="viridis",
                 extend="both",
             )
