@@ -332,8 +332,8 @@ def _build_b_spline_cache(
 ):
     n_alpha, n_s, _ = b_cache.shape
     return [
-        [CubicSpline(phi, b_cache[a_idx, s_idx, :], extrapolate=True) for a_idx in range(n_alpha)]
-        for s_idx in range(n_s)
+        [CubicSpline(phi, b_cache[a_idx, s_idx, :], extrapolate=True) for s_idx in range(n_s)]
+        for a_idx in range(n_alpha)
     ]
 
 
@@ -386,7 +386,7 @@ def _compute_single_j_grid(
                     surf,
                     B=b_cache[a_idx, s_idx, :],
                     phi=phi,
-                    B_spline=b_splines[s_idx][a_idx],
+                    B_spline=b_splines[a_idx][s_idx],
                     B_bounce=b_bounce,
                     clipped_well_nan=True,
                 )
