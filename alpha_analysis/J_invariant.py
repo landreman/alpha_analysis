@@ -29,6 +29,7 @@ LARGE_PLOT_LAMBDA_N_VALUES = np.round(np.arange(0.05, 1.0, 0.05), 2).tolist()
 LAMBDA_N_VALUES = LARGE_PLOT_LAMBDA_N_VALUES[1:]
 DEFAULT_N_ALPHA = 120
 DEFAULT_N_RHO = 61
+DEFAULT_N_PHI = 4001
 DEFAULT_CONTOUR_LEVELS = 20
 
 SUPTITLE_FONT_SIZE = 11
@@ -170,6 +171,7 @@ def _compute_j_grids(
     alpha_values: np.ndarray,
     s_values: np.ndarray,
     refine: bool,
+    n_phi: int = DEFAULT_N_PHI,
     lambda_n_values: list[float] | None = None,
     return_b_extrema: bool = False,
 ):
@@ -180,7 +182,13 @@ def _compute_j_grids(
 
     if not refine:
         phi_center = np.pi / booz.nfp
-        phi, surfaces, b_cache = _build_unrefined_b_cache(booz, alpha_values, s_values, phi_center)
+        phi, surfaces, b_cache = _build_unrefined_b_cache(
+            booz,
+            alpha_values,
+            s_values,
+            phi_center,
+            n_phi=n_phi,
+        )
         for lambda_n in lambda_n_values:
             j_grids[lambda_n] = _compute_single_j_grid(
                 booz,
@@ -188,6 +196,7 @@ def _compute_j_grids(
                 s_values,
                 lambda_n=lambda_n,
                 refine=refine,
+                n_phi=n_phi,
                 phi_center=phi_center,
                 phi=phi,
                 surfaces=surfaces,
@@ -210,6 +219,7 @@ def _compute_j_grids(
             s_values,
             lambda_n=lambda_n,
             refine=refine,
+            n_phi=n_phi,
         )
 
     if return_b_extrema:
@@ -228,8 +238,8 @@ def _build_unrefined_b_cache(
     alpha_values: np.ndarray,
     s_values: np.ndarray,
     phi_center: float,
+    n_phi: int = DEFAULT_N_PHI,
 ):
-    n_phi = 501
     phi_margin = 5.0
     phi_field_period = 2.0 * np.pi / booz.nfp
     phi = phi_center + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
@@ -268,6 +278,7 @@ def _compute_single_j_grid(
     s_values: np.ndarray,
     lambda_n: float,
     refine: bool,
+    n_phi: int = DEFAULT_N_PHI,
     phi_center: float | None = None,
     phi: np.ndarray | None = None,
     surfaces: list[BoozerSurface] | None = None,
@@ -291,13 +302,20 @@ def _compute_single_j_grid(
                     b_bounce,
                     theta_center,
                     phi_center,
+                    n_phi=n_phi,
                     refine=refine,
                 )
                 j_grid[a_idx, s_idx] = data["J"]
         return j_grid
 
     if phi is None or surfaces is None or b_cache is None:
-        phi, surfaces, b_cache = _build_unrefined_b_cache(booz, alpha_values, s_values, phi_center)
+        phi, surfaces, b_cache = _build_unrefined_b_cache(
+            booz,
+            alpha_values,
+            s_values,
+            phi_center,
+            n_phi=n_phi,
+        )
 
     j_grid = np.full((len(alpha_values), len(s_values)), np.nan)
     for s_idx, surf in enumerate(surfaces):
@@ -544,7 +562,8 @@ def _plot_polar_figure(
     boozmn_path: Path,
     n_alpha: int,
     n_rho: int,
-    refine: bool,
+    n_phi: int = DEFAULT_N_PHI,
+    refine: bool = True,
 ):
     fig, axes = _build_figure_grid(len(lambda_n_values))
     for ax, lambda_n in zip(axes, lambda_n_values):
@@ -579,7 +598,7 @@ def _plot_polar_figure(
 
     _add_title_block(
         fig,
-        rf"$J$ on polar coordinates near $\phi=\pi/n_{{fp}}$ ({scale_kind} color scale, n_alpha={n_alpha}, n_rho={n_rho}, refine={refine})",
+        rf"$J$ on polar coordinates near $\phi=\pi/n_{{fp}}$ (n_alpha={n_alpha}, n_rho={n_rho}, n_phi={n_phi}, refine={refine})",
         boozmn_path,
     )
     _add_footer(fig)
@@ -684,7 +703,8 @@ def _plot_large_polar_figures(
     boozmn_path: Path,
     n_alpha: int,
     n_rho: int,
-    refine: bool,
+    n_phi: int = DEFAULT_N_PHI,
+    refine: bool = True,
     b_extrema: dict | None = None,
     b_min: float | None = None,
     b_max: float | None = None,
@@ -746,12 +766,11 @@ def _plot_large_polar_figures(
 
         _add_title_block(
             fig,
-            rf"$J$ on polar coordinates near $\phi=\pi/n_{{fp}}$ (linear contour lines, page {page_idx}, n_alpha={n_alpha}, n_rho={n_rho}, refine={refine})",
+            rf"$J$ on polar coordinates near $\phi=\pi/n_{{fp}}$ (page {page_idx}, n_alpha={n_alpha}, n_rho={n_rho}, n_phi={n_phi}, refine={refine})",
             boozmn_path,
         )
         _add_footer(fig)
-        rect_right = 0.93 if include_b_extrema else 1.0
-        fig.tight_layout(rect=[0.0, 0.02, rect_right, 0.95])
+        fig.tight_layout(rect=[0.0, 0.01, 1, 0.98])
 
         page_output = output_base_path.with_name(
             f"{output_base_path.stem}_page{page_idx:02d}{output_base_path.suffix}"
@@ -835,6 +854,7 @@ def plot_J_invariant(
     boozmn_file: str,
     n_alpha: int = DEFAULT_N_ALPHA,
     n_rho: int = DEFAULT_N_RHO,
+    n_phi: int = DEFAULT_N_PHI,
     contour_levels: int = DEFAULT_CONTOUR_LEVELS,
     refine: bool = True,
     show: bool = True,
@@ -854,12 +874,13 @@ def plot_J_invariant(
         alpha_values,
         s_values,
         refine=refine,
+        n_phi=n_phi,
         lambda_n_values=all_lambda_n_values,
         return_b_extrema=True,
     )
 
     refine_tag = "true" if refine else "false"
-    output_tag = f"_nalpha{n_alpha}_nrho{n_rho}_refine_{refine_tag}"
+    output_tag = f"_nalpha{n_alpha}_nrho{n_rho}_nphi{n_phi}_refine_{refine_tag}"
 
     figures = []
     summary_output_path = boozmn_path.with_name(f"{boozmn_path.stem}_J_polar_{output_tag}.pdf")
@@ -876,6 +897,7 @@ def plot_J_invariant(
             boozmn_path,
             n_alpha,
             n_rho,
+            n_phi,
             refine,
         )
     )
@@ -897,6 +919,7 @@ def plot_J_invariant(
             boozmn_path,
             n_alpha,
             n_rho,
+            n_phi,
             refine,
             b_extrema=b_extrema,
             b_min=b_min,
@@ -923,6 +946,7 @@ def plot_J_invariant_single_lambda(
     lambda_n: float,
     n_alpha: int = DEFAULT_N_ALPHA,
     n_rho: int = DEFAULT_N_RHO,
+    n_phi: int = DEFAULT_N_PHI,
     contour_levels: int = DEFAULT_CONTOUR_LEVELS,
     refine: bool = True,
     show: bool = True,
@@ -941,6 +965,7 @@ def plot_J_invariant_single_lambda(
         s_values,
         lambda_n=lambda_n,
         refine=refine,
+        n_phi=n_phi,
     )
 
     fig = _plot_single_lambda_gui(
@@ -979,6 +1004,12 @@ def plot_J_invariant_cli(argv=None) -> int:
         help="Number of rho grid values",
     )
     parser.add_argument(
+        "--n_phi",
+        type=int,
+        default=DEFAULT_N_PHI,
+        help="Number of phi values for J integration",
+    )
+    parser.add_argument(
         "--contour_levels",
         type=int,
         default=DEFAULT_CONTOUR_LEVELS,
@@ -1003,6 +1034,7 @@ def plot_J_invariant_cli(argv=None) -> int:
         args.boozmn_file,
         n_alpha=args.n_alpha,
         n_rho=args.n_rho,
+        n_phi=args.n_phi,
         contour_levels=args.contour_levels,
         refine=args.refine,
     )
@@ -1033,6 +1065,12 @@ def plot_J_invariant_single_lambda_cli(argv=None) -> int:
         help="Number of rho grid values",
     )
     parser.add_argument(
+        "--n_phi",
+        type=int,
+        default=DEFAULT_N_PHI,
+        help="Number of phi values for J integration",
+    )
+    parser.add_argument(
         "--contour_levels",
         type=int,
         default=DEFAULT_CONTOUR_LEVELS,
@@ -1058,6 +1096,7 @@ def plot_J_invariant_single_lambda_cli(argv=None) -> int:
         args.lambda_n,
         n_alpha=args.n_alpha,
         n_rho=args.n_rho,
+        n_phi=args.n_phi,
         contour_levels=args.contour_levels,
         refine=args.refine,
     )

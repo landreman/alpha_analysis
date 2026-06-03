@@ -131,6 +131,7 @@ def test_plot_J_invariant_cli_forwards_args(monkeypatch):
         boozmn_file,
         n_alpha,
         n_rho,
+        n_phi,
         contour_levels,
         refine,
         show=True,
@@ -138,6 +139,7 @@ def test_plot_J_invariant_cli_forwards_args(monkeypatch):
         captured["boozmn_file"] = boozmn_file
         captured["n_alpha"] = n_alpha
         captured["n_rho"] = n_rho
+        captured["n_phi"] = n_phi
         captured["contour_levels"] = contour_levels
         captured["refine"] = refine
         captured["show"] = show
@@ -150,6 +152,8 @@ def test_plot_J_invariant_cli_forwards_args(monkeypatch):
             "12",
             "--n_rho",
             "15",
+            "--n_phi",
+            "777",
             "--contour_levels",
             "27",
             "--no-refine",
@@ -160,6 +164,7 @@ def test_plot_J_invariant_cli_forwards_args(monkeypatch):
     assert captured["boozmn_file"] == boozmn_file_name
     assert captured["n_alpha"] == 12
     assert captured["n_rho"] == 15
+    assert captured["n_phi"] == 777
     assert captured["contour_levels"] == 27
     assert captured["refine"] is False
     assert captured["show"] is True
@@ -173,6 +178,7 @@ def test_plot_J_invariant_single_lambda_cli_forwards_args(monkeypatch):
         lambda_n,
         n_alpha,
         n_rho,
+        n_phi,
         contour_levels,
         refine,
         show=True,
@@ -181,6 +187,7 @@ def test_plot_J_invariant_single_lambda_cli_forwards_args(monkeypatch):
         captured["lambda_n"] = lambda_n
         captured["n_alpha"] = n_alpha
         captured["n_rho"] = n_rho
+        captured["n_phi"] = n_phi
         captured["contour_levels"] = contour_levels
         captured["refine"] = refine
         captured["show"] = show
@@ -198,6 +205,8 @@ def test_plot_J_invariant_single_lambda_cli_forwards_args(monkeypatch):
             "12",
             "--n_rho",
             "15",
+            "--n_phi",
+            "777",
             "--contour_levels",
             "27",
             "--refine",
@@ -209,6 +218,7 @@ def test_plot_J_invariant_single_lambda_cli_forwards_args(monkeypatch):
     assert captured["lambda_n"] == 0.35
     assert captured["n_alpha"] == 12
     assert captured["n_rho"] == 15
+    assert captured["n_phi"] == 777
     assert captured["contour_levels"] == 27
     assert captured["refine"] is True
     assert captured["show"] is True
