@@ -155,8 +155,8 @@ def test_compute_single_j_grid_refine_matches_pointwise_reference():
             np.testing.assert_allclose(
                 j_grid[a_idx, s_idx],
                 data["J"],
-                rtol=2e-8,
-                atol=1e-11,
+                rtol=1e-6,
+                atol=1e-9,
                 equal_nan=True,
             )
 

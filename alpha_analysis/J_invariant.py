@@ -214,7 +214,7 @@ def _compute_refined_j_from_cached_B(
         return np.sqrt(np.maximum(0, 1 - B_val / B_bounce)) / B_val
 
     constant = np.abs(surf.G + surf.I * surf.iota) / (surf.R00 * 2 * np.pi / surf.nfp)
-    return quad(integrand, phi_left, phi_right)[0] * constant
+    return quad(integrand, phi_left, phi_right, limit=200)[0] * constant
 
 
 def _compute_j_grids(
