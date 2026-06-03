@@ -313,6 +313,34 @@ class BoozerSurface:
         if theta_arr.ndim == 1:
             return B_flat
         return B_flat.reshape(theta_arr.shape)
+
+    def compute_B_along_alpha(
+        self,
+        alpha: float,
+        phi: np.ndarray | float,
+    ) -> np.ndarray | float:
+        """Compute B along a field line parameterized by Boozer alpha and phi."""
+        phi_arr = np.asarray(phi, dtype=float)
+        xm = self.booz.xm
+        xn = self.booz.xn
+        bmnc_eval = np.asarray(self.bmnc, dtype=float)
+        if bmnc_eval.ndim != 1:
+            raise ValueError("BoozerSurface bmnc data must be one-dimensional")
+        if bmnc_eval.size != xm.size:
+            raise ValueError(
+                f"bmnc mode count ({bmnc_eval.size}) does not match xm/xn length ({xm.size})"
+            )
+
+        k = xm * self.iota - xn
+        phase_offset = xm * alpha
+
+        if phi_arr.ndim == 0:
+            return (bmnc_eval @ np.cos(phase_offset + k * phi_arr.item())).item()
+
+        phi_flat = phi_arr.reshape(-1)
+        phase = phase_offset[:, np.newaxis] + k[:, np.newaxis] * phi_flat[np.newaxis, :]
+        B_flat = bmnc_eval @ np.cos(phase)
+        return B_flat.reshape(phi_arr.shape)
     
     def compute_B_tensor_alpha_phi(
         self,

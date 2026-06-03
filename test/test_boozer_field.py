@@ -120,6 +120,26 @@ def test_compute_B_tensor_alpha_phi_matches_compute_B():
     np.testing.assert_allclose(B_tensor, B_reference, rtol=1e-13, atol=1e-13)
 
 
+def test_compute_B_along_alpha_matches_compute_B():
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    surf = booz.surface(0.5)
+
+    alpha = 1.2
+    phi = np.linspace(-0.4, 0.4, 17)
+    theta = alpha + surf.iota * phi
+
+    B_reference = surf.compute_B(theta, phi)
+    B_along_alpha = surf.compute_B_along_alpha(alpha, phi)
+
+    np.testing.assert_allclose(B_along_alpha, B_reference, rtol=1e-13, atol=1e-13)
+    np.testing.assert_allclose(
+        surf.compute_B_along_alpha(alpha, phi[3]),
+        B_reference[3],
+        rtol=1e-13,
+        atol=1e-13,
+    )
+
+
 def test_B_reference():
     """Compare B to reference values from a W7-X boozmn file."""
     booz = BoozerField.from_boozmn(boozmn_file_name)

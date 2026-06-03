@@ -92,9 +92,10 @@ def compute_J_invariant(
             data["J"] = np.nan
             return data
 
+    alpha = theta_center - surf.iota * phi_center
+
     def integrand(phi: np.ndarray) -> np.ndarray:
-        theta = theta_center + surf.iota * (phi - phi_center)
-        B = surf.compute_B([theta], [phi])[0]
+        B = surf.compute_B_along_alpha(alpha, phi)
         return np.sqrt(np.maximum(0, 1 - B / B_bounce)) / B
     
     # Integrate over the allowed region.
@@ -177,10 +178,18 @@ def _compute_j_grids(
         lambda_n_values = LAMBDA_N_VALUES
 
     j_grids = {}
+    b_min, b_max = booz.get_min_max()
+    surfaces = [BoozerSurface(booz, s) for s in s_values]
 
     if not refine:
         phi_center = np.pi / booz.nfp
-        phi, surfaces, b_cache = _build_unrefined_b_cache(booz, alpha_values, s_values, phi_center)
+        phi, surfaces, b_cache = _build_unrefined_b_cache(
+            booz,
+            alpha_values,
+            s_values,
+            phi_center,
+            surfaces=surfaces,
+        )
         for lambda_n in lambda_n_values:
             j_grids[lambda_n] = _compute_single_j_grid(
                 booz,
@@ -192,6 +201,8 @@ def _compute_j_grids(
                 phi=phi,
                 surfaces=surfaces,
                 b_cache=b_cache,
+                b_min=b_min,
+                b_max=b_max,
             )
         if return_b_extrema:
             return j_grids, _compute_b_extrema(
@@ -210,6 +221,9 @@ def _compute_j_grids(
             s_values,
             lambda_n=lambda_n,
             refine=refine,
+            surfaces=surfaces,
+            b_min=b_min,
+            b_max=b_max,
         )
 
     if return_b_extrema:
@@ -228,13 +242,15 @@ def _build_unrefined_b_cache(
     alpha_values: np.ndarray,
     s_values: np.ndarray,
     phi_center: float,
+    surfaces: list[BoozerSurface] | None = None,
 ):
     n_phi = 501
     phi_margin = 5.0
     phi_field_period = 2.0 * np.pi / booz.nfp
     phi = phi_center + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
 
-    surfaces = [BoozerSurface(booz, s) for s in s_values]
+    if surfaces is None:
+        surfaces = [BoozerSurface(booz, s) for s in s_values]
     b_cache = np.empty((len(alpha_values), len(s_values), n_phi))
     for s_idx, surf in enumerate(surfaces):
         b_cache[:, s_idx, :] = surf.compute_B_tensor_alpha_phi(alpha_values, phi)
@@ -272,17 +288,21 @@ def _compute_single_j_grid(
     phi: np.ndarray | None = None,
     surfaces: list[BoozerSurface] | None = None,
     b_cache: np.ndarray | None = None,
+    b_min: float | None = None,
+    b_max: float | None = None,
 ):
-    b_min, b_max = booz.get_min_max()
+    if b_min is None or b_max is None:
+        b_min, b_max = booz.get_min_max()
     if phi_center is None:
         phi_center = np.pi / booz.nfp
     print(f"Processing lambda_n = {lambda_n}")
     b_bounce = b_min + lambda_n * (b_max - b_min)
 
     if refine:
+        if surfaces is None:
+            surfaces = [BoozerSurface(booz, s) for s in s_values]
         j_grid = np.full((len(alpha_values), len(s_values)), np.nan)
-        for s_idx, s in enumerate(s_values):
-            surf = BoozerSurface(booz, s)
+        for s_idx, surf in enumerate(surfaces):
             for a_idx, alpha in enumerate(alpha_values):
                 # alpha = theta - iota * phi, so theta_center = alpha + iota * phi_center.
                 theta_center = alpha + surf.iota * phi_center
