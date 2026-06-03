@@ -124,6 +124,43 @@ def test_J_refine_doesnt_change_too_much():
             )
 
 
+def test_compute_single_j_grid_refine_matches_pointwise_reference():
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    alpha_values = np.array([0.0, 0.5 * np.pi, np.pi, 1.5 * np.pi])
+    s_values = np.array([0.25, 0.5])
+    lambda_n = 0.35
+    phi_center = np.pi / booz.nfp
+    b_min, b_max = booz.get_min_max()
+    b_bounce = b_min + lambda_n * (b_max - b_min)
+
+    j_grid = J_invariant_module._compute_single_j_grid(
+        booz,
+        alpha_values,
+        s_values,
+        lambda_n=lambda_n,
+        refine=True,
+    )
+
+    for s_idx, s in enumerate(s_values):
+        surf = BoozerSurface(booz, s)
+        for a_idx, alpha in enumerate(alpha_values):
+            theta_center = alpha + surf.iota * phi_center
+            data = compute_J_invariant(
+                surf,
+                b_bounce,
+                theta_center,
+                phi_center,
+                refine=True,
+            )
+            np.testing.assert_allclose(
+                j_grid[a_idx, s_idx],
+                data["J"],
+                rtol=2e-8,
+                atol=1e-11,
+                equal_nan=True,
+            )
+
+
 def test_plot_J_invariant_cli_forwards_args(monkeypatch):
     captured = {}
 

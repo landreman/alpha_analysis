@@ -18,6 +18,8 @@ except ImportError:
     from numpy import trapz as trapezoid
 
 from scipy.integrate import quad
+from scipy.interpolate import CubicSpline
+from scipy.optimize import root_scalar
 
 from .boozer_field import BoozerSurface
 from .boozer_field import BoozerField
@@ -92,10 +94,9 @@ def compute_J_invariant(
             data["J"] = np.nan
             return data
 
-    alpha = theta_center - surf.iota * phi_center
-
     def integrand(phi: np.ndarray) -> np.ndarray:
-        B = surf.compute_B_along_alpha(alpha, phi)
+        theta = theta_center + surf.iota * (phi - phi_center)
+        B = surf.compute_B([theta], [phi])[0]
         return np.sqrt(np.maximum(0, 1 - B / B_bounce)) / B
     
     # Integrate over the allowed region.
@@ -166,6 +167,56 @@ def _compute_unrefined_j_from_cached_B(
     return J
 
 
+def _compute_refined_j_from_cached_B(
+    surf: BoozerSurface,
+    B: np.ndarray,
+    phi: np.ndarray,
+    B_spline: CubicSpline,
+    B_bounce: float,
+    clipped_well_nan: bool = True,
+):
+    allowed = B <= B_bounce
+    (
+        has_allowed,
+        well_crosses_left_edge,
+        well_crosses_right_edge,
+        left_index,
+        right_index,
+        _,
+    ) = _find_well_bounds_from_allowed(allowed)
+
+    if not has_allowed:
+        return np.nan
+    if clipped_well_nan and (well_crosses_left_edge or well_crosses_right_edge):
+        return np.nan
+
+    dphi = phi[1] - phi[0]
+    if well_crosses_left_edge:
+        phi_left = phi[left_index]
+    else:
+        phi_left = root_scalar(
+            lambda phi_val: B_spline(phi_val) - B_bounce,
+            bracket=(phi[left_index] - dphi, phi[left_index]),
+            method="brentq",
+        ).root
+
+    if well_crosses_right_edge:
+        phi_right = phi[right_index]
+    else:
+        phi_right = root_scalar(
+            lambda phi_val: B_spline(phi_val) - B_bounce,
+            bracket=(phi[right_index], phi[right_index] + dphi),
+            method="brentq",
+        ).root
+
+    def integrand(phi_val: np.ndarray) -> np.ndarray:
+        B_val = B_spline(phi_val)
+        return np.sqrt(np.maximum(0, 1 - B_val / B_bounce)) / B_val
+
+    constant = np.abs(surf.G + surf.I * surf.iota) / (surf.R00 * 2 * np.pi / surf.nfp)
+    return quad(integrand, phi_left, phi_right)[0] * constant
+
+
 def _compute_j_grids(
     booz: BoozerField,
     alpha_values: np.ndarray,
@@ -180,9 +231,9 @@ def _compute_j_grids(
     j_grids = {}
     b_min, b_max = booz.get_min_max()
     surfaces = [BoozerSurface(booz, s) for s in s_values]
+    phi_center = np.pi / booz.nfp
 
     if not refine:
-        phi_center = np.pi / booz.nfp
         phi, surfaces, b_cache = _build_unrefined_b_cache(
             booz,
             alpha_values,
@@ -214,6 +265,14 @@ def _compute_j_grids(
             )
         return j_grids
 
+    phi, surfaces, b_cache = _build_unrefined_b_cache(
+        booz,
+        alpha_values,
+        s_values,
+        phi_center,
+        surfaces=surfaces,
+    )
+    b_splines = _build_b_spline_cache(phi, b_cache)
     for lambda_n in lambda_n_values:
         j_grids[lambda_n] = _compute_single_j_grid(
             booz,
@@ -221,7 +280,11 @@ def _compute_j_grids(
             s_values,
             lambda_n=lambda_n,
             refine=refine,
+            phi_center=phi_center,
+            phi=phi,
             surfaces=surfaces,
+            b_cache=b_cache,
+            b_splines=b_splines,
             b_min=b_min,
             b_max=b_max,
         )
@@ -231,7 +294,8 @@ def _compute_j_grids(
             booz,
             alpha_values,
             s_values,
-            np.pi / booz.nfp,
+            phi_center,
+            b_cache=b_cache,
         )
 
     return j_grids
@@ -262,6 +326,17 @@ def _build_unrefined_b_cache(
     return phi, surfaces, b_cache
 
 
+def _build_b_spline_cache(
+    phi: np.ndarray,
+    b_cache: np.ndarray,
+):
+    n_alpha, n_s, _ = b_cache.shape
+    return [
+        [CubicSpline(phi, b_cache[a_idx, s_idx, :], extrapolate=True) for a_idx in range(n_alpha)]
+        for s_idx in range(n_s)
+    ]
+
+
 def _compute_b_extrema(
     booz: BoozerField,
     alpha_values: np.ndarray,
@@ -288,6 +363,7 @@ def _compute_single_j_grid(
     phi: np.ndarray | None = None,
     surfaces: list[BoozerSurface] | None = None,
     b_cache: np.ndarray | None = None,
+    b_splines: list[list[CubicSpline]] | None = None,
     b_min: float | None = None,
     b_max: float | None = None,
 ):
@@ -299,21 +375,21 @@ def _compute_single_j_grid(
     b_bounce = b_min + lambda_n * (b_max - b_min)
 
     if refine:
-        if surfaces is None:
-            surfaces = [BoozerSurface(booz, s) for s in s_values]
+        if phi is None or surfaces is None or b_cache is None:
+            phi, surfaces, b_cache = _build_unrefined_b_cache(booz, alpha_values, s_values, phi_center)
+        if b_splines is None:
+            b_splines = _build_b_spline_cache(phi, b_cache)
         j_grid = np.full((len(alpha_values), len(s_values)), np.nan)
         for s_idx, surf in enumerate(surfaces):
             for a_idx, alpha in enumerate(alpha_values):
-                # alpha = theta - iota * phi, so theta_center = alpha + iota * phi_center.
-                theta_center = alpha + surf.iota * phi_center
-                data = compute_J_invariant(
+                j_grid[a_idx, s_idx] = _compute_refined_j_from_cached_B(
                     surf,
-                    b_bounce,
-                    theta_center,
-                    phi_center,
-                    refine=refine,
+                    B=b_cache[a_idx, s_idx, :],
+                    phi=phi,
+                    B_spline=b_splines[s_idx][a_idx],
+                    B_bounce=b_bounce,
+                    clipped_well_nan=True,
                 )
-                j_grid[a_idx, s_idx] = data["J"]
         return j_grid
 
     if phi is None or surfaces is None or b_cache is None:

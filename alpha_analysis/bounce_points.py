@@ -89,11 +89,10 @@ def find_bounce_points(
         + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
     )
     dphi = phi[1] - phi[0]
-    alpha = theta_center - surf.iota * phi_center
-    theta = alpha + surf.iota * phi
+    theta = theta_center + surf.iota * (phi - phi_center)
     all_indices = np.arange(n_phi)
 
-    B = surf.compute_B_along_alpha(alpha, phi)
+    B = surf.compute_B(theta, phi)
     allowed = B <= B_bounce
     (
         has_allowed,
@@ -123,7 +122,9 @@ def find_bounce_points(
 
     # Function for finding the roots exactly:
     def B_residual(phi_val):
-        return surf.compute_B_along_alpha(alpha, phi_val) - B_bounce
+        theta_val = theta_center + surf.iota * (phi_val - phi_center)
+        B_val = surf.compute_B([theta_val], [phi_val])[0]
+        return B_val - B_bounce
 
     if well_crosses_left_edge or (not refine):
         phi_left = phi[left_index]
