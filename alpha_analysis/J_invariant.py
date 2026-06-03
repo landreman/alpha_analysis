@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import colors
 from matplotlib import ticker
 from matplotlib.widgets import CheckButtons
@@ -24,9 +25,10 @@ from .bounce_points import find_bounce_points
 from .bounce_points import _find_well_bounds_from_allowed
 
 # Defaults for plot_J_invariant:
-LAMBDA_N_VALUES = np.arange(0.1, 1.0, 0.05).tolist()
-DEFAULT_N_ALPHA = 20
-DEFAULT_N_RHO = 11
+LARGE_PLOT_LAMBDA_N_VALUES = np.round(np.arange(0.05, 1.0, 0.05), 2).tolist()
+LAMBDA_N_VALUES = LARGE_PLOT_LAMBDA_N_VALUES[1:]
+DEFAULT_N_ALPHA = 120
+DEFAULT_N_RHO = 61
 DEFAULT_CONTOUR_LEVELS = 20
 
 SUPTITLE_FONT_SIZE = 11
@@ -168,13 +170,18 @@ def _compute_j_grids(
     alpha_values: np.ndarray,
     s_values: np.ndarray,
     refine: bool,
+    lambda_n_values: list[float] | None = None,
+    return_b_extrema: bool = False,
 ):
+    if lambda_n_values is None:
+        lambda_n_values = LAMBDA_N_VALUES
+
     j_grids = {}
 
     if not refine:
         phi_center = np.pi / booz.nfp
         phi, surfaces, b_cache = _build_unrefined_b_cache(booz, alpha_values, s_values, phi_center)
-        for lambda_n in LAMBDA_N_VALUES:
+        for lambda_n in lambda_n_values:
             j_grids[lambda_n] = _compute_single_j_grid(
                 booz,
                 alpha_values,
@@ -186,15 +193,31 @@ def _compute_j_grids(
                 surfaces=surfaces,
                 b_cache=b_cache,
             )
+        if return_b_extrema:
+            return j_grids, _compute_b_extrema(
+                booz,
+                alpha_values,
+                s_values,
+                phi_center,
+                b_cache=b_cache,
+            )
         return j_grids
 
-    for lambda_n in LAMBDA_N_VALUES:
+    for lambda_n in lambda_n_values:
         j_grids[lambda_n] = _compute_single_j_grid(
             booz,
             alpha_values,
             s_values,
             lambda_n=lambda_n,
             refine=refine,
+        )
+
+    if return_b_extrema:
+        return j_grids, _compute_b_extrema(
+            booz,
+            alpha_values,
+            s_values,
+            np.pi / booz.nfp,
         )
 
     return j_grids
@@ -221,6 +244,22 @@ def _build_unrefined_b_cache(
         #     b_cache[a_idx, s_idx, :] = surf.compute_B(theta, phi)
 
     return phi, surfaces, b_cache
+
+
+def _compute_b_extrema(
+    booz: BoozerField,
+    alpha_values: np.ndarray,
+    s_values: np.ndarray,
+    phi_center: float,
+    b_cache: np.ndarray | None = None,
+):
+    if b_cache is None:
+        _, _, b_cache = _build_unrefined_b_cache(booz, alpha_values, s_values, phi_center)
+
+    return {
+        "min": np.min(b_cache, axis=(0, 2)),
+        "max": np.max(b_cache, axis=(0, 2)),
+    }
 
 
 def _compute_single_j_grid(
@@ -450,26 +489,21 @@ def _plot_single_lambda_gui(
             state["colorbar"] = None
 
         ax.clear()
-        plot_data, levels, _ = _get_subplot_contour_data(
+        plot_data, _, _ = _get_subplot_contour_data(
             j_plot,
             "linear",
             int(contour_slider.val),
             vmin=float(color_range.val[0]),
             vmax=float(color_range.val[1]),
         )
-        clever_levels = np.quantile(
-            plot_data[np.isfinite(plot_data)],
-            np.linspace(0.0, 1.0, int(contour_slider.val)),
-        )
-        print("levels:", clever_levels)
+        clever_levels = _compute_clever_levels(plot_data, int(contour_slider.val))
         if filled_toggle.get_status()[0]:
             contour = ax.contourf(
                 x_vals,
                 y_vals,
                 plot_data,
-                # levels=levels,
                 levels=clever_levels,
-                cmap="viridis",
+                colors=_sample_level_colors(clever_levels, filled=True),
                 extend="both",
             )
         else:
@@ -477,9 +511,8 @@ def _plot_single_lambda_gui(
                 x_vals,
                 y_vals,
                 plot_data,
-                # levels=levels,
                 levels=clever_levels,
-                cmap="viridis",
+                colors=_sample_level_colors(clever_levels, filled=False),
                 extend="both",
             )
         _style_cartesian_polar_axis(ax)
@@ -504,6 +537,7 @@ def _plot_polar_figure(
     alpha_values: np.ndarray,
     rho_values: np.ndarray,
     j_grids: dict,
+    lambda_n_values: list[float],
     contour_levels: int,
     scale_kind: str,
     output_path: Path,
@@ -512,27 +546,27 @@ def _plot_polar_figure(
     n_rho: int,
     refine: bool,
 ):
-    fig, axes = _build_figure_grid(len(LAMBDA_N_VALUES))
-    for ax, lambda_n in zip(axes, LAMBDA_N_VALUES):
+    fig, axes = _build_figure_grid(len(lambda_n_values))
+    for ax, lambda_n in zip(axes, lambda_n_values):
         rho_mesh, alpha_mesh, j_plot = _make_closed_alpha_grid(
             alpha_values,
             rho_values,
             j_grids[lambda_n],
         )
-        plot_data, levels, norm = _get_subplot_contour_data(
+        plot_data, _, _ = _get_subplot_contour_data(
             j_plot,
             scale_kind,
             contour_levels,
         )
+        clever_levels = _compute_clever_levels(plot_data, contour_levels)
         x_vals = rho_mesh * np.cos(alpha_mesh)
         y_vals = rho_mesh * np.sin(alpha_mesh)
         contour = ax.contourf(
             x_vals,
             y_vals,
             plot_data,
-            levels=levels,
-            norm=norm,
-            cmap="viridis",
+            levels=clever_levels,
+            colors=_sample_level_colors(clever_levels, filled=True),
             extend="both",
         )
         ax.set_title(rf"$\lambda_n={lambda_n:.2f}$", fontsize=SUBPLOT_TITLE_FONT_SIZE)
@@ -540,7 +574,7 @@ def _plot_polar_figure(
         colorbar = fig.colorbar(contour, ax=ax, shrink=0.82, pad=0.02)
         _format_colorbar(colorbar)
 
-    for ax in axes[len(LAMBDA_N_VALUES):]:
+    for ax in axes[len(lambda_n_values):]:
         ax.axis("off")
 
     _add_title_block(
@@ -551,6 +585,181 @@ def _plot_polar_figure(
     _add_footer(fig)
     fig.savefig(output_path)
     return fig
+
+
+def _compute_clever_levels(plot_data: np.ndarray, contour_levels: int) -> np.ndarray:
+    finite_values = np.asarray(plot_data)[np.isfinite(plot_data)]
+    if finite_values.size == 0:
+        raise ValueError("Cannot compute contour levels for an all-NaN J grid.")
+
+    level_quantiles = np.linspace(0.0, 1.0, int(contour_levels))
+    clever_levels = np.quantile(finite_values, level_quantiles)
+    clever_levels = np.unique(clever_levels)
+    if clever_levels.size < 2:
+        vmin = float(finite_values.min())
+        vmax = float(finite_values.max())
+        if math.isclose(vmin, vmax):
+            vmax = vmin + 1e-12
+        clever_levels = np.linspace(vmin, vmax, 2)
+
+    return clever_levels
+
+
+def _sample_level_colors(levels: np.ndarray, filled: bool, cmap_name: str = "viridis"):
+    """Sample colormap colors uniformly by contour level index."""
+    n_colors = max(1, len(levels) - 1) if filled else max(1, len(levels))
+    cmap = plt.get_cmap(cmap_name)
+    if n_colors == 1:
+        return [cmap(0.5)]
+    return cmap(np.linspace(0.0, 1.0, n_colors))
+
+
+def _add_large_plot_background_circles(ax):
+    g = 0.8
+    radii = np.arange(0.0, 1.1, 0.1)
+    for radius in radii:
+        ax.add_patch(
+            plt.Circle(
+                (0.0, 0.0),
+                radius,
+                fill=False,
+                lw=0.5,
+                color=(g, g, g),
+                zorder=0,
+            )
+        )
+
+
+def _plot_b_extrema_subplot(
+    ax,
+    rho_values: np.ndarray,
+    b_extrema: dict | None,
+    lambda_n_values: list[float],
+    b_min: float,
+    b_max: float,
+):
+    if b_extrema is None:
+        ax.axis("off")
+        return
+
+    ax.plot(rho_values, b_extrema["max"], label=r"$\max(B)$", linewidth=1.8)
+    ax.plot(rho_values, b_extrema["min"], label=r"$\min(B)$", linewidth=1.8)
+    lambda_norm = colors.Normalize(
+        vmin=min(lambda_n_values),
+        vmax=max(lambda_n_values) if max(lambda_n_values) > min(lambda_n_values) else min(lambda_n_values) + 1e-12,
+    )
+    lambda_cmap = plt.get_cmap("jet")
+    for lambda_n in reversed(lambda_n_values):
+        b_bounce = b_min + lambda_n * (b_max - b_min)
+        ax.hlines(
+            b_bounce,
+            xmin=0.0,
+            xmax=1.0,
+            linewidth=0.9,
+            linestyles="--",
+            colors=[lambda_cmap(lambda_norm(lambda_n))],
+            label=rf"$\lambda_n={lambda_n:.2f}$",
+        )
+    ax.set_title(r"$B$ extrema", fontsize=SUBPLOT_TITLE_FONT_SIZE)
+    ax.set_xlabel(r"$\rho$", fontsize=LABEL_FONT_SIZE)
+    ax.set_ylabel(r"$B$", fontsize=LABEL_FONT_SIZE)
+    ax.set_xlim(0.0, 1.0)
+    ax.grid(True, alpha=0.25)
+    ax.legend(
+        fontsize=TICK_FONT_SIZE,
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),
+        borderaxespad=0.0,
+    )
+    _style_axis(ax)
+
+
+def _plot_large_polar_figures(
+    alpha_values: np.ndarray,
+    rho_values: np.ndarray,
+    j_grids: dict,
+    lambda_n_values: list[float],
+    contour_levels: int,
+    output_base_path: Path,
+    boozmn_path: Path,
+    n_alpha: int,
+    n_rho: int,
+    refine: bool,
+    b_extrema: dict | None = None,
+    b_min: float | None = None,
+    b_max: float | None = None,
+    n_rows: int = 2,
+    n_cols: int = 3,
+):
+    figures = []
+    per_figure = n_rows * n_cols
+    for page_idx, start in enumerate(range(0, len(lambda_n_values), per_figure), start=1):
+        lambda_chunk = lambda_n_values[start : start + per_figure]
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(14.5, 8.1), constrained_layout=False)
+        flat_axes = np.atleast_1d(axes).ravel()
+        include_b_extrema = b_extrema is not None and start + per_figure >= len(lambda_n_values)
+        plot_axes = flat_axes[:-1] if include_b_extrema else flat_axes
+
+        for ax, lambda_n in zip(plot_axes, lambda_chunk):
+            rho_mesh, alpha_mesh, j_plot = _make_closed_alpha_grid(
+                alpha_values,
+                rho_values,
+                j_grids[lambda_n],
+            )
+            plot_data, _, _ = _get_subplot_contour_data(
+                j_plot,
+                "linear",
+                contour_levels,
+            )
+            clever_levels = _compute_clever_levels(plot_data, contour_levels)
+            x_vals = rho_mesh * np.cos(alpha_mesh)
+            y_vals = rho_mesh * np.sin(alpha_mesh)
+            _add_large_plot_background_circles(ax)
+            contour = ax.contour(
+                x_vals,
+                y_vals,
+                plot_data,
+                levels=clever_levels,
+                colors=_sample_level_colors(clever_levels, filled=False),
+                extend="both",
+            )
+            ax.set_title(rf"$\lambda_n={lambda_n:.2f}$", fontsize=SUBPLOT_TITLE_FONT_SIZE)
+            _style_cartesian_polar_axis(ax)
+            colorbar = fig.colorbar(contour, ax=ax, shrink=0.82, pad=0.02)
+            colorbar.ax.tick_params(labelsize=TICK_FONT_SIZE)
+
+        if include_b_extrema:
+            _plot_b_extrema_subplot(
+                flat_axes[-1],
+                rho_values,
+                b_extrema,
+                lambda_n_values,
+                float(b_min),
+                float(b_max),
+            )
+            unused_axes = plot_axes[len(lambda_chunk) :]
+        else:
+            unused_axes = flat_axes[len(lambda_chunk) :]
+
+        for ax in unused_axes:
+            ax.axis("off")
+
+        _add_title_block(
+            fig,
+            rf"$J$ on polar coordinates near $\phi=\pi/n_{{fp}}$ (linear contour lines, page {page_idx}, n_alpha={n_alpha}, n_rho={n_rho}, refine={refine})",
+            boozmn_path,
+        )
+        _add_footer(fig)
+        rect_right = 0.93 if include_b_extrema else 1.0
+        fig.tight_layout(rect=[0.0, 0.02, rect_right, 0.95])
+
+        page_output = output_base_path.with_name(
+            f"{output_base_path.stem}_page{page_idx:02d}{output_base_path.suffix}"
+        )
+        fig.savefig(page_output)
+        figures.append(fig)
+
+    return figures
 
 
 def _plot_rho_alpha_figure(
@@ -575,7 +784,7 @@ def _plot_rho_alpha_figure(
             rho_values,
             j_grids[lambda_n],
         )
-        plot_data, levels, norm = _get_subplot_contour_data(
+        plot_data, levels, _ = _get_subplot_contour_data(
             j_plot,
             scale_kind,
             contour_levels,
@@ -585,8 +794,7 @@ def _plot_rho_alpha_figure(
             alpha_mesh,
             plot_data,
             levels=levels,
-            norm=norm,
-            cmap="viridis",
+            colors=_sample_level_colors(levels, filled=True),
             extend="both",
         )
         ax.set_title(rf"$\lambda_n={lambda_n:.2f}$", fontsize=SUBPLOT_TITLE_FONT_SIZE)
@@ -613,6 +821,16 @@ def _plot_rho_alpha_figure(
     return fig
 
 
+def _save_combined_pdf(figures: list, output_path: Path):
+    """Save all generated figures into one multi-page PDF."""
+    if not figures:
+        return
+
+    with PdfPages(output_path) as pdf:
+        for fig in figures:
+            pdf.savefig(fig)
+
+
 def plot_J_invariant(
     boozmn_file: str,
     n_alpha: int = DEFAULT_N_ALPHA,
@@ -624,56 +842,75 @@ def plot_J_invariant(
     boozmn_path = Path(boozmn_file).expanduser().resolve()
     booz = BoozerField.from_boozmn(boozmn_path)
     ns = len(booz.s_full)
+    b_min, b_max = booz.get_min_max()
 
     alpha_values, rho_values, s_values = _build_coordinate_arrays(ns, n_alpha, n_rho)
 
     print(f"Loading {boozmn_path}")
     print("Computing J grids for all lambda_n values")
-    j_grids = _compute_j_grids(booz, alpha_values, s_values, refine=refine)
+    all_lambda_n_values = sorted(set(LAMBDA_N_VALUES + LARGE_PLOT_LAMBDA_N_VALUES))
+    j_grids, b_extrema = _compute_j_grids(
+        booz,
+        alpha_values,
+        s_values,
+        refine=refine,
+        lambda_n_values=all_lambda_n_values,
+        return_b_extrema=True,
+    )
 
     refine_tag = "true" if refine else "false"
     output_tag = f"_nalpha{n_alpha}_nrho{n_rho}_refine_{refine_tag}"
 
-    figure_outputs = [
-        (
-            _plot_polar_figure,
-            "linear",
-            boozmn_path.with_name(f"{boozmn_path.stem}_J_polar_linear{output_tag}.pdf"),
-        ),
-        (
-            _plot_polar_figure,
-            "log",
-            boozmn_path.with_name(f"{boozmn_path.stem}_J_polar_log{output_tag}.pdf"),
-        ),
-        (
-            _plot_rho_alpha_figure,
-            "linear",
-            boozmn_path.with_name(f"{boozmn_path.stem}_J_rho_alpha_linear{output_tag}.pdf"),
-        ),
-        (
-            _plot_rho_alpha_figure,
-            "log",
-            boozmn_path.with_name(f"{boozmn_path.stem}_J_rho_alpha_log{output_tag}.pdf"),
-        ),
-    ]
-
     figures = []
-    for plot_function, scale_kind, output_path in figure_outputs:
-        print(f"Saving {output_path.name}")
-        figures.append(
-            plot_function(
-                alpha_values,
-                rho_values,
-                j_grids,
-                contour_levels,
-                scale_kind,
-                output_path,
-                boozmn_path,
-                n_alpha,
-                n_rho,
-                refine,
-            )
+    summary_output_path = boozmn_path.with_name(f"{boozmn_path.stem}_J_polar_{output_tag}.pdf")
+    print(f"Saving {summary_output_path.name}")
+    figures.append(
+        _plot_polar_figure(
+            alpha_values,
+            rho_values,
+            j_grids,
+            LAMBDA_N_VALUES,
+            contour_levels,
+            "linear",
+            summary_output_path,
+            boozmn_path,
+            n_alpha,
+            n_rho,
+            refine,
         )
+    )
+
+    large_output_base_path = boozmn_path.with_name(
+        f"{boozmn_path.stem}_J_polar_linear_large{output_tag}.pdf"
+    )
+    print(
+        f"Saving paginated large polar plots (n_rows=2, n_cols=3) with base name {large_output_base_path.name}"
+    )
+    figures.extend(
+        _plot_large_polar_figures(
+            alpha_values,
+            rho_values,
+            j_grids,
+            LARGE_PLOT_LAMBDA_N_VALUES,
+            contour_levels,
+            large_output_base_path,
+            boozmn_path,
+            n_alpha,
+            n_rho,
+            refine,
+            b_extrema=b_extrema,
+            b_min=b_min,
+            b_max=b_max,
+            n_rows=2,
+            n_cols=3,
+        )
+    )
+
+    combined_output_path = boozmn_path.with_name(
+        f"{boozmn_path.stem}_J_polar_combined{output_tag}.pdf"
+    )
+    print(f"Saving combined PDF {combined_output_path.name}")
+    _save_combined_pdf(figures, combined_output_path)
 
     if show:
         plt.show()
@@ -726,7 +963,7 @@ def plot_J_invariant_single_lambda(
 def plot_J_invariant_cli(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="plot_J_invariant",
-        description="Compute J from a boozmn file and save polar and rho-alpha subplot grids.",
+        description="Compute J from a boozmn file and save polar subplot grids.",
     )
     parser.add_argument("boozmn_file", help="Path to a boozmn*.nc file")
     parser.add_argument(

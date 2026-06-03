@@ -1,5 +1,6 @@
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 import alpha_analysis.J_invariant as J_invariant_module
 
@@ -213,6 +214,22 @@ def test_plot_J_invariant_single_lambda_cli_forwards_args(monkeypatch):
     assert captured["show"] is True
 
 
+def test_save_combined_pdf_writes_output(tmp_path):
+    fig1, ax1 = plt.subplots()
+    ax1.plot([0, 1], [0, 1])
+    fig2, ax2 = plt.subplots()
+    ax2.plot([0, 1], [1, 0])
+
+    output_path = tmp_path / "combined.pdf"
+    J_invariant_module._save_combined_pdf([fig1, fig2], output_path)
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+
+    plt.close(fig1)
+    plt.close(fig2)
+
+
 def test_get_subplot_contour_data_uses_requested_linear_range():
     j_plot = np.array([[1.0, 2.0], [3.0, 4.0]])
 
@@ -266,6 +283,67 @@ def test_plot_single_lambda_gui_keeps_widgets_and_uses_cartesian_axis_labels():
     assert any(label.get_text() != "" for label in fig.axes[0].get_yticklabels())
 
     J_invariant_module.plt.close(fig)
+
+
+def test_plot_large_polar_figures_appends_b_extrema_subplot(tmp_path):
+    alpha_values = np.linspace(0.0, 2.0 * np.pi, 4, endpoint=False)
+    rho_values = np.array([0.2, 0.6, 1.0])
+    lambda_n_values = [0.1, 0.2, 0.3, 0.4, 0.5]
+    base_grid = np.array(
+        [
+            [1.0, 2.0, 3.0],
+            [1.5, 2.5, 3.5],
+            [2.0, 3.0, 4.0],
+            [2.5, 3.5, 4.5],
+        ]
+    )
+    j_grids = {lambda_n: base_grid + lambda_n for lambda_n in lambda_n_values}
+    b_extrema = {
+        "min": np.array([0.8, 0.7, 0.6]),
+        "max": np.array([1.8, 1.9, 2.0]),
+    }
+
+    figures = J_invariant_module._plot_large_polar_figures(
+        alpha_values,
+        rho_values,
+        j_grids,
+        lambda_n_values,
+        contour_levels=6,
+        output_base_path=tmp_path / "large.pdf",
+        boozmn_path=os.path.abspath(boozmn_file_name),
+        n_alpha=len(alpha_values),
+        n_rho=len(rho_values),
+        refine=False,
+        b_extrema=b_extrema,
+        b_min=0.5,
+        b_max=2.5,
+        n_rows=2,
+        n_cols=3,
+    )
+
+    assert len(figures) == 1
+    b_axes = [ax for ax in figures[0].axes if ax.get_ylabel() == r"$B$"]
+    assert len(b_axes) == 1
+    assert b_axes[0].get_xlabel() == r"$\rho$"
+    assert b_axes[0].get_title() == r"$B$ extrema"
+    assert len(b_axes[0].collections) == len(lambda_n_values)
+    assert len(b_axes[0].lines) == 2
+    expected_colors = [
+        plt.get_cmap("jet")(
+            (lambda_n - min(lambda_n_values)) / (max(lambda_n_values) - min(lambda_n_values))
+        )
+        for lambda_n in reversed(lambda_n_values)
+    ]
+    actual_colors = [collection.get_colors()[0] for collection in b_axes[0].collections]
+    for actual_color, expected_color in zip(actual_colors, expected_colors):
+        np.testing.assert_allclose(actual_color, expected_color)
+    legend = b_axes[0].get_legend()
+    assert legend is not None
+    legend_labels = [text.get_text() for text in legend.get_texts()]
+    assert legend_labels[:2] == [r"$\max(B)$", r"$\min(B)$"]
+    assert rf"$\lambda_n={lambda_n_values[-1]:.2f}$" in legend_labels
+
+    J_invariant_module.plt.close(figures[0])
 
 
 def test_compute_j_grids_refine_false_reuses_B_evaluations(monkeypatch):
