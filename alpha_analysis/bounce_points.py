@@ -230,17 +230,31 @@ def _plot_bounce_points(
 def plot_bounce_points(
     filename: str,
     s: float,
-    B_bounce: float,
+    B_bounce: float | None = None,
+    lambda_n: float | None = None,
     n_alpha: int = 50,
     n_phi: float = 501,
     phi_margin: float = 5.0,
     refine: bool = True,
     show: bool = True,
 ):
+    if (B_bounce is None) == (lambda_n is None):
+        raise ValueError("Specify exactly one of B_bounce or lambda_n.")
+
     booz = BoozerField.from_boozmn(filename)
+    b_min, b_max = booz.get_min_max()
+    b_span = b_max - b_min
+    if lambda_n is not None:
+        B_bounce = b_min + lambda_n * b_span
+    else:
+        if b_span == 0:
+            lambda_n = np.nan
+        else:
+            lambda_n = (B_bounce - b_min) / b_span
+
     surf = BoozerSurface(booz, s)
     phi_center = np.pi / surf.nfp
-    top_text = f"B_bounce={B_bounce:.3f}, s={s:.3f}, n_alpha={n_alpha}, n_phi={n_phi}, phi_margin={phi_margin}, refine={refine}"
+    top_text = f"lambda_n={lambda_n:.3f}, B_bounce={B_bounce:.3f}, s={s:.3f}, n_alpha={n_alpha}, n_phi={n_phi}, phi_margin={phi_margin}, refine={refine}"
     bottom_text = f"{os.path.abspath(filename)}"
     _plot_bounce_points(
         surf,
@@ -265,7 +279,17 @@ def plot_bounce_points_cli(argv=None) -> int:
     parser.add_argument(
         "s", type=float, help="Normalized toroidal flux (surface label)"
     )
-    parser.add_argument("B_bounce", type=float, help="Bounce-field threshold")
+    parser.add_argument(
+        "B_bounce",
+        type=float,
+        nargs="?",
+        help="Bounce-field threshold",
+    )
+    parser.add_argument(
+        "--lambda_n",
+        type=float,
+        help="Normalized bounce level where B_bounce = B_min + lambda_n * (B_max - B_min)",
+    )
     parser.add_argument(
         "--n_alpha", type=int, default=50, help="Number of alpha values"
     )
@@ -290,10 +314,14 @@ def plot_bounce_points_cli(argv=None) -> int:
     )
 
     args = parser.parse_args(argv)
+    if (args.B_bounce is None) == (args.lambda_n is None):
+        parser.error("Specify exactly one of B_bounce or --lambda_n")
+
     plot_bounce_points(
         args.boozmn_file,
         s=args.s,
         B_bounce=args.B_bounce,
+        lambda_n=args.lambda_n,
         n_alpha=args.n_alpha,
         n_phi=args.n_phi,
         phi_margin=args.phi_margin,

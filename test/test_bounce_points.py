@@ -1,4 +1,5 @@
 import os
+from types import SimpleNamespace
 
 import numpy as np
 import alpha_analysis.bounce_points as bounce_points_module
@@ -130,15 +131,106 @@ def test_plot_bounce_points_doesnt_crash():
             )
 
 
+def test_plot_bounce_points_accepts_lambda_n(monkeypatch):
+    captured = {}
+
+    class _FakeBoozerField:
+        nfp = 5
+
+        def get_min_max(self):
+            return 1.0, 5.0
+
+    monkeypatch.setattr(
+        bounce_points_module.BoozerField,
+        "from_boozmn",
+        lambda _: _FakeBoozerField(),
+    )
+    monkeypatch.setattr(
+        bounce_points_module,
+        "BoozerSurface",
+        lambda _booz, _s: SimpleNamespace(nfp=5),
+    )
+
+    def _fake_plot(*_args, **kwargs):
+        captured["top_text"] = kwargs["top_text"]
+        captured["B_bounce"] = _args[1]
+
+    monkeypatch.setattr(bounce_points_module, "_plot_bounce_points", _fake_plot)
+
+    plot_bounce_points(
+        boozmn_file_name,
+        0.5,
+        lambda_n=0.25,
+        show=False,
+    )
+
+    assert captured["B_bounce"] == 2.0
+    assert "lambda_n=0.250" in captured["top_text"]
+    assert "B_bounce=2.000" in captured["top_text"]
+
+
+def test_plot_bounce_points_title_contains_lambda_for_b_bounce(monkeypatch):
+    captured = {}
+
+    class _FakeBoozerField:
+        nfp = 5
+
+        def get_min_max(self):
+            return 1.0, 5.0
+
+    monkeypatch.setattr(
+        bounce_points_module.BoozerField,
+        "from_boozmn",
+        lambda _: _FakeBoozerField(),
+    )
+    monkeypatch.setattr(
+        bounce_points_module,
+        "BoozerSurface",
+        lambda _booz, _s: SimpleNamespace(nfp=5),
+    )
+
+    def _fake_plot(*_args, **kwargs):
+        captured["top_text"] = kwargs["top_text"]
+
+    monkeypatch.setattr(bounce_points_module, "_plot_bounce_points", _fake_plot)
+
+    plot_bounce_points(
+        boozmn_file_name,
+        0.5,
+        B_bounce=2.0,
+        show=False,
+    )
+
+    assert "lambda_n=0.250" in captured["top_text"]
+    assert "B_bounce=2.000" in captured["top_text"]
+
+
+def test_plot_bounce_points_requires_exactly_one_of_bounce_or_lambda():
+    with np.testing.assert_raises(ValueError):
+        plot_bounce_points(boozmn_file_name, 0.5)
+
+    with np.testing.assert_raises(ValueError):
+        plot_bounce_points(boozmn_file_name, 0.5, B_bounce=2.0, lambda_n=0.3)
+
+
 def test_plot_bounce_points_cli_forwards_args(monkeypatch):
     captured = {}
 
     def _fake_plot_bounce_points(
-        filename, s, B_bounce, n_alpha, n_phi, phi_margin, refine, show=True
+        filename,
+        s,
+        B_bounce=None,
+        lambda_n=None,
+        n_alpha=50,
+        n_phi=501,
+        phi_margin=5.0,
+        refine=True,
+        show=True,
     ):
         captured["filename"] = filename
         captured["s"] = s
         captured["B_bounce"] = B_bounce
+        captured["lambda_n"] = lambda_n
         captured["n_alpha"] = n_alpha
         captured["n_phi"] = n_phi
         captured["phi_margin"] = phi_margin
@@ -167,6 +259,62 @@ def test_plot_bounce_points_cli_forwards_args(monkeypatch):
     assert captured["filename"] == boozmn_file_name
     assert captured["s"] == 0.25
     assert captured["B_bounce"] == 2.7
+    assert captured["lambda_n"] is None
+    assert captured["n_alpha"] == 12
+    assert captured["n_phi"] == 301
+    assert captured["phi_margin"] == 4.5
+    assert captured["refine"] is False
+    assert captured["show"] is True
+
+
+def test_plot_bounce_points_cli_forwards_lambda_n(monkeypatch):
+    captured = {}
+
+    def _fake_plot_bounce_points(
+        filename,
+        s,
+        B_bounce=None,
+        lambda_n=None,
+        n_alpha=50,
+        n_phi=501,
+        phi_margin=5.0,
+        refine=True,
+        show=True,
+    ):
+        captured["filename"] = filename
+        captured["s"] = s
+        captured["B_bounce"] = B_bounce
+        captured["lambda_n"] = lambda_n
+        captured["n_alpha"] = n_alpha
+        captured["n_phi"] = n_phi
+        captured["phi_margin"] = phi_margin
+        captured["refine"] = refine
+        captured["show"] = show
+
+    monkeypatch.setattr(
+        bounce_points_module, "plot_bounce_points", _fake_plot_bounce_points
+    )
+    exit_code = bounce_points_module.plot_bounce_points_cli(
+        [
+            boozmn_file_name,
+            "0.25",
+            "--lambda_n",
+            "0.3",
+            "--n_alpha",
+            "12",
+            "--n_phi",
+            "301",
+            "--phi_margin",
+            "4.5",
+            "--no-refine",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured["filename"] == boozmn_file_name
+    assert captured["s"] == 0.25
+    assert captured["B_bounce"] is None
+    assert captured["lambda_n"] == 0.3
     assert captured["n_alpha"] == 12
     assert captured["n_phi"] == 301
     assert captured["phi_margin"] == 4.5
