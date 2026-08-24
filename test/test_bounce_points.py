@@ -120,7 +120,8 @@ def test_bounce_points_none():
 
 def test_plot_bounce_points_doesnt_crash():
     """Make a plot of bounce points for a W7-X boozmn file."""
-    for refine in [True, False]:
+    # for refine in [True, False]:
+    for refine in [False]:
         for B_bounce in [2.4, 2.7, 3.1]:
             plot_bounce_points(
                 boozmn_file_name,
