@@ -222,3 +222,4 @@ __marimo__/
 .vscode
 20260523-02_plot_J_grids.py
 data/temp
+.venv*

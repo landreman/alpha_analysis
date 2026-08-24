@@ -10,25 +10,27 @@ during implementation that `docs/DESIGN.md` did not settle.
 
 ## Environment
 
-* Use the existing conda environment `20250627-01-libE`. Do not create a new one.
-* Work in the virtual environment
-  `/Users/mattland/alpha_analysis/alpha_analysis/.venv`, layered on that conda
-  environment.
+* Use the existing conda environment `20220806-03` (Python 3.10.5). Do not create a
+  new conda environment. Do not use `20250627-01-libE`: its Python 3.13 `readline`
+  extension segfaults during pytest capture.
+* Work in the clean virtual environment
+  `/Users/mattland/alpha_analysis/alpha_analysis/.venv`, created from that conda
+  interpreter without `--system-site-packages`.
 * If you need to understand the workings of the `booz_xform` package, look at its
   GitHub repository at https://github.com/hiddenSymmetries/booz_xform, or on the
   researcher's computer at `/Users/mattland/booz_xform/booz_xform`.
 * W7-X reference data used by the tests lives under `data/`.
 
-First-time setup, from the repository root with the conda environment active:
+First-time setup, from the repository root:
 
 ```bash
-python -m venv --system-site-packages .venv
+/Users/mattland/opt/miniconda3/envs/20220806-03/bin/python -m venv .venv
 .venv/bin/python -m pip install -e ".[dev]"
 ```
 
-`--system-site-packages` keeps numpy, scipy, matplotlib and the rest of the conda
-environment visible; the `dev` extra adds `pytest-xdist`, `hypothesis` and `black`,
-which the conda environment does not carry. Activate `.venv` before running `make`.
+The clean venv installs the project-declared numerical and development dependencies
+itself, preventing unrelated conda packages and pytest plugins from affecting tests.
+Activate `.venv` before running `make`.
 
 ## Commands
 

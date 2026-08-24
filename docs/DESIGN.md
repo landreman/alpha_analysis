@@ -101,7 +101,10 @@ Existing public functions and command-line entry points should remain backward c
 
 Repository-specific implementation rules:
 
-- use the existing conda environment `20250627-01-libE` rather than creating a new environment;
+- use the existing `20220806-03` conda environment's Python 3.10.5 interpreter rather
+  than creating a new conda environment; create a clean project `.venv` from it without
+  `--system-site-packages`. Do not use `20250627-01-libE`: its Python 3.13 `readline`
+  extension segfaults during pytest capture;
 - keep code straightforward and avoid unnecessary framework abstractions;
 - format new Python code consistently with `black`;
 - every scientific feature must include tests;
@@ -2448,4 +2451,3 @@ Version 1 is complete when the repository can, from a Boozer equilibrium and a s
 10. generate the required mesh, surface, transition, reachability, quadrature, and convergence visualizations;
 11. pass the synthetic, legacy-regression, flux-balance, \(\Theta\equiv1\), periodicity, and W7-X smoke tests;
 12. provide a convergence report sufficient to judge whether a quoted value of \(f\) is trustworthy.
-
