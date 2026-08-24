@@ -55,7 +55,9 @@ def test_compute_B_1d_shape_and_values():
     assert B.shape == (s.size, nthetaphi)
 
     expected = np.sum(booz.bmnc_data, axis=1, keepdims=True)
-    np.testing.assert_allclose(B, np.repeat(expected, nthetaphi, axis=1), rtol=1e-13, atol=1e-13)
+    np.testing.assert_allclose(
+        B, np.repeat(expected, nthetaphi, axis=1), rtol=1e-13, atol=1e-13
+    )
 
 
 def test_compute_B_2d_shape_matches_flattened():

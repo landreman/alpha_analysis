@@ -11,6 +11,7 @@ from matplotlib.widgets import CheckButtons
 from matplotlib.widgets import RangeSlider
 from matplotlib.widgets import Slider
 import numpy as np
+
 try:
     from numpy import trapezoid
 except ImportError:
@@ -44,6 +45,7 @@ SUBPLOT_RIGHT = 0.985
 SUBPLOT_TOP = 0.915
 SUBPLOT_WSPACE = 0.55
 SUBPLOT_HSPACE = 0.6
+
 
 def compute_J_invariant(
     surf: BoozerSurface,
@@ -87,7 +89,7 @@ def compute_J_invariant(
     if not np.any(data["allowed"]):
         data["J"] = np.nan
         return data
-    
+
     if data["well_crosses_left_edge"] or data["well_crosses_right_edge"]:
         if clipped_well_nan:
             data["J"] = np.nan
@@ -97,7 +99,7 @@ def compute_J_invariant(
         theta = theta_center + surf.iota * (phi - phi_center)
         B = surf.compute_B([theta], [phi])[0]
         return np.sqrt(np.maximum(0, 1 - B / B_bounce)) / B
-    
+
     # Integrate over the allowed region.
     constant = np.abs(surf.G + surf.I * surf.iota) / (surf.R00 * 2 * np.pi / surf.nfp)
     if refine:
@@ -110,7 +112,10 @@ def compute_J_invariant(
     else:
         B = data["B"]
         integrand_on_grid = np.sqrt(np.maximum(0, 1 - B / B_bounce)) / B
-        J = trapezoid(np.where(data["well_mask"], integrand_on_grid, 0.0), data["phi"]) * constant
+        J = (
+            trapezoid(np.where(data["well_mask"], integrand_on_grid, 0.0), data["phi"])
+            * constant
+        )
 
     data["J"] = J
     return data
@@ -118,7 +123,9 @@ def compute_J_invariant(
 
 def _build_coordinate_arrays(ns: int, n_alpha: int, n_rho: int):
     alpha_values = np.linspace(0.0, 2.0 * np.pi, n_alpha, endpoint=False)
-    rho_idx = np.unique(np.round(np.linspace(0.0, 1.0, n_rho) ** 2 * (ns - 1)).astype(int))
+    rho_idx = np.unique(
+        np.round(np.linspace(0.0, 1.0, n_rho) ** 2 * (ns - 1)).astype(int)
+    )
     rho_values = np.sqrt(rho_idx / (ns - 1))
     s_values = rho_idx / (ns - 1)
     return alpha_values, rho_values, s_values
@@ -149,7 +156,9 @@ def _compute_unrefined_j_from_cached_B(
         J = np.nan
     else:
         integrand_on_grid = np.sqrt(np.maximum(0, 1 - B / B_bounce)) / B
-        constant = np.abs(surf.G + surf.I * surf.iota) / (surf.R00 * 2 * np.pi / surf.nfp)
+        constant = np.abs(surf.G + surf.I * surf.iota) / (
+            surf.R00 * 2 * np.pi / surf.nfp
+        )
         J = trapezoid(np.where(well_mask, integrand_on_grid, 0.0), phi) * constant
 
     if return_data:
@@ -242,7 +251,10 @@ def _build_unrefined_b_cache(
 ):
     phi_margin = 5.0
     phi_field_period = 2.0 * np.pi / booz.nfp
-    phi = phi_center + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
+    phi = (
+        phi_center
+        + np.linspace(-phi_margin - 0.5, phi_margin + 0.5, n_phi) * phi_field_period
+    )
 
     surfaces = [BoozerSurface(booz, s) for s in s_values]
     b_cache = np.empty((len(alpha_values), len(s_values), n_phi))
@@ -264,7 +276,9 @@ def _compute_b_extrema(
     b_cache: np.ndarray | None = None,
 ):
     if b_cache is None:
-        _, _, b_cache = _build_unrefined_b_cache(booz, alpha_values, s_values, phi_center)
+        _, _, b_cache = _build_unrefined_b_cache(
+            booz, alpha_values, s_values, phi_center
+        )
 
     return {
         "min": np.min(b_cache, axis=(0, 2)),
@@ -368,7 +382,9 @@ def _add_title_block(fig, title_text: str, boozmn_path: Path):
 def _build_figure_grid(count: int):
     ncols = max(1, math.ceil(math.sqrt(count * 16 / 9)))
     nrows = math.ceil(count / ncols)
-    fig, axes = plt.subplots(nrows, ncols, figsize=(14.5, 8.1), constrained_layout=False)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(14.5, 8.1), constrained_layout=False
+    )
     fig.subplots_adjust(
         left=SUBPLOT_LEFT,
         bottom=SUBPLOT_BOTTOM,
@@ -404,7 +420,9 @@ def _get_subplot_contour_data(
     if scale_kind == "log":
         positive_values = finite_values[finite_values > 0]
         if positive_values.size == 0:
-            raise ValueError("Cannot use a logarithmic color scale when J has no positive values.")
+            raise ValueError(
+                "Cannot use a logarithmic color scale when J has no positive values."
+            )
         vmin = positive_values.min()
         vmax = positive_values.max()
         if math.isclose(vmin, vmax):
@@ -459,7 +477,9 @@ def _plot_single_lambda_gui(
     n_rho: int,
     refine: bool,
 ):
-    rho_mesh, alpha_mesh, j_plot = _make_closed_alpha_grid(alpha_values, rho_values, j_grid)
+    rho_mesh, alpha_mesh, j_plot = _make_closed_alpha_grid(
+        alpha_values, rho_values, j_grid
+    )
     finite_values = j_plot[np.isfinite(j_plot)]
     if finite_values.size == 0:
         raise ValueError("Cannot plot an all-NaN J grid.")
@@ -593,7 +613,7 @@ def _plot_polar_figure(
         colorbar = fig.colorbar(contour, ax=ax, shrink=0.82, pad=0.02)
         _format_colorbar(colorbar)
 
-    for ax in axes[len(lambda_n_values):]:
+    for ax in axes[len(lambda_n_values) :]:
         ax.axis("off")
 
     _add_title_block(
@@ -665,7 +685,11 @@ def _plot_b_extrema_subplot(
     ax.plot(rho_values, b_extrema["min"], label=r"$\min(B)$", linewidth=1.8)
     lambda_norm = colors.Normalize(
         vmin=min(lambda_n_values),
-        vmax=max(lambda_n_values) if max(lambda_n_values) > min(lambda_n_values) else min(lambda_n_values) + 1e-12,
+        vmax=(
+            max(lambda_n_values)
+            if max(lambda_n_values) > min(lambda_n_values)
+            else min(lambda_n_values) + 1e-12
+        ),
     )
     lambda_cmap = plt.get_cmap("jet")
     for lambda_n in reversed(lambda_n_values):
@@ -713,11 +737,17 @@ def _plot_large_polar_figures(
 ):
     figures = []
     per_figure = n_rows * n_cols
-    for page_idx, start in enumerate(range(0, len(lambda_n_values), per_figure), start=1):
+    for page_idx, start in enumerate(
+        range(0, len(lambda_n_values), per_figure), start=1
+    ):
         lambda_chunk = lambda_n_values[start : start + per_figure]
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(14.5, 8.1), constrained_layout=False)
+        fig, axes = plt.subplots(
+            n_rows, n_cols, figsize=(14.5, 8.1), constrained_layout=False
+        )
         flat_axes = np.atleast_1d(axes).ravel()
-        include_b_extrema = b_extrema is not None and start + per_figure >= len(lambda_n_values)
+        include_b_extrema = b_extrema is not None and start + per_figure >= len(
+            lambda_n_values
+        )
         plot_axes = flat_axes[:-1] if include_b_extrema else flat_axes
 
         for ax, lambda_n in zip(plot_axes, lambda_chunk):
@@ -743,7 +773,9 @@ def _plot_large_polar_figures(
                 colors=_sample_level_colors(clever_levels, filled=False),
                 extend="both",
             )
-            ax.set_title(rf"$\lambda_n={lambda_n:.2f}$", fontsize=SUBPLOT_TITLE_FONT_SIZE)
+            ax.set_title(
+                rf"$\lambda_n={lambda_n:.2f}$", fontsize=SUBPLOT_TITLE_FONT_SIZE
+            )
             _style_cartesian_polar_axis(ax)
             colorbar = fig.colorbar(contour, ax=ax, shrink=0.82, pad=0.02)
             colorbar.ax.tick_params(labelsize=TICK_FONT_SIZE)
@@ -827,7 +859,7 @@ def _plot_rho_alpha_figure(
         colorbar = fig.colorbar(contour, ax=ax, shrink=0.82, pad=0.02)
         _format_colorbar(colorbar)
 
-    for ax in axes[len(LAMBDA_N_VALUES):]:
+    for ax in axes[len(LAMBDA_N_VALUES) :]:
         ax.axis("off")
 
     _add_title_block(
@@ -883,7 +915,9 @@ def plot_J_invariant(
     output_tag = f"_nalpha{n_alpha}_nrho{n_rho}_nphi{n_phi}_refine_{refine_tag}"
 
     figures = []
-    summary_output_path = boozmn_path.with_name(f"{boozmn_path.stem}_J_polar_{output_tag}.pdf")
+    summary_output_path = boozmn_path.with_name(
+        f"{boozmn_path.stem}_J_polar_{output_tag}.pdf"
+    )
     print(f"Saving {summary_output_path.name}")
     figures.append(
         _plot_polar_figure(

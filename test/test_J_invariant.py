@@ -85,6 +85,7 @@ def test_compute_J_invariant_reference_grid():
         equal_nan=True,
     )
 
+
 def test_J_refine_doesnt_change_too_much():
     """The J invariant computed with refine=True should be close to that found with refine=False."""
     booz = BoozerField.from_boozmn(boozmn_file_name)
@@ -340,7 +341,8 @@ def test_plot_large_polar_figures_appends_b_extrema_subplot(tmp_path):
     assert len(b_axes[0].lines) == 2
     expected_colors = [
         plt.get_cmap("jet")(
-            (lambda_n - min(lambda_n_values)) / (max(lambda_n_values) - min(lambda_n_values))
+            (lambda_n - min(lambda_n_values))
+            / (max(lambda_n_values) - min(lambda_n_values))
         )
         for lambda_n in reversed(lambda_n_values)
     ]
@@ -427,8 +429,12 @@ def test_cached_unrefined_j_matches_public_unrefined_paths():
                 clipped_well_nan=True,
             )
 
-            np.testing.assert_array_equal(cached_data["allowed"], bounce_data["allowed"])
-            np.testing.assert_array_equal(cached_data["well_mask"], bounce_data["well_mask"])
+            np.testing.assert_array_equal(
+                cached_data["allowed"], bounce_data["allowed"]
+            )
+            np.testing.assert_array_equal(
+                cached_data["well_mask"], bounce_data["well_mask"]
+            )
             np.testing.assert_equal(
                 cached_data["well_crosses_left_edge"],
                 bounce_data["well_crosses_left_edge"],
@@ -437,8 +443,12 @@ def test_cached_unrefined_j_matches_public_unrefined_paths():
                 cached_data["well_crosses_right_edge"],
                 bounce_data["well_crosses_right_edge"],
             )
-            np.testing.assert_equal(cached_data["left_index"], bounce_data["left_index"])
-            np.testing.assert_equal(cached_data["right_index"], bounce_data["right_index"])
+            np.testing.assert_equal(
+                cached_data["left_index"], bounce_data["left_index"]
+            )
+            np.testing.assert_equal(
+                cached_data["right_index"], bounce_data["right_index"]
+            )
             np.testing.assert_allclose(
                 cached_data["J"],
                 j_data["J"],
