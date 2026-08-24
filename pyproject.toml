@@ -20,10 +20,43 @@ plot_J_invariant = "alpha_analysis.J_invariant:plot_J_invariant_cli"
 plot_J_invariant_single_lambda = "alpha_analysis.J_invariant:plot_J_invariant_single_lambda_cli"
 
 [project.optional-dependencies]
+# Everything needed to run the test suite. This is what CI installs.
 test = [
     "pytest",
+    "pytest-xdist",
+    "hypothesis",
+]
+# Test suite plus the formatter. This is what `make check` needs locally.
+dev = [
+    "alpha-analysis[test]",
+    "black",
+]
+# Optional stack for the j_connectivity subpackage (DESIGN.md sections 19.1 and 19.4).
+# Not required by the base package; imports of these are guarded.
+connectivity = [
+    "pyvista",
+    "gmsh",
+    "networkx",
+    "numba",
+    "h5py",
+    "joblib",
+]
+mesh-io = [
+    "meshio",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["alpha_analysis*"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+markers = [
+    "slow: excluded from `make test`; runs in `make test-full`. DESIGN.md section 22.5.",
+]
+# Unregistered markers are an error, not a warning; short tracebacks stay readable in CI.
+addopts = "--strict-markers --tb=short"
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
