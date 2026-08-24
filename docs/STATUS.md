@@ -14,7 +14,7 @@ lowest-numbered unchecked row.
 
 | # | Milestone | Goal | Done | PR |
 | --- | --- | --- | --- | --- |
-| 0 | Baseline and design scaffolding | Establish package skeleton without changing numerical behavior | [ ] | |
+| 0 | Baseline and design scaffolding | Establish package skeleton without changing numerical behavior | [x] | #3 |
 | 1 | General Boozer field derivatives and asymmetric modes | Provide the field interface needed by all later work | [ ] | |
 | 2 | Denominator \(V_h\) and global \(B\) bounds | Implement the independent normalization calculation | [ ] | |
 | 3 | Deterministic periodic background mesh | Build the axis-regular logical mesh without Gmsh | [ ] | |
@@ -41,7 +41,7 @@ here — a convention settled during implementation, a data file that has to be
 regenerated, a known-shaky tolerance. Keep it short; when an entry becomes permanent,
 move it into `docs/DESIGN.md` and delete it here.
 
-- (none yet)
+- Milestone 0 established base-only `j_connectivity` imports; optional features must use `optional_import()` so missing extras provide an install command.
 
 ## Accepted deviations
 
