@@ -313,7 +313,7 @@ class BoozerSurface:
         if theta_arr.ndim == 1:
             return B_flat
         return B_flat.reshape(theta_arr.shape)
-    
+
     def compute_B_tensor_alpha_phi(
         self,
         alpha: np.ndarray,
