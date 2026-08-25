@@ -25,6 +25,11 @@ If the previous milestone's row in `docs/STATUS.md` is unchecked, or its GitHub 
 `Tests` workflow was not green, stop and say so. A failed or unavailable `Claude Code
 Review` workflow does not block the next milestone.
 
+The pull request you generate will be reviewed by an AI agent following the instructions
+in `.claude/commands/review-milestone.md`. So, read that document, and in planning your
+implementation, anticipate any objections the review agent might raise, to ensure that
+your work will pass review.
+
 ## 2. Branch
 
 ```bash
