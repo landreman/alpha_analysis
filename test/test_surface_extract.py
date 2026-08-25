@@ -84,7 +84,14 @@ def _component_euler_characteristics(surface):
     return characteristics
 
 
-def test_two_closed_level_surface_components_are_periodic_tori_with_polished_roots():
+@pytest.mark.parametrize(
+    "extractor_type",
+    [MarchingTetrahedraExtractor, PyVistaSurfaceExtractor],
+    ids=["marching-tetrahedra", "pyvista"],
+)
+def test_extractors_return_two_closed_periodic_tori_with_polished_roots(
+    extractor_type,
+):
     # B=(s-1/2)^2 + 0.01 cos(3 zeta), B=0.04 has two radial roots
     # for every zeta.  Each root sweeps one torus on the one-period quotient.
     field = _field(radial_coefficients=[0.25, -1.0, 1.0], toroidal_cosine=0.01)
@@ -92,7 +99,7 @@ def test_two_closed_level_surface_components_are_periodic_tori_with_polished_roo
         BackgroundMeshConfig(n_radial=10, n_poloidal=16, n_zeta=12)
     ).build(field)
 
-    extraction = MarchingTetrahedraExtractor().extract(background, field, b=0.04)
+    extraction = extractor_type().extract(background, field, b=0.04)
     surface = extraction.full
     s, theta, zeta = _coordinates(surface.points)
 
@@ -118,11 +125,34 @@ def test_two_closed_level_surface_components_are_periodic_tori_with_polished_roo
     assert np.any(surface.boundary_tags & surface.PERIODIC_SEAM)
     assert np.all(zeta < 2.0 * np.pi / field.nfp)
     np.testing.assert_allclose(field.B(s, theta, zeta), 0.04, atol=1.0e-10)
-    assert np.all(surface.point_parent_edges >= 0)
-    assert np.all(surface.triangle_parent_tetrahedra >= 0)
+    if extractor_type is MarchingTetrahedraExtractor:
+        assert np.all(surface.point_parent_edges >= 0)
+        assert np.all(surface.triangle_parent_tetrahedra >= 0)
+    else:
+        assert np.all(surface.point_parent_edges == -1)
+        assert np.all(surface.triangle_parent_tetrahedra == -1)
 
 
-def test_physical_current_sign_selects_incoming_half_and_flux_balance_converges():
+@pytest.mark.parametrize(
+    "extractor_type,resolutions,max_imbalance",
+    [
+        pytest.param(
+            MarchingTetrahedraExtractor,
+            ((10, 20, 13), (18, 36, 29)),
+            2.0e-5,
+            id="marching-tetrahedra",
+        ),
+        pytest.param(
+            PyVistaSurfaceExtractor,
+            ((6, 12, 7), (22, 44, 37)),
+            5.0e-4,
+            id="pyvista",
+        ),
+    ],
+)
+def test_extractors_use_physical_current_sign_and_flux_balance_converges(
+    extractor_type, resolutions, max_imbalance
+):
     # B=2+0.3s+0.1cos(3zeta), b=2.15 is a closed torus.  With C=G+iota I<0,
     # incoming g=B*D_B/C<0 is the D_B>0 half, catching a lost current sign.
     field = _field(
@@ -134,11 +164,11 @@ def test_physical_current_sign_selects_incoming_half_and_flux_balance_converges(
     imbalances = []
     reconstruction_errors = []
     extractions = []
-    for resolution in ((10, 20, 13), (18, 36, 29)):
+    for resolution in resolutions:
         background = StructuredPrismMeshBackend(
             BackgroundMeshConfig(*resolution)
         ).build(field)
-        extraction = MarchingTetrahedraExtractor().extract(background, field, b=2.15)
+        extraction = extractor_type().extract(background, field, b=2.15)
         extractions.append(extraction)
         incoming_flux = surface_flux(extraction.incoming, field)
         outgoing_flux = surface_flux(extraction.outgoing, field)
@@ -176,7 +206,7 @@ def test_physical_current_sign_selects_incoming_half_and_flux_balance_converges(
     )
     assert len(extraction.g_zero.segments) > 0
     assert imbalances[1] < imbalances[0]
-    assert imbalances[1] < 2.0e-5
+    assert imbalances[1] < max_imbalance
     assert reconstruction_errors[1] < reconstruction_errors[0]
     assert reconstruction_errors[1] < 0.01
     for surface in (
@@ -226,7 +256,12 @@ def test_surface_flux_matches_independent_ds_wedge_dalpha_determinant():
     np.testing.assert_allclose(surface_flux(surface, field), expected, rtol=1.0e-14)
 
 
-def test_undefined_physical_field_direction_has_explicit_surface_status():
+@pytest.mark.parametrize(
+    "extractor_type",
+    [MarchingTetrahedraExtractor, PyVistaSurfaceExtractor],
+    ids=["marching-tetrahedra", "pyvista"],
+)
+def test_extractors_report_undefined_physical_field_direction(extractor_type):
     field = _field(
         radial_coefficients=[2.0, 0.3],
         toroidal_cosine=0.1,
@@ -237,7 +272,7 @@ def test_undefined_physical_field_direction_has_explicit_surface_status():
     ).build(field)
 
     with pytest.raises(SurfaceExtractionError) as caught:
-        MarchingTetrahedraExtractor().extract(background, field, b=2.15)
+        extractor_type().extract(background, field, b=2.15)
 
     assert caught.value.status is SurfaceStatus.DEGENERATE
 

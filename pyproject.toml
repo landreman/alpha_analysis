@@ -26,6 +26,7 @@ test = [
     "pytest-xdist",
     "hypothesis",
     "gmsh",
+    "pyvista",
 ]
 # Test suite plus the formatter. This is what `make check` needs locally.
 dev = [

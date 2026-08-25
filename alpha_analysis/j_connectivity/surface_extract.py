@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import product
 from typing import ClassVar
 
 import numpy as np
-from scipy.optimize import brentq, root
+from scipy.optimize import brentq, linear_sum_assignment, root
 
 from .field import BoozerFieldLike
 from .types import BackgroundMesh, SurfaceStatus
@@ -258,9 +259,9 @@ class PyVistaSurfaceExtractor:
             triangles = faces[:, 1:]
         else:
             triangles = np.empty((0, 3), dtype=np.int64)
-        points, triangles = _merge_coordinate_copies(
-            points, triangles, period, self.config.merge_tolerance
-        )
+        seam_sides = np.zeros(len(points), dtype=np.int8)
+        seam_sides[points[:, 2] <= self.config.merge_tolerance] = -1
+        seam_sides[period - points[:, 2] <= self.config.merge_tolerance] = 1
         points = np.asarray(
             [
                 _project_point_to_level(point, field, float(b), period, self.config)
@@ -268,6 +269,12 @@ class PyVistaSurfaceExtractor:
             ],
             dtype=np.float64,
         ).reshape(-1, 3)
+        points = _match_pyvista_periodic_seam(
+            points, seam_sides, self.config.merge_tolerance
+        )
+        points, triangles = _merge_coordinate_copies(
+            points, triangles, period, self.config.merge_tolerance
+        )
         B_values = _evaluate_B(field, points)
         g = _physical_g(field, points)
         tags = _coordinate_boundary_tags(points, period, self.config.merge_tolerance)
@@ -966,17 +973,63 @@ def _coordinate_boundary_tags(
     return tags
 
 
+def _match_pyvista_periodic_seam(points, seam_sides, tolerance):
+    """Identify VTK's lower/upper contour copies before coordinate merging.
+
+    VTK may interpolate matching periodic boundary triangles a few ulps apart.
+    The boundary side retained from the unprojected contour supplies the missing
+    provenance: copies must form a one-to-one lower/upper assignment, and the
+    assignment must agree to the square-root-epsilon scale of VTK geometry.
+    """
+    lower = np.flatnonzero(seam_sides == -1)
+    upper = np.flatnonzero(seam_sides == 1)
+    if not len(lower) and not len(upper):
+        return points
+    if len(lower) != len(upper):
+        raise SurfaceExtractionError(
+            SurfaceStatus.PERIODIC_MISMATCH,
+            "PyVista contour has unequal lower/upper periodic seam point counts",
+        )
+    distances = np.linalg.norm(
+        points[lower, np.newaxis, :2] - points[np.newaxis, upper, :2], axis=2
+    )
+    lower_assignment, upper_assignment = linear_sum_assignment(distances)
+    matched_distances = distances[lower_assignment, upper_assignment]
+    coordinate_scale = max(1.0, float(np.max(np.abs(points[:, :2]))))
+    vtk_tolerance = max(
+        tolerance, 8.0 * np.sqrt(np.finfo(float).eps) * coordinate_scale
+    )
+    if np.any(matched_distances > vtk_tolerance):
+        raise SurfaceExtractionError(
+            SurfaceStatus.PERIODIC_MISMATCH,
+            "PyVista contour seam copies do not form coincident periodic pairs",
+        )
+    matched = np.asarray(points, dtype=np.float64).copy()
+    matched[upper[upper_assignment]] = matched[lower[lower_assignment]]
+    return matched
+
+
 def _merge_coordinate_copies(points, triangles, period, tolerance):
     canonical_points: list[np.ndarray] = []
-    point_ids: dict[tuple[int, int, int], int] = {}
+    point_buckets: dict[tuple[int, int, int], list[int]] = {}
     remap = np.empty(len(points), dtype=np.int64)
     for index, point in enumerate(points):
         canonical = _canonicalize_point(point, period, tolerance)
-        key = tuple(np.rint(canonical / tolerance).astype(np.int64))
-        if key not in point_ids:
-            point_ids[key] = len(canonical_points)
+        key = tuple(np.floor(canonical / tolerance).astype(np.int64))
+        point_id = None
+        for offset in product((-1, 0, 1), repeat=3):
+            neighbor = tuple(key[axis] + offset[axis] for axis in range(3))
+            for candidate in point_buckets.get(neighbor, ()):
+                if np.linalg.norm(canonical - canonical_points[candidate]) <= tolerance:
+                    point_id = candidate
+                    break
+            if point_id is not None:
+                break
+        if point_id is None:
+            point_id = len(canonical_points)
             canonical_points.append(canonical)
-        remap[index] = point_ids[key]
+            point_buckets.setdefault(key, []).append(point_id)
+        remap[index] = point_id
     remapped = remap[triangles]
     for triangle in remapped:
         if len(np.unique(triangle)) < 3:
