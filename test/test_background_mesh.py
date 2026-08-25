@@ -8,6 +8,8 @@ import pytest
 
 from alpha_analysis.j_connectivity.background_mesh import (
     BackgroundMeshConfig,
+    GmshBackgroundMeshBackend,
+    GmshBackgroundMeshConfig,
     StructuredPrismMeshBackend,
     signed_tetrahedron_volumes,
     tetrahedron_quality,
@@ -23,6 +25,19 @@ def _field(nfp=3):
         n=np.array([0, nfp]),
         cosine_coefficients=np.array([[2.0], [0.2]]),
         sine_coefficients=np.array([[0.0], [0.1]]),
+        G_coefficients=np.array([1.0]),
+        I_coefficients=np.array([0.0]),
+        iota_coefficients=np.array([0.7]),
+    )
+
+
+def _constant_field(nfp=3):
+    return SyntheticFourierField(
+        nfp=nfp,
+        m=np.array([0]),
+        n=np.array([0]),
+        cosine_coefficients=np.array([[2.0]]),
+        sine_coefficients=np.array([[0.0]]),
         G_coefficients=np.array([1.0]),
         I_coefficients=np.array([0.0]),
         iota_coefficients=np.array([0.7]),
@@ -149,3 +164,76 @@ def test_pyvista_conversion_is_an_optional_view(monkeypatch):
     )
     with pytest.raises(ImportError, match="connectivity"):
         mesh.to_pyvista()
+
+
+def test_gmsh_mesh_matches_structured_invariants_and_closes_gmsh():
+    gmsh = pytest.importorskip("gmsh")
+    field = _field(nfp=2)
+    gmsh_mesh = GmshBackgroundMeshBackend(
+        GmshBackgroundMeshConfig(target_size=0.4)
+    ).build(field)
+    structured_mesh = StructuredPrismMeshBackend(BackgroundMeshConfig(3, 12, 4)).build(
+        field
+    )
+
+    for mesh in (gmsh_mesh, structured_mesh):
+        assert np.all(signed_tetrahedron_volumes(mesh) > 0.0)
+        assert np.all(tetrahedron_quality(mesh) > 0.0)
+        lower, upper = mesh.periodic_node_pairs.T
+        assert len(np.unique(lower)) == len(lower)
+        assert len(np.unique(upper)) == len(upper)
+        assert len(lower) == np.count_nonzero(mesh.boundary_tags & mesh.ZETA_MIN)
+        np.testing.assert_array_equal(mesh.points[lower, :2], mesh.points[upper, :2])
+        assert np.all(mesh.points[lower, 2] == 0.0)
+        assert np.all(mesh.points[upper, 2] == 2.0 * np.pi / field.nfp)
+        counts = _face_counts_after_seam_identification(mesh)
+        assert max(counts.values()) == 2
+        boundary_faces = [face for face, count in counts.items() if count == 1]
+        assert boundary_faces
+        assert all(
+            np.all(mesh.boundary_tags[list(face)] & mesh.OUTER)
+            for face in boundary_faces
+        )
+        assert mesh.B.shape == (len(mesh.points),)
+        assert np.all(np.isfinite(mesh.B))
+        assert np.count_nonzero(mesh.boundary_tags & mesh.AXIS) > 2
+
+    assert np.all(
+        gmsh_mesh.points[:, 0] ** 2 + gmsh_mesh.points[:, 1] ** 2 <= 1.0 + 1e-12
+    )
+    assert gmsh.isInitialized() == 0
+
+
+def test_gmsh_optional_size_fields_refine_axis_and_critical_region():
+    pytest.importorskip("gmsh")
+    field = _field()
+    coarse = GmshBackgroundMeshBackend(
+        GmshBackgroundMeshConfig(target_size=0.45)
+    ).build(field)
+    refined = GmshBackgroundMeshBackend(
+        GmshBackgroundMeshConfig(
+            target_size=0.45,
+            axis_size=0.16,
+            axis_radius=0.3,
+            critical_points=((0.7, 0.0, np.pi / field.nfp),),
+            critical_size=0.14,
+            critical_radius=0.5,
+        )
+    ).build(field)
+    low_gradient_refined = GmshBackgroundMeshBackend(
+        GmshBackgroundMeshConfig(
+            target_size=0.45,
+            low_gradient_size=0.2,
+            low_gradient_threshold=0.0,
+        )
+    ).build(_constant_field())
+
+    def count_near(mesh, point, radius):
+        return np.count_nonzero(np.linalg.norm(mesh.points - point, axis=1) < radius)
+
+    assert count_near(refined, np.array([0.0, 0.0, 0.5]), 0.35) > count_near(
+        coarse, np.array([0.0, 0.0, 0.5]), 0.35
+    )
+    critical = np.array([0.7, 0.0, np.pi / field.nfp])
+    assert count_near(refined, critical, 0.5) > count_near(coarse, critical, 0.5)
+    assert len(low_gradient_refined.points) > len(coarse.points)

@@ -11,6 +11,8 @@ from types import ModuleType
 
 from .background_mesh import (
     BackgroundMeshConfig,
+    GmshBackgroundMeshBackend,
+    GmshBackgroundMeshConfig,
     StructuredPrismMeshBackend,
     signed_tetrahedron_volumes,
     tetrahedron_quality,
@@ -50,6 +52,8 @@ __all__ = [
     "DenominatorEstimate",
     "FloodFillStatus",
     "GlobalBBounds",
+    "GmshBackgroundMeshBackend",
+    "GmshBackgroundMeshConfig",
     "QuadratureStatus",
     "RunMetadata",
     "SourceProfile",

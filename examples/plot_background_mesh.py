@@ -1,4 +1,4 @@
-"""Generate the Milestone 3 structured-background-mesh diagnostic."""
+"""Generate a structured or Gmsh background-mesh diagnostic (Milestones 3–4)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ matplotlib.use("Agg")
 
 from alpha_analysis.j_connectivity.background_mesh import (  # noqa: E402
     BackgroundMeshConfig,
+    GmshBackgroundMeshBackend,
+    GmshBackgroundMeshConfig,
     StructuredPrismMeshBackend,
 )
 from alpha_analysis.j_connectivity.synthetic_fields import (  # noqa: E402
@@ -39,11 +41,18 @@ def manufactured_field() -> SyntheticFourierField:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=Path("background_mesh.png"))
+    parser.add_argument(
+        "--backend", choices=("structured", "gmsh"), default="structured"
+    )
     args = parser.parse_args()
 
-    mesh = StructuredPrismMeshBackend(BackgroundMeshConfig(4, 16, 4)).build(
-        manufactured_field()
-    )
+    field = manufactured_field()
+    if args.backend == "gmsh":
+        mesh = GmshBackgroundMeshBackend(
+            GmshBackgroundMeshConfig(target_size=0.3, axis_size=0.15, axis_radius=0.25)
+        ).build(field)
+    else:
+        mesh = StructuredPrismMeshBackend(BackgroundMeshConfig(4, 16, 4)).build(field)
     figure, _ = plot_background_mesh(mesh)
     figure.savefig(args.output, dpi=160)
 
