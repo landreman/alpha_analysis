@@ -9,6 +9,12 @@ from __future__ import annotations
 import importlib
 from types import ModuleType
 
+from .background_mesh import (
+    BackgroundMeshConfig,
+    StructuredPrismMeshBackend,
+    signed_tetrahedron_volumes,
+    tetrahedron_quality,
+)
 from .config import ConnectivityConfig
 from .denominator import (
     BoundsConfig,
@@ -24,6 +30,7 @@ from .denominator import (
 )
 from .field import BoozerFieldLike
 from .types import (
+    BackgroundMesh,
     FloodFillStatus,
     QuadratureStatus,
     RunMetadata,
@@ -33,6 +40,8 @@ from .types import (
 )
 
 __all__ = [
+    "BackgroundMesh",
+    "BackgroundMeshConfig",
     "ConnectivityConfig",
     "BoundsConfig",
     "BoozerFieldLike",
@@ -44,6 +53,7 @@ __all__ = [
     "QuadratureStatus",
     "RunMetadata",
     "SourceProfile",
+    "StructuredPrismMeshBackend",
     "SurfaceStatus",
     "TraceStatus",
     "TransitionStatus",
@@ -52,6 +62,8 @@ __all__ = [
     "denominator_convergence",
     "find_global_B_bounds",
     "optional_import",
+    "signed_tetrahedron_volumes",
+    "tetrahedron_quality",
 ]
 
 
