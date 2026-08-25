@@ -232,6 +232,13 @@ def test_gmsh_optional_size_fields_refine_axis_and_critical_region():
             critical_radius=0.5,
         )
     ).build(field)
+    axis_only = GmshBackgroundMeshBackend(
+        GmshBackgroundMeshConfig(
+            target_size=0.45,
+            axis_size=0.16,
+            axis_radius=0.3,
+        )
+    ).build(field)
     low_gradient_field = _localized_low_gradient_field()
     low_gradient_coarse = GmshBackgroundMeshBackend(
         GmshBackgroundMeshConfig(target_size=0.45)
@@ -251,17 +258,19 @@ def test_gmsh_optional_size_fields_refine_axis_and_critical_region():
         coarse, np.array([0.0, 0.0, 0.5]), 0.35
     )
     critical = np.array([0.7, 0.0, np.pi / field.nfp])
-    assert count_near(refined, critical, 0.5) > count_near(coarse, critical, 0.5)
-    low_gradient = np.array([0.7, 0.0, 0.5])
-    control = np.array([0.4, 0.0, 0.5])
-    refined_increment = count_near(
-        low_gradient_refined, low_gradient, 0.2
-    ) - count_near(low_gradient_coarse, low_gradient, 0.2)
-    control_increment = count_near(low_gradient_refined, control, 0.15) - count_near(
-        low_gradient_coarse, control, 0.15
-    )
-    assert refined_increment > 0
-    assert refined_increment > 5 * control_increment
+    assert count_near(refined, critical, 0.5) > 3 * count_near(axis_only, critical, 0.5)
+
+    def count_radial_shell(mesh, inner, outer):
+        radius = np.linalg.norm(mesh.points[:, :2], axis=1)
+        return np.count_nonzero((radius > inner) & (radius < outer))
+
+    annulus_ratio = count_radial_shell(
+        low_gradient_refined, 0.589, 0.795
+    ) / count_radial_shell(low_gradient_coarse, 0.589, 0.795)
+    control_ratio = count_radial_shell(
+        low_gradient_refined, 0.25, 0.55
+    ) / count_radial_shell(low_gradient_coarse, 0.25, 0.55)
+    assert annulus_ratio > 3 * control_ratio
 
 
 def test_logical_gradient_uses_regular_cartesian_axis_limit():

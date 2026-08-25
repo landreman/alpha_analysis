@@ -461,6 +461,11 @@ def _extract_gmsh_mesh(
     pairs = pairs[pair_order]
     tags[pairs[:, 0]] |= BackgroundMesh.ZETA_MIN
     tags[pairs[:, 1]] |= BackgroundMesh.ZETA_MAX
+    seam_displacement = np.linalg.norm(
+        points[pairs[:, 1], :2] - points[pairs[:, 0], :2], axis=1
+    )
+    if np.max(seam_displacement) > 1e-9:
+        raise RuntimeError("Gmsh periodic seam displacement exceeds roundoff")
     points[pairs[:, 0], 2] = 0.0
     points[pairs[:, 1], :2] = points[pairs[:, 0], :2]
     points[pairs[:, 1], 2] = period
