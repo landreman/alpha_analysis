@@ -31,6 +31,16 @@ from .denominator import (
     find_global_B_bounds,
 )
 from .field import BoozerFieldLike
+from .surface_extract import (
+    MarchingTetrahedraExtractor,
+    PyVistaSurfaceExtractor,
+    SurfaceCurveMesh,
+    SurfaceExtraction,
+    SurfaceExtractionConfig,
+    SurfaceExtractionError,
+    SurfaceMesh,
+    surface_flux,
+)
 from .types import (
     BackgroundMesh,
     FloodFillStatus,
@@ -54,10 +64,17 @@ __all__ = [
     "GlobalBBounds",
     "GmshBackgroundMeshBackend",
     "GmshBackgroundMeshConfig",
+    "MarchingTetrahedraExtractor",
+    "PyVistaSurfaceExtractor",
     "QuadratureStatus",
     "RunMetadata",
     "SourceProfile",
     "StructuredPrismMeshBackend",
+    "SurfaceCurveMesh",
+    "SurfaceExtraction",
+    "SurfaceExtractionConfig",
+    "SurfaceExtractionError",
+    "SurfaceMesh",
     "SurfaceStatus",
     "TraceStatus",
     "TransitionStatus",
@@ -67,6 +84,7 @@ __all__ = [
     "find_global_B_bounds",
     "optional_import",
     "signed_tetrahedron_volumes",
+    "surface_flux",
     "tetrahedron_quality",
 ]
 
