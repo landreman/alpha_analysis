@@ -108,6 +108,13 @@ def test_two_closed_level_surface_components_are_periodic_tori_with_polished_roo
         )
     )
     assert set(edge_counts.values()) == {2}
+    directed_edges = Counter(
+        edge
+        for triangle in surface.triangles
+        for edge in zip(triangle, np.roll(triangle, -1))
+    )
+    assert set(directed_edges.values()) == {1}
+    assert all(directed_edges[(second, first)] == 1 for first, second in directed_edges)
     assert np.any(surface.boundary_tags & surface.PERIODIC_SEAM)
     assert np.all(zeta < 2.0 * np.pi / field.nfp)
     np.testing.assert_allclose(field.B(s, theta, zeta), 0.04, atol=1.0e-10)
