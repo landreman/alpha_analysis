@@ -10,6 +10,7 @@ import importlib
 from types import ModuleType
 
 from .config import ConnectivityConfig
+from .field import BoozerFieldLike
 from .types import (
     FloodFillStatus,
     QuadratureStatus,
@@ -21,6 +22,7 @@ from .types import (
 
 __all__ = [
     "ConnectivityConfig",
+    "BoozerFieldLike",
     "FloodFillStatus",
     "QuadratureStatus",
     "RunMetadata",

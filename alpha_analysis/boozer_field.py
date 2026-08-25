@@ -41,6 +41,7 @@ class BoozerField:
         self.I_data: np.ndarray | None = None
         self.iota_data: np.ndarray | None = None
         self.bmnc_data: np.ndarray | None = None
+        self.bmns_data: np.ndarray | None = None
         self.xm: np.ndarray | None = None
         self.xn: np.ndarray | None = None
         self.asym: bool | None = None
@@ -51,6 +52,7 @@ class BoozerField:
         self._I_spline: CubicSpline | None = None
         self._iota_spline: CubicSpline | None = None
         self._bmnc_spline: CubicSpline | None = None
+        self._bmns_spline: CubicSpline | None = None
 
     @classmethod
     def from_boozmn(cls, boozmn_file: str | Path) -> "BoozerField":
@@ -87,10 +89,19 @@ class BoozerField:
             self.I_data = f.variables["buco_b"][()][1:]
             self.G_data = f.variables["bvco_b"][()][1:]
             self.bmnc_data = f.variables["bmnc_b"][()]
+            self.asym = bool(f.variables.get("lasym__logical__", np.array(0))[()])
+            bmns_variable = f.variables.get("bmns_b")
+            if bmns_variable is None:
+                if self.asym:
+                    raise ValueError("asymmetric boozmn data is missing bmns_b")
+                self.bmns_data = np.zeros_like(self.bmnc_data)
+            else:
+                self.bmns_data = bmns_variable[()]
             self.xm = f.variables["ixm_b"][()]
             self.xn = f.variables["ixn_b"][()]
             self.nfp = int(f.variables["nfp_b"][()])
             self.R00 = float(f.variables["rmnc_b"][()][0, 0])
+            self.s_bmnc = self.s_half.copy()
 
             self._build_splines()
         finally:
@@ -115,7 +126,24 @@ class BoozerField:
         self.iota_data = self._read_xform_1d(bx, ("iota", "iota_b"))
         self.I_data = self._read_xform_1d(bx, ("Boozer_I_all", "buco_b", "I"))
         self.G_data = self._read_xform_1d(bx, ("Boozer_G_all", "bvco_b", "G"))
-        self.bmnc_data = self._read_xform_2d(bx, ("bmnc_b",))
+        # booz_xform exposes (mode, surface), whereas boozmn NetCDF stores
+        # (surface, mode).  Keep one internal convention for the spline axis.
+        self.bmnc_data = self._read_xform_2d(bx, ("bmnc_b",)).T
+        try:
+            bmns = self._read_xform_2d(bx, ("bmns_b",))
+        except AttributeError:
+            if self.asym:
+                raise ValueError(
+                    "asymmetric booz_xform output is missing bmns_b"
+                ) from None
+            self.bmns_data = np.zeros_like(self.bmnc_data)
+        else:
+            if bmns.size == 0:
+                if self.asym:
+                    raise ValueError("asymmetric booz_xform output has empty bmns_b")
+                self.bmns_data = np.zeros_like(self.bmnc_data)
+            else:
+                self.bmns_data = bmns.T
         self.xm = self._read_xform_1d(bx, ("xm_b", "ixm_b"), allow_missing=True)
         self.xn = self._read_xform_1d(bx, ("xn_b", "ixn_b"), allow_missing=True)
 
@@ -123,14 +151,17 @@ class BoozerField:
         if s_bmnc is not None:
             self.s_bmnc = np.asarray(s_bmnc, dtype=float).copy()
         else:
-            self.s_bmnc = np.linspace(0.0, 1.0, self.bmnc_data.shape[1])
+            self.s_bmnc = np.linspace(0.0, 1.0, self.bmnc_data.shape[0])
 
-        self.s_full = np.linspace(0.0, 1.0, self.iota_data.size)
-        if self.iota_data.size > 1:
-            ds = self.s_full[1] - self.s_full[0]
-            self.s_half = self.s_full[1:] - 0.5 * ds
+        s_in = getattr(bx, "s_in", None)
+        if s_in is None:
+            self.s_full = np.linspace(0.0, 1.0, self.iota_data.size)
         else:
-            self.s_half = self.s_full.copy()
+            self.s_full = np.asarray(s_in, dtype=float).copy()
+        self.s_half = self.s_full.copy()
+        self.nfp = int(bx.nfp)
+        rmnc_b = self._read_xform_2d(bx, ("rmnc_b",))
+        self.R00 = float(rmnc_b[0, 0])
 
         self._build_splines()
         return self
@@ -146,6 +177,72 @@ class BoozerField:
 
     def bmnc(self, s: np.ndarray | float) -> np.ndarray | float:
         return self._evaluate_spline(self._bmnc_spline, s)
+
+    def bmns(self, s: np.ndarray | float) -> np.ndarray | float:
+        """Return sine Fourier coefficients at normalized toroidal flux ``s``."""
+        return self._evaluate_spline(self._bmns_spline, s)
+
+    def B(self, s, theta, zeta) -> np.ndarray:
+        """Evaluate the general Fourier field pointwise (DESIGN.md §7.1).
+
+        ``s``, ``theta``, and ``zeta`` are mutually broadcast; angles are radians.
+        This protocol method is distinct from the legacy outer-grid semantics of
+        :meth:`compute_B`.
+        """
+        return self._evaluate_fourier(s, theta, zeta, derivative="B")
+
+    def dB_ds(self, s, theta, zeta) -> np.ndarray:
+        """Return analytic ``partial_s B`` using differentiated radial splines (§7.1)."""
+        return self._evaluate_fourier(s, theta, zeta, derivative="s")
+
+    def dB_dtheta(self, s, theta, zeta) -> np.ndarray:
+        """Return analytic ``partial_theta B`` in B per radian (§7.1)."""
+        return self._evaluate_fourier(s, theta, zeta, derivative="theta")
+
+    def dB_dzeta(self, s, theta, zeta) -> np.ndarray:
+        """Return analytic ``partial_zeta B`` in B per radian (§7.1)."""
+        return self._evaluate_fourier(s, theta, zeta, derivative="zeta")
+
+    def D_B(self, s, theta, zeta) -> np.ndarray:
+        """Return ``(iota partial_theta + partial_zeta) B`` (DESIGN.md §5.1)."""
+        return self._evaluate_fourier(s, theta, zeta, derivative="parallel")
+
+    def D2_B(self, s, theta, zeta) -> np.ndarray:
+        """Return the second field-line derivative in zeta parametrization (§5.1)."""
+        return self._evaluate_fourier(s, theta, zeta, derivative="parallel2")
+
+    def C(self, s):
+        """Return signed ``G + iota I`` in the loaded Boozer current units (§5.1)."""
+        return self.G(s) + self.iota(s) * self.I(s)
+
+    def _evaluate_fourier(self, s, theta, zeta, *, derivative: str) -> np.ndarray:
+        s_arr, theta_arr, zeta_arr = np.broadcast_arrays(
+            np.asarray(s, dtype=float),
+            np.asarray(theta, dtype=float),
+            np.asarray(zeta, dtype=float),
+        )
+        phase = (
+            theta_arr[..., np.newaxis] * self.xm - zeta_arr[..., np.newaxis] * self.xn
+        )
+        spline_order = 1 if derivative == "s" else 0
+        cosine = np.asarray(
+            self._evaluate_spline(self._bmnc_spline, s_arr, spline_order)
+        )
+        sine = np.asarray(self._evaluate_spline(self._bmns_spline, s_arr, spline_order))
+        base = cosine * np.cos(phase) + sine * np.sin(phase)
+        first = -cosine * np.sin(phase) + sine * np.cos(phase)
+        if derivative in ("B", "s"):
+            return np.sum(base, axis=-1)
+        if derivative == "theta":
+            return np.sum(self.xm * first, axis=-1)
+        if derivative == "zeta":
+            return np.sum(-self.xn * first, axis=-1)
+        k = self.xm * np.asarray(self.iota(s_arr))[..., np.newaxis] - self.xn
+        if derivative == "parallel":
+            return np.sum(k * first, axis=-1)
+        if derivative == "parallel2":
+            return -np.sum(k**2 * base, axis=-1)
+        raise ValueError(f"unknown Fourier derivative {derivative!r}")
 
     def compute_B(
         self,
@@ -180,7 +277,10 @@ class BoozerField:
             xm[:, np.newaxis] * theta_flat[np.newaxis, :]
             - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
         )
-        B_flat = bmnc_eval @ np.cos(phase)
+        bmns_eval = np.asarray(self.bmns(s), dtype=float)
+        if bmns_eval.ndim == 1:
+            bmns_eval = bmns_eval[np.newaxis, :]
+        B_flat = bmnc_eval @ np.cos(phase) + bmns_eval @ np.sin(phase)
 
         if theta_arr.ndim == 1:
             if scalar_s:
@@ -218,6 +318,7 @@ class BoozerField:
             or self.I_data is None
             or self.iota_data is None
             or self.bmnc_data is None
+            or self.bmns_data is None
         ):
             raise ValueError("Data has not been loaded")
 
@@ -226,18 +327,22 @@ class BoozerField:
         self._iota_spline = CubicSpline(
             self.s_half, self.iota_data, axis=0, extrapolate=True
         )
+        fourier_s = self.s_half if self.s_bmnc is None else self.s_bmnc
         self._bmnc_spline = CubicSpline(
-            self.s_half, self.bmnc_data, axis=0, extrapolate=True
+            fourier_s, self.bmnc_data, axis=0, extrapolate=True
+        )
+        self._bmns_spline = CubicSpline(
+            fourier_s, self.bmns_data, axis=0, extrapolate=True
         )
 
     @staticmethod
     def _evaluate_spline(
-        spline: CubicSpline | None, s: np.ndarray | float
+        spline: CubicSpline | None, s: np.ndarray | float, derivative_order: int = 0
     ) -> np.ndarray | float:
         if spline is None:
             raise ValueError("The requested field has not been loaded")
 
-        value = np.asarray(spline(s))
+        value = np.asarray(spline(s, nu=derivative_order))
         if value.ndim == 0:
             return value.item()
         return value
@@ -276,6 +381,7 @@ class BoozerSurface:
         self.I = booz.I(s)
         self.iota = booz.iota(s)
         self.bmnc = booz.bmnc(s)
+        self.bmns = booz.bmns(s)
         self.nfp = booz.nfp
         self.R00 = booz.R00
 
@@ -308,7 +414,8 @@ class BoozerSurface:
             xm[:, np.newaxis] * theta_flat[np.newaxis, :]
             - xn[:, np.newaxis] * phi_flat[np.newaxis, :]
         )
-        B_flat = bmnc_eval @ np.cos(phase)
+        bmns_eval = np.asarray(self.bmns, dtype=float)
+        B_flat = bmnc_eval @ np.cos(phase) + bmns_eval @ np.sin(phase)
 
         if theta_arr.ndim == 1:
             return B_flat
@@ -326,6 +433,7 @@ class BoozerSurface:
         xm = self.booz.xm
         xn = self.booz.xn
         bmnc_eval = np.asarray(self.bmnc, dtype=float)
+        bmns_eval = np.asarray(self.bmns, dtype=float)
         if bmnc_eval.ndim != 1:
             raise ValueError("BoozerSurface bmnc data must be one-dimensional")
         if bmnc_eval.size != xm.size:
@@ -338,6 +446,12 @@ class BoozerSurface:
         sin_k_phi = np.sin(k_phi)
 
         xm_alpha = np.outer(alpha_arr, xm)
-        cos_xm_alpha = np.cos(xm_alpha) * bmnc_eval[np.newaxis, :]
-        sin_xm_alpha = np.sin(xm_alpha) * bmnc_eval[np.newaxis, :]
-        return cos_xm_alpha @ cos_k_phi - sin_xm_alpha @ sin_k_phi
+        cos_alpha = np.cos(xm_alpha)
+        sin_alpha = np.sin(xm_alpha)
+        cos_part = (
+            cos_alpha * bmnc_eval[np.newaxis, :] + sin_alpha * bmns_eval[np.newaxis, :]
+        )
+        sin_part = (
+            cos_alpha * bmns_eval[np.newaxis, :] - sin_alpha * bmnc_eval[np.newaxis, :]
+        )
+        return cos_part @ cos_k_phi + sin_part @ sin_k_phi
