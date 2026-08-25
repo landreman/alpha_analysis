@@ -822,9 +822,10 @@ def _project_point_to_level(
     if on_seam:
         projected[2] = period if seam_side > 0 else 0.0
     active_domain_boundary = False
+    guarded_unit_radius = 1.0 - 8.0 * np.finfo(float).eps
     initial_radius = np.linalg.norm(projected[:2])
     if initial_radius > 1.0:
-        projected[:2] /= initial_radius
+        projected[:2] *= guarded_unit_radius / initial_radius
         active_domain_boundary = True
     for _ in range(20):
         residual = float(_evaluate_B(field, projected[np.newaxis, :])[0] - b)
@@ -848,7 +849,7 @@ def _project_point_to_level(
         if on_axis:
             candidate[:2] = 0.0
         elif active_domain_boundary or radius > 1.0:
-            candidate[:2] /= radius
+            candidate[:2] *= guarded_unit_radius / radius
             active_domain_boundary = True
         if on_seam:
             candidate[2] = period if seam_side > 0 else 0.0

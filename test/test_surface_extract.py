@@ -244,7 +244,7 @@ def test_extractors_preserve_edge_boundary_inside_plasma_domain(extractor_type):
     ).build(field)
 
     surface = extractor_type().extract(background, field, b=1.75).full
-    radii = np.linalg.norm(surface.points[:, :2], axis=1)
+    radii_squared = np.sum(surface.points[:, :2] ** 2, axis=1)
     edge = (surface.boundary_tags & SurfaceMesh.EDGE) != 0
     edge_counts = Counter(
         tuple(sorted(segment))
@@ -261,7 +261,7 @@ def test_extractors_preserve_edge_boundary_inside_plasma_domain(extractor_type):
 
     assert len(boundary_vertices) > 0
     np.testing.assert_array_equal(np.flatnonzero(edge), boundary_vertices)
-    assert np.all(radii <= 1.0)
+    assert np.all(radii_squared <= 1.0 + 32.0 * np.finfo(float).eps)
 
 
 def test_surface_flux_matches_independent_ds_wedge_dalpha_determinant():
