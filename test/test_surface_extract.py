@@ -235,17 +235,27 @@ def test_extractors_use_physical_current_sign_and_flux_balance_converges(
     [MarchingTetrahedraExtractor, PyVistaSurfaceExtractor],
     ids=["marching-tetrahedra", "pyvista"],
 )
-def test_extractors_preserve_edge_boundary_inside_plasma_domain(extractor_type):
-    # B=2-0.3s+0.1cos(3zeta), b=1.75 reaches s=1 on two boundary curves.
-    # Projection must stay in the logical plasma and retain EDGE provenance.
-    field = _field(radial_coefficients=[2.0, -0.3], toroidal_cosine=0.1)
-    background = StructuredPrismMeshBackend(
-        BackgroundMeshConfig(n_radial=10, n_poloidal=20, n_zeta=13)
-    ).build(field)
+@pytest.mark.parametrize(
+    "radial_coefficients,b,resolution,expect_seam",
+    [
+        pytest.param([2.0, -0.3], 1.75, (10, 20, 13), False, id="edge-only"),
+        pytest.param([2.0, 0.3], 2.35, (8, 16, 5), True, id="edge-and-seam"),
+    ],
+)
+def test_extractors_preserve_boundary_provenance_inside_plasma_domain(
+    extractor_type, radial_coefficients, b, resolution, expect_seam
+):
+    # These analytic levels reach the physical edge; the second also crosses
+    # the periodic seam, so EDGE recovery must not absorb seam-only vertices.
+    field = _field(radial_coefficients=radial_coefficients, toroidal_cosine=0.1)
+    background = StructuredPrismMeshBackend(BackgroundMeshConfig(*resolution)).build(
+        field
+    )
 
-    surface = extractor_type().extract(background, field, b=1.75).full
+    surface = extractor_type().extract(background, field, b=b).full
     radii_squared = np.sum(surface.points[:, :2] ** 2, axis=1)
     edge = (surface.boundary_tags & SurfaceMesh.EDGE) != 0
+    seam = (surface.boundary_tags & SurfaceMesh.PERIODIC_SEAM) != 0
     edge_counts = Counter(
         tuple(sorted(segment))
         for triangle in surface.triangles
@@ -261,7 +271,28 @@ def test_extractors_preserve_edge_boundary_inside_plasma_domain(extractor_type):
 
     assert len(boundary_vertices) > 0
     np.testing.assert_array_equal(np.flatnonzero(edge), boundary_vertices)
+    assert bool(np.any(seam)) is expect_seam
     assert np.all(radii_squared <= 1.0 + 32.0 * np.finfo(float).eps)
+
+
+@pytest.mark.parametrize(
+    "extractor_type",
+    [MarchingTetrahedraExtractor, PyVistaSurfaceExtractor],
+    ids=["marching-tetrahedra", "pyvista"],
+)
+def test_extractors_return_empty_mesh_for_absent_level(extractor_type):
+    field = _field(radial_coefficients=[2.0, 0.3], toroidal_cosine=0.1)
+    background = StructuredPrismMeshBackend(
+        BackgroundMeshConfig(n_radial=3, n_poloidal=8, n_zeta=4)
+    ).build(field)
+
+    extraction = extractor_type().extract(background, field, b=3.0)
+
+    for surface in (extraction.full, extraction.incoming, extraction.outgoing):
+        assert surface.points.shape == (0, 3)
+        assert surface.triangles.shape == (0, 3)
+    assert extraction.g_zero.points.shape == (0, 3)
+    assert extraction.g_zero.segments.shape == (0, 2)
 
 
 def test_surface_flux_matches_independent_ds_wedge_dalpha_determinant():
@@ -375,6 +406,7 @@ def test_pyvista_prototype_returns_plain_arrays(monkeypatch):
         faces = np.array([3, 0, 1, 2])
         point_data = {
             "boundary tag [bit mask]": np.full(3, 2, dtype=np.int64),
+            "background OUTER boundary indicator": np.ones(3),
         }
 
         def triangulate(self):

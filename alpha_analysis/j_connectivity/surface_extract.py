@@ -12,6 +12,8 @@ from scipy.optimize import brentq, linear_sum_assignment, root
 from .field import BoozerFieldLike
 from .types import BackgroundMesh, SurfaceStatus
 
+_PYVISTA_OUTER_INDICATOR = "background OUTER boundary indicator"
+
 
 class SurfaceExtractionError(RuntimeError):
     """A level surface could not be returned without hiding a failure (§21.2)."""
@@ -249,16 +251,21 @@ class PyVistaSurfaceExtractor:
             raise ValueError("b must be finite")
         period = 2.0 * np.pi / field.nfp
         grid = background.to_pyvista()
+        grid.point_data[_PYVISTA_OUTER_INDICATOR] = (
+            (background.boundary_tags & BackgroundMesh.OUTER) != 0
+        ).astype(np.float64)
         polydata = grid.contour([float(b)], scalars="B [field units]").triangulate()
         points = np.asarray(polydata.points, dtype=np.float64)
         faces = np.asarray(polydata.faces, dtype=np.int64)
-        if "boundary tag [bit mask]" not in polydata.point_data:
+        if len(points) and _PYVISTA_OUTER_INDICATOR not in polydata.point_data:
             raise SurfaceExtractionError(
                 SurfaceStatus.DEGENERATE,
-                "PyVista contour lost point-located background boundary tags",
+                "PyVista contour lost the OUTER boundary indicator",
             )
-        background_tags = np.asarray(
-            polydata.point_data["boundary tag [bit mask]"], dtype=np.int64
+        outer_indicator = (
+            np.asarray(polydata.point_data[_PYVISTA_OUTER_INDICATOR], dtype=np.float64)
+            if len(points)
+            else np.empty(0, dtype=np.float64)
         )
         if len(faces):
             faces = faces.reshape(-1, 4)
@@ -275,7 +282,7 @@ class PyVistaSurfaceExtractor:
         source_boundary_tags = _pyvista_boundary_tags(
             points,
             triangles,
-            background_tags,
+            outer_indicator,
             seam_sides,
             period,
             self.config.merge_tolerance,
@@ -1037,13 +1044,13 @@ def _coordinate_boundary_tags(
 
 
 def _pyvista_boundary_tags(
-    points, triangles, background_tags, seam_sides, period, tolerance
+    points, triangles, outer_indicator, seam_sides, period, tolerance
 ):
     """Recover VTK contour boundary provenance before projection moves points."""
-    if background_tags.shape != (len(points),):
+    if outer_indicator.shape != (len(points),):
         raise SurfaceExtractionError(
             SurfaceStatus.DEGENERATE,
-            "PyVista contour lost point-located background boundary tags",
+            "PyVista contour returned an invalid OUTER boundary indicator",
         )
     tags = _coordinate_boundary_tags(points, period, tolerance)
     tags &= ~SurfaceMesh.EDGE
@@ -1065,7 +1072,12 @@ def _pyvista_boundary_tags(
         seam_sides[boundary_edges[:, 0]] == seam_sides[boundary_edges[:, 1]]
     )
     physical_edge = np.all(
-        (background_tags[boundary_edges] & BackgroundMesh.OUTER) != 0,
+        np.isclose(
+            outer_indicator[boundary_edges],
+            1.0,
+            rtol=0.0,
+            atol=32.0 * np.finfo(float).eps,
+        ),
         axis=1,
     )
     if np.any(~(same_seam | physical_edge)):
