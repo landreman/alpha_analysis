@@ -16,7 +16,7 @@ lowest-numbered unchecked row.
 | --- | --- | --- | --- | --- |
 | 0 | Baseline and design scaffolding | Establish package skeleton without changing numerical behavior | [x] | #3 |
 | 1 | General Boozer field derivatives and asymmetric modes | Provide the field interface needed by all later work | [x] | #4 |
-| 2 | Denominator \(V_h\) and global \(B\) bounds | Implement the independent normalization calculation | [ ] | |
+| 2 | Denominator \(V_h\) and global \(B\) bounds | Implement the independent normalization calculation | [x] | #5 |
 | 3 | Deterministic periodic background mesh | Build the axis-regular logical mesh without Gmsh | [ ] | |
 | 4 | Gmsh background backend | Add the production mesher behind the same interface | [ ] | |
 | 5 | \(B=b\) surface extraction | Extract all level-surface components and incoming/outgoing halves | [ ] | |
@@ -43,6 +43,7 @@ move it into `docs/DESIGN.md` and delete it here.
 
 - Milestone 0 established base-only `j_connectivity` imports; optional features must use `optional_import()` so missing extras provide an install command.
 - Milestone 1's `BoozerFieldLike.B()` uses pointwise NumPy broadcasting; legacy `compute_B()` retains its outer-`s` grid semantics.
+- Milestone 2's `find_global_B_bounds()` returns refined extrema, a safety-margin bracket, and radial extrema profiles on the configured `s` grid for later background-mesh diagnostics.
 
 ## Accepted deviations
 
