@@ -10,6 +10,18 @@ import importlib
 from types import ModuleType
 
 from .config import ConnectivityConfig
+from .denominator import (
+    BoundsConfig,
+    DenominatorConfig,
+    DenominatorConvergence,
+    DenominatorEstimate,
+    GlobalBBounds,
+    SourceProfile,
+    UniformSourceProfile,
+    compute_denominator,
+    denominator_convergence,
+    find_global_B_bounds,
+)
 from .field import BoozerFieldLike
 from .types import (
     FloodFillStatus,
@@ -22,13 +34,23 @@ from .types import (
 
 __all__ = [
     "ConnectivityConfig",
+    "BoundsConfig",
     "BoozerFieldLike",
+    "DenominatorConfig",
+    "DenominatorConvergence",
+    "DenominatorEstimate",
     "FloodFillStatus",
+    "GlobalBBounds",
     "QuadratureStatus",
     "RunMetadata",
+    "SourceProfile",
     "SurfaceStatus",
     "TraceStatus",
     "TransitionStatus",
+    "UniformSourceProfile",
+    "compute_denominator",
+    "denominator_convergence",
+    "find_global_B_bounds",
     "optional_import",
 ]
 
