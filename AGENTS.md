@@ -78,7 +78,9 @@ A milestone is done when all of these hold:
 3. You verified the tests can fail: applied the one or two mutations that matter for
    this milestone, watched the suite go red, reverted. The PR body names them.
 4. Any new geometric object has at least one diagnostic plot (`docs/DESIGN.md` §17).
-5. GitHub Actions CI is green on the branch.
+5. The GitHub Actions `Tests` workflow is green on the branch. The optional
+   `Claude Code Review` workflow is not a prerequisite for starting the next
+   milestone.
 6. `docs/STATUS.md` has the milestone's row marked and any note the next milestone
    needs.
 7. Every deviation from `docs/DESIGN.md` is either an accepted ADR or written up in the

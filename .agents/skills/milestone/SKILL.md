@@ -21,8 +21,9 @@ have to guess the physics.
 
 Also read the "Notes for the next milestone" section of `docs/STATUS.md`.
 
-If the previous milestone's row in `docs/STATUS.md` is unchecked, or its CI was not
-green, stop and say so.
+If the previous milestone's row in `docs/STATUS.md` is unchecked, or its GitHub Actions
+`Tests` workflow was not green, stop and say so. A failed or unavailable `Claude Code
+Review` workflow does not block the next milestone.
 
 ## 2. Branch
 
@@ -84,10 +85,11 @@ does not count.
 This repository does not aim for exhaustive coverage, so do not pad the suite. Adding
 tests that cost wall-clock without being able to fail is worse than adding none.
 
-## 6. Run GitHub Actions CI
+## 6. Run the GitHub Actions Tests workflow
 
-Push the branch to GitHub and let the CI run. Check that it passes. If anything fails,
-fix the issue, push again, and iterate until CI is green.
+Push the branch to GitHub and let the `Tests` workflow run. Check that it passes. If it
+fails, fix the issue, push again, and iterate until the `Tests` workflow is green. The
+optional `Claude Code Review` workflow is not part of this gate.
 
 ## 7. Record
 
@@ -120,7 +122,7 @@ PR body must contain, in this order:
 - open ADRs blocking merge, or "none"
 - anything you were unsure about and want the reviewer to look at hardest
 
-## 9. Fix serious issues raised by Claude review
+## 9. Optionally address Claude review findings
 
 The review only runs when the PR transitions to ready-for-review, so trigger it
 explicitly once the PR is in the state you want reviewed:
@@ -129,10 +131,12 @@ explicitly once the PR is in the state you want reviewed:
 gh pr ready <number>
 ```
 
-Periodically check for the `claude-review` workflow run. For everything it flags as
-`blocking` or `should-fix`, fix it. Before pushing more commits that you don't want
-reviewed immediately (e.g. you're still iterating on the same round of fixes), convert
-the PR back to draft:
+If the review workflow is configured and runs, periodically check for the
+`claude-review` workflow run. Address findings flagged as `blocking` or `should-fix`
+when appropriate. A failed, unavailable, or unconfigured Claude review must not block
+the milestone or the start of the next one; only the `Tests` workflow is required.
+Before pushing more commits that you don't want reviewed immediately (e.g. you're still
+iterating on the same round of fixes), convert the PR back to draft:
 
 ```bash
 gh pr ready <number> --undo
@@ -144,8 +148,9 @@ Iterate until the review is satisfied. For items flagged as `note`, it is up to 
 judgement whether to address them. If you disagree with a finding, write an ADR and name
 it in the PR body.
 
-Once the `claude-review` workflow produces no `blocking` or `should-fix` findings, stop,
-leaving the PR marked ready for review. Do not merge. Do not start the next milestone.
+Once any desired Claude review pass is complete, stop, leaving the PR marked ready for
+review if appropriate. Do not merge. A clean `Tests` workflow permits the next
+milestone regardless of Claude review status.
 
 ## If you hit a STOP condition
 
