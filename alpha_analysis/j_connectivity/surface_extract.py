@@ -748,9 +748,11 @@ def _polish_g_crossing(
     parameter = initial_parameter + solution.x[0]
     point = initial + solution.x[0] * tangent + solution.x[1] * normal
     residual = equations(solution.x)
+    normal_displacement_limit = config.merge_tolerance + np.linalg.norm(tangent)
     if (
         not np.all(np.isfinite(solution.x))
         or not -config.merge_tolerance <= parameter <= 1.0 + config.merge_tolerance
+        or abs(solution.x[1]) > normal_displacement_limit
         or abs(residual[0]) > config.B_tolerance
         or abs(residual[1]) > config.g_tolerance
     ):
@@ -758,6 +760,8 @@ def _polish_g_crossing(
             SurfaceStatus.ROOT_FAILURE,
             "simultaneous B=b and g=0 split-point polishing failed "
             f"(success={solution.success}, parameter={parameter:.6g}, "
+            f"normal_displacement={solution.x[1]:.3g}, "
+            f"normal_limit={normal_displacement_limit:.3g}, "
             f"residual=({residual[0]:.3g}, {residual[1]:.3g}))",
         )
     return _canonicalize_point(point, period, config.merge_tolerance)

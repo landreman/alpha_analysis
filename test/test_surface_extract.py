@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from types import SimpleNamespace
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -232,6 +233,47 @@ def test_undefined_physical_field_direction_has_explicit_surface_status():
         MarchingTetrahedraExtractor().extract(background, field, b=2.15)
 
     assert caught.value.status is SurfaceStatus.DEGENERATE
+
+
+def test_g_zero_projection_rejects_a_root_beyond_the_local_edge(monkeypatch):
+    import alpha_analysis.j_connectivity.surface_extract as module
+
+    field = _field(radial_coefficients=[2.0, 0.3], toroidal_cosine=0.1)
+    period = 2.0 * np.pi / field.nfp
+    first = np.array([0.6, 0.0, 0.2])
+    second = np.array([0.0, 0.6, 0.4])
+    local_edge_length = np.linalg.norm(second - first)
+    monkeypatch.setattr(
+        module,
+        "root",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            success=True, x=np.array([0.0, 2.0 * local_edge_length])
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "_evaluate_B",
+        lambda _field, points: np.full(len(points), 2.15),
+    )
+    monkeypatch.setattr(
+        module,
+        "_physical_g",
+        lambda _field, points: np.zeros(len(points)),
+    )
+
+    with pytest.raises(SurfaceExtractionError, match="normal_displacement") as caught:
+        module._polish_g_crossing(
+            first,
+            second,
+            first_g=-1.0,
+            second_g=1.0,
+            field=field,
+            b=2.15,
+            period=period,
+            config=module.SurfaceExtractionConfig(),
+        )
+
+    assert caught.value.status is SurfaceStatus.ROOT_FAILURE
 
 
 def test_pyvista_prototype_returns_plain_arrays(monkeypatch):
