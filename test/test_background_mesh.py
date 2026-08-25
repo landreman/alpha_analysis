@@ -294,6 +294,8 @@ def test_logical_gradient_uses_regular_cartesian_axis_limit():
     field = AxisRegularLinearField()
     axis = _logical_gradient_magnitude(field, 0.0, 0.0, 0.3, 1e-6)
     near_axis = _logical_gradient_magnitude(field, 1e-8, 0.0, 0.3, 1e-6)
+    off_axis = _logical_gradient_magnitude(field, 0.3, 0.3, 0.3, 1e-6)
 
     np.testing.assert_allclose(axis, 1.0, rtol=1e-9)
     np.testing.assert_allclose(near_axis, 1.0, rtol=1e-12)
+    np.testing.assert_allclose(off_axis, 1.0, rtol=1e-12)
