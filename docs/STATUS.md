@@ -45,7 +45,7 @@ move it into `docs/DESIGN.md` and delete it here.
 - Milestone 1's `BoozerFieldLike.B()` uses pointwise NumPy broadcasting; legacy `compute_B()` retains its outer-`s` grid semantics.
 - Milestone 2's `find_global_B_bounds()` returns refined extrema, a safety-margin bracket, and radial extrema profiles on the configured `s` grid for later background-mesh diagnostics.
 - Milestone 3's `BackgroundMesh.boundary_tags` is a point-located bit mask; periodic pairs are explicit `(zeta=0, zeta=L_zeta)` node IDs, and the Gmsh backend must satisfy the same array and orientation invariants.
-- Milestone 4's Gmsh backend embeds the logical axis, returns exact lower/upper seam pairs, supports axis/critical/low-gradient sizing, and finalizes its owned Gmsh session before returning plain arrays.
+- Milestone 4's Gmsh backend embeds the logical axis, returns exact lower/upper seam pairs, supports axis/critical/low-gradient sizing, and finalizes its owned Gmsh session before returning plain arrays; full background-resolution convergence remains Milestone 17 validation work.
 
 ## Accepted deviations
 

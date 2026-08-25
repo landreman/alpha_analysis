@@ -39,7 +39,9 @@ class GmshBackgroundMeshConfig:
     Sizes and radii are dimensionless logical-cylinder lengths. Critical
     points use ``(x, y, zeta)`` with zeta in radians. When both gradient
     controls are set, locations whose logical-coordinate gradient magnitude
-    is below ``low_gradient_threshold`` receive ``low_gradient_size``.
+    is below ``low_gradient_threshold`` receive ``low_gradient_size``. The
+    axis gradient uses centered Cartesian differences at
+    ``axis_gradient_radius`` to evaluate the regular limit from §7.3.
     """
 
     target_size: float = 0.35
@@ -50,12 +52,14 @@ class GmshBackgroundMeshConfig:
     critical_radius: float = 0.2
     low_gradient_size: float | None = None
     low_gradient_threshold: float | None = None
+    axis_gradient_radius: float = 1e-6
 
     def __post_init__(self) -> None:
         positive = {
             "target_size": self.target_size,
             "axis_radius": self.axis_radius,
             "critical_radius": self.critical_radius,
+            "axis_gradient_radius": self.axis_gradient_radius,
         }
         positive.update(
             (name, value)
@@ -69,6 +73,8 @@ class GmshBackgroundMeshConfig:
         for name, value in positive.items():
             if value <= 0.0:
                 raise ValueError(f"{name} must be positive")
+            if name.endswith("_size") and value > self.target_size:
+                raise ValueError(f"{name} must not exceed target_size")
         if bool(self.critical_points) != (self.critical_size is not None):
             raise ValueError(
                 "critical_points and critical_size must be provided together"
@@ -233,13 +239,7 @@ class StructuredPrismMeshBackend:
             )
         )
 
-        s = radii_squared
-        theta = np.arctan2(points[:, 1], points[:, 0])
-        theta[s == 0.0] = 0.0
-        field_values = tuple(
-            np.asarray(evaluator(s, theta, points[:, 2]), dtype=np.float64)
-            for evaluator in (field.B, field.D_B, field.D2_B)
-        )
+        field_values = _sample_field_on_points(field, points)
         return BackgroundMesh(
             points=points,
             tetrahedra=tetrahedra,
@@ -315,22 +315,49 @@ def _gmsh_size_callback(
                     + fraction * (config.target_size - config.critical_size),
                 )
         if config.low_gradient_size is not None:
-            s = x * x + y * y
-            theta = 0.0 if s == 0.0 else np.arctan2(y, x)
-            dB_ds = float(field.dB_ds(s, theta, zeta))
-            dB_dtheta = float(field.dB_dtheta(s, theta, zeta))
-            dB_dzeta = float(field.dB_dzeta(s, theta, zeta))
-            if s == 0.0:
-                gradient_squared = dB_dzeta**2
-            else:
-                dB_dx = 2.0 * x * dB_ds - y * dB_dtheta / s
-                dB_dy = 2.0 * y * dB_ds + x * dB_dtheta / s
-                gradient_squared = dB_dx**2 + dB_dy**2 + dB_dzeta**2
-            if np.sqrt(gradient_squared) <= config.low_gradient_threshold:
+            gradient = _logical_gradient_magnitude(
+                field, x, y, zeta, config.axis_gradient_radius
+            )
+            if gradient <= config.low_gradient_threshold:
                 size = min(size, config.low_gradient_size)
-        return size
+        return min(size, _default_size)
 
     return callback
+
+
+def _logical_gradient_magnitude(
+    field: BoozerFieldLike,
+    x: float,
+    y: float,
+    zeta: float,
+    axis_gradient_radius: float,
+) -> float:
+    """Return ``|grad B|`` in logical ``(x,y,zeta)`` coordinates (§§7.3, 8.2).
+
+    At the axis, centered logical-coordinate differences at the configured
+    dimensionless radius evaluate the regular Cartesian limit without dividing
+    by ``s``. Away from the axis, the exact ``s=x^2+y^2`` chain rule is used.
+    """
+    s = x * x + y * y
+    dB_dzeta = float(field.dB_dzeta(s, 0.0 if s == 0.0 else np.arctan2(y, x), zeta))
+    if s == 0.0:
+        epsilon = axis_gradient_radius
+        epsilon_s = epsilon**2
+        dB_dx = (
+            float(field.B(epsilon_s, 0.0, zeta))
+            - float(field.B(epsilon_s, np.pi, zeta))
+        ) / (2.0 * epsilon)
+        dB_dy = (
+            float(field.B(epsilon_s, 0.5 * np.pi, zeta))
+            - float(field.B(epsilon_s, -0.5 * np.pi, zeta))
+        ) / (2.0 * epsilon)
+    else:
+        theta = np.arctan2(y, x)
+        dB_ds = float(field.dB_ds(s, theta, zeta))
+        dB_dtheta = float(field.dB_dtheta(s, theta, zeta))
+        dB_dx = 2.0 * x * dB_ds - y * dB_dtheta / s
+        dB_dy = 2.0 * y * dB_ds + x * dB_dtheta / s
+    return float(np.sqrt(dB_dx**2 + dB_dy**2 + dB_dzeta**2))
 
 
 def _set_gmsh_background_fields(
@@ -438,13 +465,7 @@ def _extract_gmsh_mesh(
     points[pairs[:, 1], :2] = points[pairs[:, 0], :2]
     points[pairs[:, 1], 2] = period
 
-    s = np.sum(points[:, :2] ** 2, axis=1)
-    theta = np.arctan2(points[:, 1], points[:, 0])
-    theta[s == 0.0] = 0.0
-    field_values = tuple(
-        np.asarray(evaluator(s, theta, points[:, 2]), dtype=np.float64)
-        for evaluator in (field.B, field.D_B, field.D2_B)
-    )
+    field_values = _sample_field_on_points(field, points)
     return BackgroundMesh(
         points=points,
         tetrahedra=tetrahedra,
@@ -453,6 +474,19 @@ def _extract_gmsh_mesh(
         B=field_values[0],
         D_B=field_values[1],
         D2_B=field_values[2],
+    )
+
+
+def _sample_field_on_points(
+    field: BoozerFieldLike, points: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Sample ``B``, ``D B``, and ``D² B`` using §3.2 logical coordinates."""
+    s = np.sum(points[:, :2] ** 2, axis=1)
+    theta = np.arctan2(points[:, 1], points[:, 0])
+    theta[s == 0.0] = 0.0
+    return tuple(
+        np.asarray(evaluator(s, theta, points[:, 2]), dtype=np.float64)
+        for evaluator in (field.B, field.D_B, field.D2_B)
     )
 
 
