@@ -134,24 +134,26 @@ def test_extractors_return_two_closed_periodic_tori_with_polished_roots(
 
 
 @pytest.mark.parametrize(
-    "extractor_type,resolutions,max_imbalance",
+    "extractor_type,resolutions,max_imbalance,expected_seam_points",
     [
         pytest.param(
             MarchingTetrahedraExtractor,
             ((10, 20, 13), (18, 36, 29)),
             2.0e-5,
+            72,
             id="marching-tetrahedra",
         ),
         pytest.param(
             PyVistaSurfaceExtractor,
             ((6, 12, 7), (22, 44, 37)),
             5.0e-4,
+            90,
             id="pyvista",
         ),
     ],
 )
 def test_extractors_use_physical_current_sign_and_flux_balance_converges(
-    extractor_type, resolutions, max_imbalance
+    extractor_type, resolutions, max_imbalance, expected_seam_points
 ):
     # B=2+0.3s+0.1cos(3zeta), b=2.15 is a closed torus.  With C=G+iota I<0,
     # incoming g=B*D_B/C<0 is the D_B>0 half, catching a lost current sign.
@@ -205,6 +207,10 @@ def test_extractors_use_physical_current_sign_and_flux_balance_converges(
         < 0.0
     )
     assert len(extraction.g_zero.segments) > 0
+    assert (
+        np.count_nonzero(extraction.full.boundary_tags & SurfaceMesh.PERIODIC_SEAM)
+        == expected_seam_points
+    )
     assert imbalances[1] < imbalances[0]
     assert imbalances[1] < max_imbalance
     assert reconstruction_errors[1] < reconstruction_errors[0]
@@ -222,6 +228,40 @@ def test_extractors_use_physical_current_sign_and_flux_balance_converges(
         )
     np.testing.assert_allclose(extraction.g_zero.B, extraction.b, atol=1.0e-10)
     np.testing.assert_allclose(extraction.g_zero.g, 0.0, atol=1.0e-10)
+
+
+@pytest.mark.parametrize(
+    "extractor_type",
+    [MarchingTetrahedraExtractor, PyVistaSurfaceExtractor],
+    ids=["marching-tetrahedra", "pyvista"],
+)
+def test_extractors_preserve_edge_boundary_inside_plasma_domain(extractor_type):
+    # B=2-0.3s+0.1cos(3zeta), b=1.75 reaches s=1 on two boundary curves.
+    # Projection must stay in the logical plasma and retain EDGE provenance.
+    field = _field(radial_coefficients=[2.0, -0.3], toroidal_cosine=0.1)
+    background = StructuredPrismMeshBackend(
+        BackgroundMeshConfig(n_radial=10, n_poloidal=20, n_zeta=13)
+    ).build(field)
+
+    surface = extractor_type().extract(background, field, b=1.75).full
+    radii = np.linalg.norm(surface.points[:, :2], axis=1)
+    edge = (surface.boundary_tags & SurfaceMesh.EDGE) != 0
+    edge_counts = Counter(
+        tuple(sorted(segment))
+        for triangle in surface.triangles
+        for segment in (
+            (triangle[0], triangle[1]),
+            (triangle[1], triangle[2]),
+            (triangle[2], triangle[0]),
+        )
+    )
+    boundary_vertices = np.unique(
+        [segment for segment, count in edge_counts.items() if count == 1]
+    )
+
+    assert len(boundary_vertices) > 0
+    np.testing.assert_array_equal(np.flatnonzero(edge), boundary_vertices)
+    assert np.all(radii <= 1.0)
 
 
 def test_surface_flux_matches_independent_ds_wedge_dalpha_determinant():
@@ -333,6 +373,9 @@ def test_pyvista_prototype_returns_plain_arrays(monkeypatch):
     class FakePolyData:
         points = contour_points
         faces = np.array([3, 0, 1, 2])
+        point_data = {
+            "boundary tag [bit mask]": np.full(3, 2, dtype=np.int64),
+        }
 
         def triangulate(self):
             return self

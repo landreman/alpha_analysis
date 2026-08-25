@@ -240,8 +240,10 @@ class PyVistaSurfaceExtractor:
         """Prototype ``B=b`` extraction; PyVista objects do not cross this call.
 
         VTK does not expose parent-edge or parent-tetrahedron IDs, so those
-        provenance arrays contain ``-1``. Contour points are projected to
-        ``B=b`` before the common physical-sign splitting stage.
+        provenance arrays contain ``-1``. Boundary provenance is captured
+        before projection and carried through coordinate merging. Contour
+        points are projected to ``B=b`` without leaving the logical plasma
+        before the common physical-sign splitting stage.
         """
         if not np.isfinite(b):
             raise ValueError("b must be finite")
@@ -250,6 +252,14 @@ class PyVistaSurfaceExtractor:
         polydata = grid.contour([float(b)], scalars="B [field units]").triangulate()
         points = np.asarray(polydata.points, dtype=np.float64)
         faces = np.asarray(polydata.faces, dtype=np.int64)
+        if "boundary tag [bit mask]" not in polydata.point_data:
+            raise SurfaceExtractionError(
+                SurfaceStatus.DEGENERATE,
+                "PyVista contour lost point-located background boundary tags",
+            )
+        background_tags = np.asarray(
+            polydata.point_data["boundary tag [bit mask]"], dtype=np.int64
+        )
         if len(faces):
             faces = faces.reshape(-1, 4)
             if np.any(faces[:, 0] != 3):
@@ -262,22 +272,41 @@ class PyVistaSurfaceExtractor:
         seam_sides = np.zeros(len(points), dtype=np.int8)
         seam_sides[points[:, 2] <= self.config.merge_tolerance] = -1
         seam_sides[period - points[:, 2] <= self.config.merge_tolerance] = 1
+        source_boundary_tags = _pyvista_boundary_tags(
+            points,
+            triangles,
+            background_tags,
+            seam_sides,
+            period,
+            self.config.merge_tolerance,
+        )
         points = np.asarray(
             [
-                _project_point_to_level(point, field, float(b), period, self.config)
-                for point in points
+                _project_point_to_level(
+                    point,
+                    field,
+                    float(b),
+                    period,
+                    self.config,
+                    boundary_tag=int(boundary_tag),
+                    seam_side=int(seam_side),
+                )
+                for point, boundary_tag, seam_side in zip(
+                    points, source_boundary_tags, seam_sides
+                )
             ],
             dtype=np.float64,
         ).reshape(-1, 3)
         points = _match_pyvista_periodic_seam(
             points, seam_sides, self.config.merge_tolerance
         )
-        points, triangles = _merge_coordinate_copies(
+        points, triangles, point_remap = _merge_coordinate_copies(
             points, triangles, period, self.config.merge_tolerance
         )
         B_values = _evaluate_B(field, points)
         g = _physical_g(field, points)
         tags = _coordinate_boundary_tags(points, period, self.config.merge_tolerance)
+        np.bitwise_or.at(tags, point_remap, source_boundary_tags)
         tags[np.abs(g) <= self.config.g_tolerance] |= SurfaceMesh.G_ZERO
         triangles = _orient_triangles(points, triangles, field, period)
         full = SurfaceMesh(
@@ -780,17 +809,50 @@ def _project_point_to_level(
     b: float,
     period: float,
     config: SurfaceExtractionConfig,
+    *,
+    boundary_tag: int = 0,
+    seam_side: int = 0,
 ) -> np.ndarray:
+    """Project a VTK contour point to ``B=b`` within the §8.2 disk domain."""
     projected = np.asarray(point, dtype=np.float64).copy()
+    on_axis = bool(boundary_tag & SurfaceMesh.AXIS)
+    on_seam = bool(boundary_tag & SurfaceMesh.PERIODIC_SEAM)
+    if on_axis:
+        projected[:2] = 0.0
+    if on_seam:
+        projected[2] = period if seam_side > 0 else 0.0
+    active_domain_boundary = False
+    initial_radius = np.linalg.norm(projected[:2])
+    if initial_radius > 1.0:
+        projected[:2] /= initial_radius
+        active_domain_boundary = True
     for _ in range(20):
         residual = float(_evaluate_B(field, projected[np.newaxis, :])[0] - b)
         if abs(residual) <= config.B_tolerance:
+            if np.linalg.norm(projected[:2]) > 1.0 + config.merge_tolerance:
+                break
             return _canonicalize_point(projected, period, config.merge_tolerance)
         gradient = _logical_B_gradient(field, projected)
+        if active_domain_boundary:
+            radial = np.array([projected[0], projected[1], 0.0])
+            gradient -= np.dot(gradient, radial) * radial
+        if on_axis:
+            gradient[:2] = 0.0
+        if on_seam:
+            gradient[2] = 0.0
         norm_squared = float(np.dot(gradient, gradient))
         if norm_squared <= np.finfo(float).eps:
             break
-        projected -= residual * gradient / norm_squared
+        candidate = projected - residual * gradient / norm_squared
+        radius = np.linalg.norm(candidate[:2])
+        if on_axis:
+            candidate[:2] = 0.0
+        elif active_domain_boundary or radius > 1.0:
+            candidate[:2] /= radius
+            active_domain_boundary = True
+        if on_seam:
+            candidate[2] = period if seam_side > 0 else 0.0
+        projected = candidate
     raise SurfaceExtractionError(
         SurfaceStatus.ROOT_FAILURE, "PyVista contour-point projection failed"
     )
@@ -973,6 +1035,48 @@ def _coordinate_boundary_tags(
     return tags
 
 
+def _pyvista_boundary_tags(
+    points, triangles, background_tags, seam_sides, period, tolerance
+):
+    """Recover VTK contour boundary provenance before projection moves points."""
+    if background_tags.shape != (len(points),):
+        raise SurfaceExtractionError(
+            SurfaceStatus.DEGENERATE,
+            "PyVista contour lost point-located background boundary tags",
+        )
+    tags = _coordinate_boundary_tags(points, period, tolerance)
+    tags &= ~SurfaceMesh.EDGE
+    if not len(triangles):
+        return tags
+    edges = np.sort(
+        np.vstack(
+            (
+                triangles[:, [0, 1]],
+                triangles[:, [1, 2]],
+                triangles[:, [2, 0]],
+            )
+        ),
+        axis=1,
+    )
+    unique_edges, counts = np.unique(edges, axis=0, return_counts=True)
+    boundary_edges = unique_edges[counts == 1]
+    same_seam = (seam_sides[boundary_edges[:, 0]] != 0) & (
+        seam_sides[boundary_edges[:, 0]] == seam_sides[boundary_edges[:, 1]]
+    )
+    physical_edge = np.all(
+        (background_tags[boundary_edges] & BackgroundMesh.OUTER) != 0,
+        axis=1,
+    )
+    if np.any(~(same_seam | physical_edge)):
+        raise SurfaceExtractionError(
+            SurfaceStatus.DEGENERATE,
+            "PyVista contour has a boundary without seam or EDGE provenance",
+        )
+    if np.any(physical_edge):
+        tags[np.unique(boundary_edges[physical_edge])] |= SurfaceMesh.EDGE
+    return tags
+
+
 def _match_pyvista_periodic_seam(points, seam_sides, tolerance):
     """Identify VTK's lower/upper contour copies before coordinate merging.
 
@@ -1037,4 +1141,8 @@ def _merge_coordinate_copies(points, triangles, period, tolerance):
                 SurfaceStatus.DEGENERATE,
                 "coordinate merging collapsed a PyVista contour triangle",
             )
-    return np.asarray(canonical_points, dtype=np.float64).reshape(-1, 3), remapped
+    return (
+        np.asarray(canonical_points, dtype=np.float64).reshape(-1, 3),
+        remapped,
+        remap,
+    )
