@@ -47,7 +47,7 @@ move it into `docs/DESIGN.md` and delete it here.
 - Milestone 3's `BackgroundMesh.boundary_tags` is a point-located bit mask; periodic pairs are explicit `(zeta=0, zeta=L_zeta)` node IDs, and the Gmsh backend must satisfy the same array and orientation invariants.
 - Milestone 4's Gmsh backend embeds the logical axis, returns exact lower/upper seam pairs, supports axis/critical/low-gradient sizing, and finalizes its owned Gmsh session before returning plain arrays; full background-resolution convergence remains Milestone 17 validation work.
 - Milestone 5's signed-half meshes include the shared `G_ZERO` closure; regular incoming vertices have physical `g<0`, split-created vertices use parent edge `(-1, -1)`, and periodic cells require local zeta unwrapping.
-- Milestone 5 uses a temporary centered Cartesian finite difference for the axis gradient only as a projection direction, followed by residual checks; §7.3 axis-regular interpolation or an excluded-core bound remains required before a production result includes axis topology.
+- Milestone 5 uses a temporary centered Cartesian finite difference for the axis gradient only as a projection direction, followed by residual checks; near-axis `dB_dtheta / s` amplification also remains uncontrolled, so §7.3 axis-regular interpolation or an excluded-core bound is required before a production result includes axis topology.
 
 ## Accepted deviations
 

@@ -53,7 +53,7 @@ def _field(
         n=np.array(n),
         cosine_coefficients=np.array(cosine),
         sine_coefficients=np.array(sine),
-        iota_coefficients=np.array([0.7]),
+        iota_coefficients=np.array([0.7, 0.25]),
         G_coefficients=np.array([current_sign]),
         I_coefficients=np.array([0.0]),
     )
@@ -127,7 +127,7 @@ def test_physical_current_sign_selects_incoming_half_and_flux_balance_converges(
     imbalances = []
     reconstruction_errors = []
     extractions = []
-    for resolution in ((8, 16, 9), (10, 20, 13)):
+    for resolution in ((10, 20, 13), (18, 36, 29)):
         background = StructuredPrismMeshBackend(
             BackgroundMeshConfig(*resolution)
         ).build(field)
