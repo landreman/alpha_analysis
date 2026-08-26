@@ -382,7 +382,7 @@ def test_g_zero_planar_runaway_root_is_replaced_by_a_local_bracketed_root(
         lambda _field, points: np.zeros(len(points)),
     )
 
-    point = module._polish_g_crossing(
+    point, resolved = module._polish_g_crossing(
         first,
         second,
         first_g=-1.0,
@@ -393,16 +393,23 @@ def test_g_zero_planar_runaway_root_is_replaced_by_a_local_bracketed_root(
         config=module.SurfaceExtractionConfig(),
     )
 
+    assert resolved
     assert module._distance_to_segment(point, first, second) < 1.0e-9
 
 
-def test_g_zero_polish_raises_when_no_local_root_exists(monkeypatch):
+def test_g_zero_polish_reports_an_unresolved_split_when_no_local_root_exists(
+    monkeypatch,
+):
     # g pretends to be +1 everywhere while the endpoint bracket claims a sign
-    # change: every stage must reject rather than fabricate a split point.
+    # change, so no g=0 point exists anywhere: no stage may fabricate a
+    # resolved split point.  The polish must instead report the split as
+    # unresolved with a local, on-surface point (the g sign discontinuity).
     import alpha_analysis.j_connectivity.surface_extract as module
 
     field = _field(radial_coefficients=[2.0, 0.3], toroidal_cosine=0.1)
     period = 2.0 * np.pi / field.nfp
+    first = np.array([0.6, 0.0, 0.2])
+    second = np.array([0.0, 0.6, 0.4])
     monkeypatch.setattr(
         module,
         "_evaluate_B",
@@ -414,19 +421,21 @@ def test_g_zero_polish_raises_when_no_local_root_exists(monkeypatch):
         lambda _field, points: np.ones(len(points)),
     )
 
-    with pytest.raises(SurfaceExtractionError, match="split-point") as caught:
-        module._polish_g_crossing(
-            np.array([0.6, 0.0, 0.2]),
-            np.array([0.0, 0.6, 0.4]),
-            first_g=-1.0,
-            second_g=1.0,
-            field=field,
-            b=2.15,
-            period=period,
-            config=module.SurfaceExtractionConfig(),
-        )
+    point, resolved = module._polish_g_crossing(
+        first,
+        second,
+        first_g=-1.0,
+        second_g=1.0,
+        field=field,
+        b=2.15,
+        period=period,
+        config=module.SurfaceExtractionConfig(),
+    )
 
-    assert caught.value.status is SurfaceStatus.ROOT_FAILURE
+    assert not resolved
+    assert module._distance_to_segment(point, first, second) <= np.linalg.norm(
+        second - first
+    )
 
 
 def _record_split_point_locality(monkeypatch):
@@ -453,7 +462,7 @@ def _record_split_point_locality(monkeypatch):
     def recording_polish(
         first, second, first_g, second_g, field, b, period, config, **kwargs
     ):
-        point = polish(
+        point, resolved = polish(
             first, second, first_g, second_g, field, b, period, config, **kwargs
         )
         second_local = module._unwrap_point_relative(second, first, period)
@@ -462,16 +471,24 @@ def _record_split_point_locality(monkeypatch):
         )
         edge_length = float(np.linalg.norm(second_local - first))
         locality.append((distance, edge_length, float(np.sum(point[:2] ** 2))))
-        return point
+        return point, resolved
 
     monkeypatch.setattr(module, "_polish_g_crossing_planar", counting_planar)
     monkeypatch.setattr(module, "_polish_g_crossing", recording_polish)
     return rejections, locality
 
 
-def _assert_thin_tube_extraction_is_sound(extraction, field, b, rejections, locality):
+def _assert_thin_tube_extraction_is_sound(
+    extraction, field, b, rejections, locality, expect_unresolved=False
+):
     # The scenario must actually exercise the fallback, or it tests nothing.
     assert rejections
+    if expect_unresolved:
+        assert extraction.status is SurfaceStatus.UNRESOLVED
+        assert extraction.n_unresolved_splits > 0
+    else:
+        assert extraction.status is SurfaceStatus.REGULAR
+        assert extraction.n_unresolved_splits == 0
     assert len(extraction.incoming.triangles) > 0
     assert len(extraction.outgoing.triangles) > 0
     assert len(extraction.g_zero.segments) > 0
@@ -561,6 +578,172 @@ def test_w7x_split_points_polish_on_the_thin_tube_near_min_B(
     extraction = MarchingTetrahedraExtractor().extract(background, field, b)
 
     _assert_thin_tube_extraction_is_sound(extraction, field, b, rejections, locality)
+
+
+def test_sheet_bridging_edge_yields_an_unresolved_g_jump_split(monkeypatch):
+    # Regression for a gmsh-mesh edge (target_size=0.25, b=2.37689) whose
+    # marching triangle bridges two sheets of the under-resolved thin tube:
+    # walking on the surface from one endpoint can never reach the other,
+    # the genuine g=0 crossings are more than a background cell away, and
+    # the nearby portion of the g=0 curve lies outside the unit disk.  The
+    # polish must classify the split as unresolved and place the vertex at
+    # the local g sign discontinuity instead of failing or returning a
+    # distant root.
+    import alpha_analysis.j_connectivity.surface_extract as module
+
+    field = BoozerField.from_boozmn(
+        os.path.join(
+            DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
+        )
+    )
+    b = 2.37689
+    first = np.array([-0.8233028, -0.24078709, 0.55283671])
+    second = np.array([-0.85337398, -0.29026496, 0.70184775])
+
+    point, resolved = module._polish_g_crossing(
+        first,
+        second,
+        first_g=-0.09975090828317087,
+        second_g=0.09779409743075868,
+        field=field,
+        b=b,
+        period=2.0 * np.pi / field.nfp,
+        config=module.SurfaceExtractionConfig(),
+        patch_scale=0.4605287527600239,
+    )
+
+    assert not resolved
+    # The point is on the surface, inside the domain, and local to the edge.
+    np.testing.assert_allclose(
+        module._evaluate_B(field, point[np.newaxis, :]), b, atol=1.0e-10
+    )
+    assert float(np.sum(point[:2] ** 2)) <= 1.0 + 1.0e-9
+    assert module._distance_to_segment(point, first, second) <= np.linalg.norm(
+        second - first
+    )
+
+
+@pytest.mark.slow
+def test_gmsh_extraction_reports_unresolved_sheet_bridging_splits(monkeypatch):
+    # End-to-end version: the level with sheet-bridging triangles extracts,
+    # reports UNRESOLVED with a G_JUMP count, keeps every G_JUMP vertex out
+    # of the g=0 curve, and the curve's own points still satisfy g=0.
+    from alpha_analysis.j_connectivity.background_mesh import (
+        GmshBackgroundMeshBackend,
+        GmshBackgroundMeshConfig,
+    )
+
+    field = BoozerField.from_boozmn(
+        os.path.join(
+            DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
+        )
+    )
+    background = GmshBackgroundMeshBackend(
+        GmshBackgroundMeshConfig(target_size=0.25)
+    ).build(field)
+    rejections, locality = _record_split_point_locality(monkeypatch)
+
+    b = 2.40339
+    extraction = MarchingTetrahedraExtractor().extract(background, field, b)
+
+    _assert_thin_tube_extraction_is_sound(
+        extraction, field, b, rejections, locality, expect_unresolved=True
+    )
+    for half in (extraction.incoming, extraction.outgoing):
+        assert np.any((half.boundary_tags & SurfaceMesh.G_JUMP) != 0)
+    assert np.all((extraction.g_zero.boundary_tags & SurfaceMesh.G_JUMP) == 0)
+
+
+@pytest.mark.slow
+def test_gmsh_extraction_polishes_boundary_exit_split_points(monkeypatch):
+    # End-to-end version of the boundary-exit regression: the reported
+    # failing configuration (gmsh backend, target_size=0.16, the lowest
+    # level of the example script) must extract, with the boundary-exit
+    # split point on x^2+y^2=1 carrying both EDGE and G_ZERO provenance.
+    from alpha_analysis.j_connectivity.background_mesh import (
+        GmshBackgroundMeshBackend,
+        GmshBackgroundMeshConfig,
+    )
+
+    field = BoozerField.from_boozmn(
+        os.path.join(
+            DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
+        )
+    )
+    background = GmshBackgroundMeshBackend(
+        GmshBackgroundMeshConfig(target_size=0.16)
+    ).build(field)
+    rejections, locality = _record_split_point_locality(monkeypatch)
+
+    b = 2.45077049
+    extraction = MarchingTetrahedraExtractor().extract(background, field, b)
+
+    _assert_thin_tube_extraction_is_sound(extraction, field, b, rejections, locality)
+    curve = extraction.g_zero
+    radii = np.linalg.norm(curve.points[:, :2], axis=1)
+    on_boundary = np.abs(radii - 1.0) <= 1.0e-9
+    assert np.any(on_boundary)
+    expected = SurfaceMesh.EDGE | SurfaceMesh.G_ZERO
+    assert np.all((curve.boundary_tags[on_boundary] & expected) == expected)
+
+
+def test_g_zero_crossing_exits_through_the_outer_boundary(monkeypatch):
+    # Regression for a gmsh-mesh edge (target_size=0.16, b=2.45077049) whose
+    # surface patch has no interior g=0 crossing inside the unit disk: the
+    # g=0 curve leaves the domain, every in-plane trace exits the disk
+    # without a sign change, and the split point must be found on the
+    # boundary curve B=b, x^2+y^2=1 instead of failing or fabricating an
+    # out-of-domain root.
+    import alpha_analysis.j_connectivity.surface_extract as module
+
+    field = BoozerField.from_boozmn(
+        os.path.join(
+            DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
+        )
+    )
+    b = 2.45077049
+    first = np.array([0.8563976980785168, -0.04927986920210465, 0.683797253974709])
+    second = first + np.array(
+        [0.14360230192148316, 0.04927986920210441, -0.14139055613177587]
+    )
+    boundary_stage = module._polish_g_zero_on_outer_boundary
+    calls = []
+
+    def counting_boundary_stage(*args, **kwargs):
+        calls.append(1)
+        return boundary_stage(*args, **kwargs)
+
+    monkeypatch.setattr(
+        module, "_polish_g_zero_on_outer_boundary", counting_boundary_stage
+    )
+
+    point, resolved = module._polish_g_crossing(
+        first,
+        second,
+        first_g=0.09250636086144219,
+        second_g=-0.17835418567150624,
+        field=field,
+        b=b,
+        period=2.0 * np.pi / field.nfp,
+        config=module.SurfaceExtractionConfig(),
+        patch_scale=0.28858997612245285,
+    )
+
+    # The interior stages must have given way to the boundary stage, and the
+    # result must sit exactly on the domain boundary with both residuals met.
+    assert calls
+    assert resolved
+    np.testing.assert_allclose(np.linalg.norm(point[:2]), 1.0, rtol=0.0, atol=1.0e-9)
+    np.testing.assert_allclose(
+        module._evaluate_B(field, point[np.newaxis, :]), b, atol=1.0e-10
+    )
+    np.testing.assert_allclose(
+        module._physical_g(field, point[np.newaxis, :]), 0.0, atol=1.0e-10
+    )
+    # Locality: the boundary exit point stays within the acceptance radius.
+    assert module._distance_to_segment(point, first, second) <= max(
+        4.0 * np.linalg.norm(second - first), 2.0 * 0.28858997612245285
+    )
 
 
 def test_pyvista_prototype_returns_plain_arrays(monkeypatch):

@@ -66,6 +66,12 @@ class SurfaceMesh:
     AXIS: ClassVar[int] = 2
     PERIODIC_SEAM: ClassVar[int] = 4
     G_ZERO: ClassVar[int] = 8
+    # A split vertex placed at the g sign discontinuity of a marching
+    # triangle that bridges two sheets of an under-resolved surface: no
+    # local g=0 point exists there, so the vertex satisfies B=b but not
+    # g=0, is excluded from the g=0 curve, and marks the extraction
+    # UNRESOLVED (ADR 0001).
+    G_JUMP: ClassVar[int] = 16
 
     level: float
     period: float
@@ -196,7 +202,13 @@ class SurfaceCurveMesh:
 
 @dataclass(frozen=True)
 class SurfaceExtraction:
-    """Full ``B=b`` surface, signed halves, and preserved ``g=0`` curves."""
+    """Full ``B=b`` surface, signed halves, and preserved ``g=0`` curves.
+
+    ``n_unresolved_splits`` counts split vertices placed at ``g`` sign
+    discontinuities of sheet-bridging marching triangles (``G_JUMP``); when
+    it is nonzero the status is ``UNRESOLVED`` and the ``g=0`` curve omits
+    those vertices rather than pretending they satisfy ``g=0``.
+    """
 
     b: float
     full: SurfaceMesh
@@ -204,6 +216,7 @@ class SurfaceExtraction:
     outgoing: SurfaceMesh
     g_zero: SurfaceCurveMesh
     status: SurfaceStatus = SurfaceStatus.REGULAR
+    n_unresolved_splits: int = 0
 
 
 class MarchingTetrahedraExtractor:
@@ -567,7 +580,7 @@ def _split_by_physical_g(
         lower, upper = sorted((int(first), int(second)))
         key = ("e", lower, upper)
         if key not in crossing_cache:
-            point = _polish_g_crossing(
+            point, resolved = _polish_g_crossing(
                 full.points[first],
                 full.points[second],
                 float(full.g[first]),
@@ -580,7 +593,7 @@ def _split_by_physical_g(
             )
             B_value = float(_evaluate_B(field, point[np.newaxis, :])[0])
             g_value = float(_physical_g(field, point[np.newaxis, :])[0])
-            tag = SurfaceMesh.G_ZERO
+            tag = SurfaceMesh.G_ZERO if resolved else SurfaceMesh.G_JUMP
             for bit in (
                 SurfaceMesh.EDGE,
                 SurfaceMesh.AXIS,
@@ -590,6 +603,11 @@ def _split_by_physical_g(
                     full.boundary_tags[second] & bit
                 ):
                     tag |= bit
+            # A split point polished onto the outer boundary (where the g=0
+            # curve exits the domain) is an EDGE point regardless of its
+            # parent vertices' provenance.
+            if abs(float(np.linalg.norm(point[:2])) - 1.0) <= config.merge_tolerance:
+                tag |= SurfaceMesh.EDGE
             crossing_cache[key] = {
                 "key": key,
                 "point": point,
@@ -633,12 +651,19 @@ def _split_by_physical_g(
     incoming = _build_clipped_surface(full, True, clipped_polygon, config)
     outgoing = _build_clipped_surface(full, False, clipped_polygon, config)
     g_zero = _build_g_zero_curves(full, crossing_record, vertex_record, config)
+    n_unresolved = sum(
+        1
+        for record in crossing_cache.values()
+        if int(record["tag"]) & SurfaceMesh.G_JUMP
+    )
     return SurfaceExtraction(
         b=full.level,
         full=full,
         incoming=incoming,
         outgoing=outgoing,
         g_zero=g_zero,
+        status=(SurfaceStatus.UNRESOLVED if n_unresolved else SurfaceStatus.REGULAR),
+        n_unresolved_splits=n_unresolved,
     )
 
 
@@ -734,6 +759,11 @@ def _build_g_zero_curves(
                 SurfaceStatus.DEGENERATE,
                 "a surface triangle contains an unresolved multiway g=0 event",
             )
+        # A G_JUMP split vertex is not a g=0 point; the g=0 curve honestly
+        # omits it rather than drawing a curve segment that is not there.
+        records = [
+            record for record in records if int(record["tag"]) & SurfaceMesh.G_ZERO
+        ]
         if len(records) != 2:
             continue
         key = tuple(sorted((records[0]["key"], records[1]["key"])))
@@ -762,22 +792,28 @@ def _polish_g_crossing(
     period: float,
     config: SurfaceExtractionConfig,
     patch_scale: float = 0.0,
-) -> np.ndarray:
-    """Locate the ``B=b``, ``g=0`` point on one bracketed surface edge (§8.3).
+) -> tuple[np.ndarray, bool]:
+    """Locate the split point on one bracketed surface edge (§8.3).
 
-    A planar two-equation Newton solve is the fast path. It searches an
-    affine plane through the edge and can escape to a distant root when the
-    edge skims a weak-``|grad B|`` valley (a ``b`` near ``min B``), so any
-    result that fails the locality or residual checks falls back to
-    bracketed solves that cannot leave the edge: first ``brentq`` on ``g``
-    along the chord with every sample projected onto ``B=b`` under a hard
-    displacement cap, then — if that projection jumps between sheets of a
-    strongly curved surface — a predictor-corrector trace of the ``B=b``
-    curves in a pencil of planes through the edge, returning the crossing
-    nearest the edge (ADR 0001). ``patch_scale`` is the size of the surface
-    patch one background cell holds (the largest marching-triangle edge);
-    it keeps the fallback's search range and acceptance radius meaningful
-    on marching edges much shorter than a background cell.
+    Returns ``(point, resolved)``. When ``resolved`` is true the point
+    satisfies ``B=b`` and ``g=0`` to tolerance — found by the planar Newton
+    fast path, by the bracketed projected-chord solve, by a pencil of
+    plane-curve continuations returning the crossing nearest the edge, or,
+    when the ``g=0`` curve exits the domain near the outer boundary, on the
+    ``x^2+y^2=1`` cylinder (ADR 0001).
+
+    When every one of those bracketed searches proves that no local ``g=0``
+    point exists — a marching triangle bridging two sheets of an
+    under-resolved surface, whose genuine crossings are many cells away —
+    ``resolved`` is false and the point is the ``g`` sign discontinuity of
+    the projected chord path: on the surface (``B=b`` to tolerance), local
+    by construction, but with ``g != 0``. Callers must record such points
+    as ``G_JUMP``, not ``G_ZERO``.
+
+    ``patch_scale`` is the size of the surface patch one background cell
+    holds (the largest marching-triangle edge); it keeps the fallbacks'
+    search range and acceptance radius meaningful on marching edges much
+    shorter than a background cell.
     """
     if first_g * second_g >= 0.0:
         raise SurfaceExtractionError(
@@ -801,16 +837,112 @@ def _polish_g_crossing(
             displacement_limit,
             patch_scale,
         )
+    if point is not None:
+        return _canonicalize_point(point, period, config.merge_tolerance), True
+    point = _locate_g_jump_on_chord(
+        first, tangent, first_g, second_g, field, b, config, displacement_limit
+    )
     if point is None:
         raise SurfaceExtractionError(
             SurfaceStatus.ROOT_FAILURE,
-            "simultaneous B=b and g=0 split-point polishing failed: both the "
-            "planar Newton solve and the bracketed projected fallback were "
-            "rejected by the locality and residual checks "
+            "simultaneous B=b and g=0 split-point polishing failed: the "
+            "planar Newton solve, the bracketed fallbacks, and the g-jump "
+            "locator were all rejected by the locality and residual checks "
             f"(edge length={np.linalg.norm(tangent):.3g}, "
             f"g bracket=({first_g:.3g}, {second_g:.3g}))",
         )
-    return _canonicalize_point(point, period, config.merge_tolerance)
+    return _canonicalize_point(point, period, config.merge_tolerance), False
+
+
+def _locate_g_jump_on_chord(
+    first: np.ndarray,
+    tangent: np.ndarray,
+    first_g: float,
+    second_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    displacement_limit: float,
+) -> np.ndarray | None:
+    """Bisect the chord to the ``g`` sign discontinuity of its projection.
+
+    Used only after the bracketed searches have established that no local
+    ``g=0`` point exists: the marching edge bridges two surface sheets of
+    opposite ``g`` sign, and the projection of the chord onto ``B=b`` jumps
+    between them at some chord parameter. Sign bisection converges to that
+    parameter regardless of the discontinuity, and the returned projected
+    point lies on one of the two sheets right at the gap — the honest
+    seam for partitioning a triangle whose true ``g=0`` curve is elsewhere.
+    """
+
+    def project(parameter: float) -> np.ndarray | None:
+        return _project_to_level_near(
+            first + parameter * tangent, field, b, config, displacement_limit
+        )
+
+    # Sample the projectable part of the chord; the projection can stall in
+    # the vanishing-gradient interior of the tube, so failed samples are
+    # simply skipped. The endpoints are already on the surface with known
+    # opposite signs, so an adjacent sign change always exists.
+    samples: list[tuple[float, np.ndarray, float]] = [
+        (0.0, np.asarray(first, dtype=np.float64), float(first_g))
+    ]
+    for parameter in np.linspace(0.0, 1.0, 65)[1:-1]:
+        candidate = project(float(parameter))
+        if candidate is not None:
+            samples.append(
+                (
+                    float(parameter),
+                    candidate,
+                    float(_physical_g(field, candidate[np.newaxis, :])[0]),
+                )
+            )
+    samples.append((1.0, first + tangent, float(second_g)))
+    flip = None
+    for left, right in zip(samples, samples[1:]):
+        if np.sign(left[2]) != np.sign(right[2]):
+            flip = (left, right)
+            break
+    if flip is None:
+        return None
+    (t_low, p_low, g_low), (t_high, p_high, g_high) = flip
+    for _ in range(40):
+        if t_high - t_low <= config.parameter_tolerance:
+            break
+        t_mid = 0.5 * (t_low + t_high)
+        candidate = project(t_mid)
+        if candidate is None:
+            break
+        g_mid = float(_physical_g(field, candidate[np.newaxis, :])[0])
+        if np.sign(g_mid) == np.sign(g_low):
+            t_low, p_low, g_low = t_mid, candidate, g_mid
+        else:
+            t_high, p_high, g_high = t_mid, candidate, g_mid
+    # Both bracket points sit at the gap on their own sheets. Prefer a
+    # genuine interior point over a pre-existing endpoint, but a sheet can
+    # bulge outside the unit disk near the outer boundary, so fall back
+    # through the remaining samples by proximity to the flip; the in-disk
+    # edge endpoints guarantee an acceptable candidate exists.
+    t_flip = 0.5 * (t_low + t_high)
+    preferred: list[np.ndarray] = []
+    if t_low <= 0.0:
+        preferred = [p_high, p_low]
+    elif t_high >= 1.0:
+        preferred = [p_low, p_high]
+    else:
+        preferred = [p_low, p_high] if abs(g_low) <= abs(g_high) else [p_high, p_low]
+    fallbacks = [
+        sample[1]
+        for sample in sorted(samples, key=lambda sample: abs(sample[0] - t_flip))
+    ]
+    for point in preferred + fallbacks:
+        if (
+            float(np.sum(point[:2] ** 2)) <= 1.0 + config.merge_tolerance
+            and abs(float(_evaluate_B(field, point[np.newaxis, :])[0] - b))
+            <= config.B_tolerance
+        ):
+            return point
+    return None
 
 
 def _polish_g_crossing_planar(
@@ -885,12 +1017,15 @@ def _polish_g_crossing_bracketed(
     through the edge, and the crossing nearest the edge is returned.
 
     The surface patch that the parent triangle approximates lies inside its
-    background tetrahedron and hence inside the unit disk, and ``g`` flips
-    across it, so a genuinely local, in-disk crossing exists; every accepted
-    candidate must therefore stay inside the disk and within the locality
-    scale — a few edge lengths, or twice the background patch scale for
-    marching edges much shorter than their background cell. A distant or
-    out-of-domain root is never returned (§21.2).
+    background tetrahedron and hence inside the unit disk; every accepted
+    candidate must stay inside the disk and within the locality scale — a
+    few edge lengths, or twice the background patch scale for marching
+    edges much shorter than their background cell. Near the outer boundary
+    the surface's ``g=0`` curve may leave the domain entirely, in which
+    case no interior crossing exists and the split point is where that
+    curve exits: the ``g`` flip along the surface's boundary curve on the
+    ``x^2+y^2=1`` cylinder. A distant or out-of-domain root is never
+    returned (§21.2).
     """
     second = first + tangent
     edge_length = float(np.linalg.norm(tangent))
@@ -909,7 +1044,209 @@ def _polish_g_crossing_bracketed(
         _distance_to_segment(point, first, second) <= acceptance_radius
     ):
         return point
+    if (
+        max(np.linalg.norm(first[:2]), np.linalg.norm(second[:2])) + acceptance_radius
+        >= 1.0
+    ):
+        point = _polish_g_zero_on_outer_boundary(
+            first, second, first_g, second_g, field, b, config, patch_scale
+        )
+        if point is not None and (
+            _distance_to_segment(point, first, second) <= acceptance_radius
+        ):
+            return point
     return None
+
+
+def _polish_g_zero_on_outer_boundary(
+    first: np.ndarray,
+    second: np.ndarray,
+    first_g: float,
+    second_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    patch_scale: float,
+) -> np.ndarray | None:
+    """Find where the surface's ``g=0`` curve exits through ``x^2+y^2=1``.
+
+    On the outer cylinder, parametrized by ``(theta, zeta)`` with
+    ``(x, y) = (cos theta, sin theta)``, the level set ``B(1, theta,
+    zeta) = b`` is a one-dimensional implicit curve — the boundary curve of
+    the domain-clipped surface. When the interior ``g=0`` curve leaves the
+    domain near the edge, ``g`` restricted to this boundary curve changes
+    sign at the exit point, so the same predictor-corrector continuation
+    used for the in-plane traces applies in the chart, seeded at an edge
+    endpoint that lies on the boundary (or at the projected mid-chord).
+    Every candidate lies on the boundary exactly, so it is in-domain by
+    construction.
+    """
+    length = float(np.linalg.norm(second - first))
+    scale = max(length, 0.5 * patch_scale)
+
+    def cylinder_point(theta: float, zeta: float) -> np.ndarray:
+        return np.array([np.cos(theta), np.sin(theta), zeta])
+
+    def cylinder_residual(theta: float, zeta: float) -> float:
+        return float(field.B(1.0, theta, zeta)) - b
+
+    def cylinder_gradient(theta: float, zeta: float) -> np.ndarray:
+        return np.array(
+            [
+                float(field.dB_dtheta(1.0, theta, zeta)),
+                float(field.dB_dzeta(1.0, theta, zeta)),
+            ]
+        )
+
+    def correct(theta: float, zeta: float, cap: float) -> tuple[float, float] | None:
+        position = np.array([theta, zeta])
+        start_position = position.copy()
+        residual = cylinder_residual(*position)
+        for _ in range(30):
+            if abs(residual) <= config.B_tolerance:
+                return float(position[0]), float(position[1])
+            gradient2 = cylinder_gradient(*position)
+            norm_squared = float(np.dot(gradient2, gradient2))
+            if norm_squared <= np.finfo(float).eps:
+                return None
+            step = (-residual / norm_squared) * gradient2
+            improved = None
+            for _halving in range(20):
+                trial = position + step
+                if np.linalg.norm(trial - start_position) > cap:
+                    step = 0.5 * step
+                    continue
+                trial_residual = cylinder_residual(*trial)
+                if abs(trial_residual) < abs(residual):
+                    improved = (trial, trial_residual)
+                    break
+                step = 0.5 * step
+            if improved is None:
+                return None
+            position, residual = improved
+        return None
+
+    def chart_g(theta: float, zeta: float) -> float:
+        return float(_physical_g(field, cylinder_point(theta, zeta)[np.newaxis, :])[0])
+
+    # Seed on the boundary curve: an edge endpoint already on the cylinder
+    # is exact; otherwise correct the projected mid-chord onto the curve.
+    seed: tuple[float, float] | None = None
+    seed_g = 0.0
+    for endpoint, endpoint_g in ((first, first_g), (second, second_g)):
+        if abs(float(np.linalg.norm(endpoint[:2])) - 1.0) <= config.merge_tolerance:
+            seed = (
+                float(np.arctan2(endpoint[1], endpoint[0])),
+                float(endpoint[2]),
+            )
+            seed_g = float(endpoint_g)
+            break
+    if seed is None:
+        middle = 0.5 * (first + second)
+        corrected = correct(
+            float(np.arctan2(middle[1], middle[0])),
+            float(middle[2]),
+            cap=2.0 * scale,
+        )
+        if corrected is None:
+            return None
+        seed = corrected
+        seed_g = chart_g(*seed)
+        if abs(seed_g) <= config.g_tolerance:
+            return cylinder_point(*seed)
+
+    def polish_between(
+        start: np.ndarray, start_g: float, end: np.ndarray, end_g: float
+    ) -> np.ndarray | None:
+        span = end - start
+        cap = float(np.linalg.norm(span)) + config.merge_tolerance
+
+        def bracketed_g(parameter: float) -> float:
+            if parameter <= 0.0:
+                return start_g
+            if parameter >= 1.0:
+                return end_g
+            sample = start + parameter * span
+            corrected = correct(sample[0], sample[1], cap)
+            if corrected is None:
+                raise _LocalProjectionFailure()
+            return chart_g(*corrected)
+
+        try:
+            parameter = brentq(
+                bracketed_g,
+                0.0,
+                1.0,
+                xtol=config.parameter_tolerance,
+                rtol=4.0 * np.finfo(float).eps,
+                maxiter=200,
+            )
+        except (_LocalProjectionFailure, ValueError):
+            return None
+        sample = start + float(np.clip(parameter, 0.0, 1.0)) * span
+        corrected = correct(sample[0], sample[1], cap)
+        if corrected is None:
+            return None
+        point = cylinder_point(*corrected)
+        if (
+            abs(float(_evaluate_B(field, point[np.newaxis, :])[0] - b))
+            > config.B_tolerance
+            or abs(chart_g(*corrected)) > config.g_tolerance
+        ):
+            return None
+        return point
+
+    nominal_step = scale / 16.0
+    arc_budget = 8.0 * scale
+    candidates: list[np.ndarray] = []
+    for orientation in (1.0, -1.0):
+        position = np.array(seed, dtype=np.float64)
+        position_g = seed_g
+        previous_direction: np.ndarray | None = None
+        traveled = 0.0
+        step_size = nominal_step
+        for _ in range(1024):
+            if traveled > arc_budget or len(candidates) >= 8:
+                break
+            gradient2 = cylinder_gradient(*position)
+            norm2 = float(np.linalg.norm(gradient2))
+            if norm2 <= np.finfo(float).eps:
+                break
+            tangent2 = np.array([-gradient2[1], gradient2[0]]) / norm2
+            if previous_direction is None:
+                tangent2 = orientation * tangent2
+            elif float(np.dot(tangent2, previous_direction)) < 0.0:
+                tangent2 = -tangent2
+            corrected = None
+            while step_size >= nominal_step * 2.0**-20:
+                trial = position + step_size * tangent2
+                corrected = correct(trial[0], trial[1], cap=step_size)
+                if corrected is not None:
+                    break
+                step_size *= 0.5
+            if corrected is None:
+                break
+            following = np.array(corrected, dtype=np.float64)
+            advance = float(np.linalg.norm(following - position))
+            if advance <= config.merge_tolerance:
+                break
+            following_g = chart_g(*following)
+            if abs(following_g) <= config.g_tolerance:
+                candidates.append(cylinder_point(*following))
+            elif position_g * following_g < 0.0:
+                candidate = polish_between(position, position_g, following, following_g)
+                if candidate is not None:
+                    candidates.append(candidate)
+            previous_direction = (following - position) / advance
+            traveled += advance
+            position, position_g = following, following_g
+            step_size = min(2.0 * step_size, nominal_step)
+    if not candidates:
+        return None
+    return min(
+        candidates,
+        key=lambda candidate: _distance_to_segment(candidate, first, second),
+    )
 
 
 def _trace_plane_curve_to_g_zero(

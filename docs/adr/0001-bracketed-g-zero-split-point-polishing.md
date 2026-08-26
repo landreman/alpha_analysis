@@ -48,10 +48,37 @@ when the local Newton solve escapes, and §21.2 forbids hiding the failure.
    \(\max(4\,L_{\mathrm{edge}},\ 2\,L_{\mathrm{patch}})\), where
    \(L_{\mathrm{patch}}\) — the largest marching-triangle edge of the full
    surface — proxies the background cell size so that marching edges much
-   shorter than their cell are not held to an arbitrarily small radius. Total
-   failure still raises `ROOT_FAILURE`. Costs: more code, and hard edges spend
-   up to a few thousand field evaluations (measured: the worst level in a
-   100-level W7-X sweep took ~20 s total versus ~2 s typical).
+   shorter than their cell are not held to an arbitrarily small radius.
+
+   Near the outer boundary the surface's \(g=0\) curve can leave the domain
+   entirely (observed on a gmsh mesh with `target_size=0.16` at \(b=2.45077\):
+   every in-plane trace exited the disk with no sign change). No interior
+   crossing then exists, and the split point is where the \(g=0\) curve exits:
+   the \(g\) sign change along the surface's boundary curve
+   \(B(1,\theta,\zeta)=b\) on the \(x^2+y^2=1\) cylinder, found by the same
+   continuation in the \((\theta,\zeta)\) chart and subject to the same
+   acceptance radius. Such split points lie on the boundary exactly and carry
+   the `EDGE` provenance bit in addition to `G_ZERO`.
+
+   Finally, coarse meshes can produce marching triangles that **bridge two
+   sheets** of a thin tube (observed on gmsh meshes with `target_size` 0.16 and
+   0.25 near \(\min B\)): walking on the surface from one endpoint can never
+   reach the other, and the bracketed searches prove that no local \(g=0\)
+   point exists — the genuine crossings are more than a background cell away or
+   outside the domain. Such an edge is split at the ``g`` **sign
+   discontinuity** of its projected chord path: a point on the surface
+   (\(B=b\) to tolerance), local by construction, but with \(g\neq0\). It is
+   tagged `G_JUMP` instead of `G_ZERO`, excluded from the \(g=0\) curve
+   (which honestly has a gap there), and counted in
+   `SurfaceExtraction.n_unresolved_splits` with the extraction status set to
+   `UNRESOLVED` — the §21.2-compatible alternative to failing the whole level
+   or fabricating a distant "crossing". Refining the background mesh removes
+   these (the same \(b\) range is `REGULAR` on all tested structured meshes).
+
+   Total failure still raises `ROOT_FAILURE`. Costs: more code, and hard edges
+   spend up to a few thousand field evaluations (measured: the worst level in
+   a 100-level W7-X sweep took ~20 s on the default structured mesh and ~80 s
+   on the gmsh `target_size=0.16` mesh, versus ~2 s typical).
 3. **Globally subdivide any triangle whose split point fails** — changes mesh
    topology during extraction, complicating parent-edge provenance and the seam
    contract, and still needs a robust root-finder for the subdivided edges.
@@ -84,7 +111,20 @@ record is pending.
   total failure still raises
   (`test_g_zero_polish_raises_when_no_local_root_exists`).
 - The fallback chain lives in `_polish_g_crossing_bracketed`,
-  `_brentq_projected_chord`, `_project_to_level_near`, and
-  `_trace_plane_curve_to_g_zero` in
+  `_brentq_projected_chord`, `_project_to_level_near`,
+  `_trace_plane_curve_to_g_zero`, `_polish_g_zero_on_outer_boundary`, and
+  `_locate_g_jump_on_chord` in
   `alpha_analysis/j_connectivity/surface_extract.py`; later refinement milestones
-  (§8.4) inherit split points whose residuals still satisfy the §8.3 tolerances.
+  (§8.4) inherit split points whose residuals still satisfy the §8.3 tolerances,
+  except `G_JUMP` vertices, which are explicitly marked as not satisfying
+  ``g=0``.
+- `SurfaceExtraction` gains `n_unresolved_splits`, and its status becomes
+  `UNRESOLVED` whenever a `G_JUMP` vertex was placed; the `g=0` curve omits such
+  vertices. Downstream milestones must treat `UNRESOLVED` extractions as
+  requiring background refinement before entering a production result.
+- New tests: `test_g_zero_crossing_exits_through_the_outer_boundary`,
+  `test_gmsh_extraction_polishes_boundary_exit_split_points` (slow),
+  `test_sheet_bridging_edge_yields_an_unresolved_g_jump_split`,
+  `test_gmsh_extraction_reports_unresolved_sheet_bridging_splits` (slow), and
+  `test_g_zero_polish_reports_an_unresolved_split_when_no_local_root_exists`
+  (replacing the raise-on-no-root test).
