@@ -13,9 +13,10 @@ values of ``B`` degenerate to isolated points rather than surfaces.
 
 Each surface is colored by its own value of ``|B|`` against a shared color
 scale. The two physical-sign halves of DESIGN.md §5.1,
-``g = B D_parallel B / (G + iota I)``, are distinguished by their edges: the
-incoming half ``g < 0`` is drawn with solid triangle edges, the outgoing half
-``g > 0`` with dotted ones. The ``g = 0`` boundary curve is where the two meet.
+``g = B D_parallel B / (G + iota I)``, are distinguished by their edge color:
+the incoming half ``g < 0`` is drawn with black triangle edges, the outgoing
+half ``g > 0`` with red ones. The ``g = 0`` boundary curve is where the two
+meet.
 
 Triangles that straddle the periodic seam are unwrapped in zeta before being
 mapped, so the surface stays local instead of drawing a triangle across the
@@ -98,36 +99,6 @@ def to_real_space_surface(surface, geometry: BoozerGeometry) -> pv.PolyData | No
     return mesh
 
 
-def dashed_edges(mesh: pv.PolyData, n_dashes: int = 3) -> pv.PolyData:
-    """Return the mesh edges with alternating pieces removed, giving dots.
-
-    VTK's OpenGL2 backend has no line stipple, so the dotted style is built
-    geometrically: every edge is cut into ``2 * n_dashes - 1`` pieces and the
-    even-numbered ones are kept.
-    """
-    edges = mesh.extract_all_edges()
-    lines = np.asarray(edges.lines, dtype=np.int64).reshape(-1, 3)[:, 1:]
-    points = np.asarray(edges.points, dtype=float)
-    starts, ends = points[lines[:, 0]], points[lines[:, 1]]
-    n_pieces = 2 * n_dashes - 1
-    fractions = np.linspace(0.0, 1.0, n_pieces + 1)
-    keep = np.arange(0, n_pieces, 2)
-    first = (
-        starts[:, None, :]
-        + fractions[keep][None, :, None] * (ends - starts)[:, None, :]
-    )
-    second = (
-        starts[:, None, :]
-        + fractions[keep + 1][None, :, None] * (ends - starts)[:, None, :]
-    )
-    dash_points = np.stack((first, second), axis=2).reshape(-1, 3)
-    segments = np.arange(len(dash_points), dtype=np.int64).reshape(-1, 2)
-    cells = np.column_stack(
-        (np.full(len(segments), 2, dtype=np.int64), segments)
-    ).ravel()
-    return pv.PolyData(dash_points, lines=cells)
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--boozmn", type=Path, default=DEFAULT_BOOZMN)
@@ -160,9 +131,6 @@ def main() -> None:
     )
     parser.add_argument(
         "--opacity", type=float, default=0.55, help="surface face opacity"
-    )
-    parser.add_argument(
-        "--n-dashes", type=int, default=10, help="dots per edge on the g > 0 half"
     )
     parser.add_argument(
         "--window-size",
@@ -219,7 +187,10 @@ def main() -> None:
     clim = (B_min, B_max)
     first = True
     for level, extraction in extractions:
-        for half, dotted in ((extraction.incoming, False), (extraction.outgoing, True)):
+        for half, edge_color in (
+            (extraction.incoming, "black"),
+            (extraction.outgoing, "red"),
+        ):
             mesh = to_real_space_surface(half, geometry)
             if mesh is None:
                 continue
@@ -234,20 +205,13 @@ def main() -> None:
                     cmap="viridis",
                     clim=clim,
                     opacity=args.opacity,
-                    show_edges=not dotted,
-                    edge_color="black",
+                    show_edges=True,
+                    edge_color=edge_color,
                     line_width=1,
                     show_scalar_bar=first,
                     scalar_bar_args={"title": "|B| [T]"} if first else None,
                 )
                 first = False
-                if dotted:
-                    plotter.add_mesh(
-                        dashed_edges(copy, args.n_dashes),
-                        color="black",
-                        line_width=1,
-                        show_scalar_bar=False,
-                    )
     plotter.add_axes(xlabel="X", ylabel="Y", zlabel="Z")
     plotter.add_text(
         f"{args.boozmn.name}\n{args.backend} background mesh, "
@@ -255,7 +219,7 @@ def main() -> None:
         f"{len(levels)} pitch surfaces in "
         f"[{levels[0]:.4g}, {levels[-1]:.4g}], "
         f"{args.n_periods} of {field.nfp} field periods\n"
-        "solid edges: incoming g < 0    dotted edges: outgoing g > 0",
+        "black edges: incoming g < 0    red edges: outgoing g > 0",
         font_size=8,
     )
     plotter.show_bounds(

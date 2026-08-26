@@ -14,9 +14,10 @@ values of ``B`` degenerate to isolated points rather than surfaces.
 
 Each surface is colored by its own value of ``|B|`` against a shared color
 scale. The two physical-sign halves of DESIGN.md §5.1,
-``g = B D_parallel B / (G + iota I)``, are distinguished by their edges: the
-incoming half ``g < 0`` is drawn with solid triangle edges, the outgoing half
-``g > 0`` with dotted ones. The ``g = 0`` boundary curve is where the two meet.
+``g = B D_parallel B / (G + iota I)``, are distinguished by their edge color:
+the incoming half ``g < 0`` is drawn with black triangle edges, the outgoing
+half ``g > 0`` with red ones. The ``g = 0`` boundary curve is where the two
+meet.
 
 Triangles that straddle the periodic seam are unwrapped in zeta so the surface
 stays local instead of drawing a triangle across the whole period; the
@@ -54,7 +55,6 @@ from plot_volume_mesh_pyvista_logical import (  # noqa: E402
     screen_size,
 )
 from plot_pitch_surfaces_pyvista_real_space import (  # noqa: E402
-    dashed_edges,
     unwrapped_triangle_soup,
 )
 
@@ -130,9 +130,6 @@ def main() -> None:
         "--opacity", type=float, default=0.55, help="surface face opacity"
     )
     parser.add_argument(
-        "--n-dashes", type=int, default=10, help="dots per edge on the g > 0 half"
-    )
-    parser.add_argument(
         "--window-size",
         type=int,
         nargs=2,
@@ -189,7 +186,10 @@ def main() -> None:
     clim = (B_min, B_max)
     first = True
     for level, extraction in extractions:
-        for half, dotted in ((extraction.incoming, False), (extraction.outgoing, True)):
+        for half, edge_color in (
+            (extraction.incoming, "black"),
+            (extraction.outgoing, "red"),
+        ):
             mesh = to_logical_surface(half, args.zeta_scale)
             if mesh is None:
                 continue
@@ -204,20 +204,13 @@ def main() -> None:
                     cmap="viridis",
                     clim=clim,
                     opacity=args.opacity,
-                    show_edges=not dotted,
-                    edge_color="black",
+                    show_edges=True,
+                    edge_color=edge_color,
                     line_width=1,
                     show_scalar_bar=first,
                     scalar_bar_args={"title": "|B| [T]"} if first else None,
                 )
                 first = False
-                if dotted:
-                    plotter.add_mesh(
-                        dashed_edges(copy, args.n_dashes),
-                        color="black",
-                        line_width=1,
-                        show_scalar_bar=False,
-                    )
     plotter.add_axes(xlabel="x", ylabel="y", zlabel="zeta")
     plotter.add_text(
         f"{args.boozmn.name}\n{args.backend} background mesh, "
@@ -227,7 +220,7 @@ def main() -> None:
         f"{args.n_periods} of {field.nfp} field periods\n"
         "logical coordinates, zeta stretched by "
         f"{args.zeta_scale:g} for legibility\n"
-        "solid edges: incoming g < 0    dotted edges: outgoing g > 0",
+        "black edges: incoming g < 0    red edges: outgoing g > 0",
         font_size=8,
     )
     plotter.show_bounds(
