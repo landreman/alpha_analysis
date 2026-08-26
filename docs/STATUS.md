@@ -50,7 +50,7 @@ move it into `docs/DESIGN.md` and delete it here.
 - Milestone 5's common extractor contract runs against both marching tetrahedra and real PyVista/VTK in CI; PyVista empty levels return empty meshes, seam copies are matched one-to-one, `OUTER` provenance uses a dedicated indicator because VTK interpolates packed masks arithmetically, projection is constrained to `s <= 1`, and parent provenance IDs intentionally remain `-1`.
 - Milestone 5 uses a temporary centered Cartesian finite difference for the axis gradient only as a projection direction, followed by residual checks; near-axis `dB_dtheta / s` amplification also remains uncontrolled.
 - The §7.3 option-1 axis-regular interpolation is implemented: `BoozerField` continues `m != 0` coefficients below the innermost half-grid surface with the `s^{|m|/2}` harmonic scaling (ADR 0002), so `|B|` is single-valued at the axis; values at `s >= s0` are unchanged.
-- `g=0` split-point polishing backs the planar Newton solve with bracketed, locality-bounded fallbacks (projected chord solve, then plane-curve continuation; ADR 0001); thin-tube levels near `min B` extract for the W7-X reference file at every swept `b`.
+- `g=0` split-point polishing backs the planar Newton solve with bracketed, locality-bounded fallbacks (projected chord solve, then plane-curve continuation over a pencil of cutting planes returning the nearest in-disk crossing; ADR 0001); thin-tube levels near `min B` extract for the W7-X reference file at every swept `b`, with split points within 4 edge lengths of their parent edge and inside `x^2+y^2<=1`.
 
 ## Accepted deviations
 

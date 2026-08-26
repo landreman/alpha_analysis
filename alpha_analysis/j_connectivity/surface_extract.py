@@ -540,6 +540,11 @@ def _split_by_physical_g(
     config: SurfaceExtractionConfig,
 ) -> SurfaceExtraction:
     crossing_cache: dict[tuple[str, int, int], dict[str, object]] = {}
+    # The surface patch a marching triangle approximates lives inside one
+    # background tetrahedron, so the largest marching-triangle edge is the
+    # locality scale for split-point polishing on edges much shorter than a
+    # background cell.
+    patch_scale = _max_triangle_edge_length(full)
 
     def vertex_record(vertex: int) -> dict[str, object]:
         key = ("v", int(vertex), int(vertex))
@@ -571,6 +576,7 @@ def _split_by_physical_g(
                 full.level,
                 full.period,
                 config,
+                patch_scale=patch_scale,
             )
             B_value = float(_evaluate_B(field, point[np.newaxis, :])[0])
             g_value = float(_physical_g(field, point[np.newaxis, :])[0])
@@ -755,6 +761,7 @@ def _polish_g_crossing(
     b: float,
     period: float,
     config: SurfaceExtractionConfig,
+    patch_scale: float = 0.0,
 ) -> np.ndarray:
     """Locate the ``B=b``, ``g=0`` point on one bracketed surface edge (§8.3).
 
@@ -766,7 +773,11 @@ def _polish_g_crossing(
     along the chord with every sample projected onto ``B=b`` under a hard
     displacement cap, then — if that projection jumps between sheets of a
     strongly curved surface — a predictor-corrector trace of the ``B=b``
-    curve in the plane through the edge (ADR 0001).
+    curves in a pencil of planes through the edge, returning the crossing
+    nearest the edge (ADR 0001). ``patch_scale`` is the size of the surface
+    patch one background cell holds (the largest marching-triangle edge);
+    it keeps the fallback's search range and acceptance radius meaningful
+    on marching edges much shorter than a background cell.
     """
     if first_g * second_g >= 0.0:
         raise SurfaceExtractionError(
@@ -780,7 +791,15 @@ def _polish_g_crossing(
     )
     if point is None:
         point = _polish_g_crossing_bracketed(
-            first, tangent, first_g, second_g, field, b, config, displacement_limit
+            first,
+            tangent,
+            first_g,
+            second_g,
+            field,
+            b,
+            config,
+            displacement_limit,
+            patch_scale,
         )
     if point is None:
         raise SurfaceExtractionError(
@@ -837,6 +856,7 @@ def _polish_g_crossing_planar(
         or abs(solution.x[1]) > displacement_limit
         or abs(residual[0]) > config.B_tolerance
         or abs(residual[1]) > config.g_tolerance
+        or float(np.sum(point[:2] ** 2)) > 1.0 + config.merge_tolerance
     ):
         return None
     return point
@@ -851,6 +871,7 @@ def _polish_g_crossing_bracketed(
     b: float,
     config: SurfaceExtractionConfig,
     displacement_limit: float,
+    patch_scale: float,
 ) -> np.ndarray | None:
     """Bracketed fallback that cannot leave the edge neighborhood.
 
@@ -859,21 +880,36 @@ def _polish_g_crossing_bracketed(
     function of the chord parameter — unless the surface curves so strongly
     between the endpoints (a thin tube near ``min B``) that the projection
     jumps sheets and the projected ``g`` is discontinuous. When the direct
-    chord solve is rejected for that reason, the crossing is bracketed by
-    tracing the closed intersection curve of ``B=b`` with the plane through
-    the edge; the trace's arc-length budget keeps every candidate on the
-    surface patch spanned by the edge, so a distant root can never be
-    returned (§21.2).
+    chord solve is rejected for that reason, crossings are collected by
+    tracing the intersection curves of ``B=b`` with a pencil of planes
+    through the edge, and the crossing nearest the edge is returned.
+
+    The surface patch that the parent triangle approximates lies inside its
+    background tetrahedron and hence inside the unit disk, and ``g`` flips
+    across it, so a genuinely local, in-disk crossing exists; every accepted
+    candidate must therefore stay inside the disk and within the locality
+    scale — a few edge lengths, or twice the background patch scale for
+    marching edges much shorter than their background cell. A distant or
+    out-of-domain root is never returned (§21.2).
     """
     second = first + tangent
+    edge_length = float(np.linalg.norm(tangent))
+    acceptance_radius = config.merge_tolerance + max(
+        4.0 * edge_length, 2.0 * patch_scale
+    )
     point = _brentq_projected_chord(first, second, first_g, second_g, field, b, config)
     if point is not None and (
         _distance_to_segment(point, first, second) <= displacement_limit
     ):
         return point
-    return _trace_plane_curve_to_g_zero(
-        first, second, first_g, second_g, field, b, config
+    point = _trace_plane_curve_to_g_zero(
+        first, second, first_g, second_g, field, b, config, patch_scale
     )
+    if point is not None and (
+        _distance_to_segment(point, first, second) <= acceptance_radius
+    ):
+        return point
+    return None
 
 
 def _trace_plane_curve_to_g_zero(
@@ -884,35 +920,87 @@ def _trace_plane_curve_to_g_zero(
     field: BoozerFieldLike,
     b: float,
     config: SurfaceExtractionConfig,
+    patch_scale: float,
 ) -> np.ndarray | None:
-    """Trace ``B=b`` within the plane through the edge until ``g`` flips.
+    """Trace ``B=b`` within planes through the edge, return the nearest
+    ``g=0`` crossing.
 
-    The plane spanned by the chord and ``grad B`` cuts the level set in a
-    one-dimensional implicit curve through both endpoints (around the tube
-    cross-section when ``b`` is near ``min B``). Predictor steps follow the
-    in-plane curve tangent with orientation continuity — no
-    step-toward-the-target heuristic, which stalls when the far endpoint
-    sits on the opposite sheet — and corrector steps are damped in-plane
-    Newton back onto ``B=b``. ``g`` is continuous along the curve and has
-    opposite signs at the endpoints, so a sign flip is met before the trace
-    returns to the far endpoint; the flip is then polished on the short
-    bracketing sub-chord. The arc-length budget bounds the explored patch.
+    A plane containing the chord cuts the level set in a one-dimensional
+    implicit curve; every point of the curve lies on the surface. When the
+    cut is transversal (the tube cross-section for ``b`` near ``min B``)
+    that curve passes through both endpoints, ``g`` restricted to it is
+    continuous with opposite signs at the endpoints, and the direct arc
+    carries a crossing near the edge. A near-axial plane instead cuts the
+    tube in two disconnected curves, one per endpoint, with no bracket on
+    either — so a pencil of planes rotated about the chord is tried, seeded
+    by the ``grad B`` direction. Predictor steps follow the in-plane curve
+    tangent with orientation continuity — no step-toward-the-target
+    heuristic, which stalls when the far endpoint sits on the opposite
+    sheet — and corrector steps are damped in-plane Newton back onto
+    ``B=b``. Every sign flip met in either direction of every plane is
+    polished on its short bracketing sub-chord, and the candidate closest
+    to the edge wins. A direction ends at the far endpoint, at the unit-disk
+    boundary (beyond it the field is unphysical extrapolation and no valid
+    crossing can live), or at the arc-length budget.
     """
     chord = second - first
     length = float(np.linalg.norm(chord))
     if length <= 0.0:
         return None
     u = chord / length
-    w = None
+    w0 = None
     for probe in (0.5 * (first + second), first, second):
         gradient = _logical_B_gradient(field, probe)
         candidate = gradient - float(np.dot(gradient, u)) * u
         candidate_norm = float(np.linalg.norm(candidate))
         if candidate_norm > 1.0e-8 * max(1.0, float(np.linalg.norm(gradient))):
-            w = candidate / candidate_norm
+            w0 = candidate / candidate_norm
             break
-    if w is None:
+    if w0 is None:
         return None
+    w_perpendicular = np.cross(u, w0)
+    # The search scale: the chord itself when the marching edge is a fair
+    # sample of the background cell, the patch scale when the edge is much
+    # shorter than the cell that holds the surface patch.
+    scale = max(length, 0.5 * patch_scale)
+
+    candidates: list[np.ndarray] = []
+    for angle in (0.0, 0.25 * np.pi, 0.5 * np.pi, 0.75 * np.pi):
+        w = np.cos(angle) * w0 + np.sin(angle) * w_perpendicular
+        candidates.extend(
+            _trace_one_plane_for_g_zero(
+                first, second, first_g, second_g, u, w, length, scale, field, b, config
+            )
+        )
+        near = [
+            candidate
+            for candidate in candidates
+            if _distance_to_segment(candidate, first, second) <= 1.5 * scale
+        ]
+        if near:
+            break
+    if not candidates:
+        return None
+    return min(
+        candidates,
+        key=lambda candidate: _distance_to_segment(candidate, first, second),
+    )
+
+
+def _trace_one_plane_for_g_zero(
+    first: np.ndarray,
+    second: np.ndarray,
+    first_g: float,
+    second_g: float,
+    u: np.ndarray,
+    w: np.ndarray,
+    length: float,
+    scale: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+) -> list[np.ndarray]:
+    """Collect polished ``g=0`` crossings on ``B=b`` in one cutting plane."""
 
     def plane_point(a: float, c: float) -> np.ndarray:
         return first + a * u + c * w
@@ -952,8 +1040,15 @@ def _trace_plane_curve_to_g_zero(
             position, residual = improved
         return None
 
-    nominal_step = length / 16.0
-    arc_budget = 16.0 * length
+    def collect(candidates: list[np.ndarray], point: np.ndarray | None) -> None:
+        if point is not None and (
+            float(np.sum(point[:2] ** 2)) <= 1.0 + config.merge_tolerance
+        ):
+            candidates.append(point)
+
+    nominal_step = scale / 16.0
+    arc_budget = 8.0 * scale
+    candidates: list[np.ndarray] = []
     for orientation in (1.0, -1.0):
         a, c = 0.0, 0.0
         current = np.asarray(first, dtype=np.float64)
@@ -962,7 +1057,7 @@ def _trace_plane_curve_to_g_zero(
         traveled = 0.0
         step_size = nominal_step
         for _ in range(1024):
-            if traveled > arc_budget:
+            if traveled > arc_budget or len(candidates) >= 8:
                 break
             gradient2 = plane_gradient(a, c)
             norm2 = float(np.linalg.norm(gradient2))
@@ -988,17 +1083,29 @@ def _trace_plane_curve_to_g_zero(
             if advance <= config.merge_tolerance:
                 break
             point = plane_point(a_next, c_next)
+            if float(np.sum(point[:2] ** 2)) > 1.0:
+                # The trace left the plasma domain; the field beyond the unit
+                # disk is extrapolation, so no valid crossing lies this way.
+                break
             point_g = float(_physical_g(field, point[np.newaxis, :])[0])
             if abs(point_g) <= config.g_tolerance:
-                return point
-            if current_g * point_g < 0.0:
-                return _brentq_projected_chord(
-                    current, point, current_g, point_g, field, b, config
+                collect(candidates, point)
+            elif current_g * point_g < 0.0:
+                collect(
+                    candidates,
+                    _brentq_projected_chord(
+                        current, point, current_g, point_g, field, b, config
+                    ),
                 )
             if np.hypot(a_next - length, c_next) <= step_size:
-                return _brentq_projected_chord(
-                    point, second, point_g, second_g, field, b, config
-                )
+                if point_g * second_g < 0.0:
+                    collect(
+                        candidates,
+                        _brentq_projected_chord(
+                            point, second, point_g, second_g, field, b, config
+                        ),
+                    )
+                break
             previous_direction = (
                 np.array([a_next - a, c_next - c], dtype=np.float64) / advance
             )
@@ -1006,7 +1113,7 @@ def _trace_plane_curve_to_g_zero(
             a, c = a_next, c_next
             current, current_g = point, point_g
             step_size = min(2.0 * step_size, nominal_step)
-    return None
+    return candidates
 
 
 def _brentq_projected_chord(
@@ -1052,9 +1159,35 @@ def _brentq_projected_chord(
         return None
     residual_B = float(_evaluate_B(field, point[np.newaxis, :])[0] - b)
     residual_g = float(_physical_g(field, point[np.newaxis, :])[0])
-    if abs(residual_B) > config.B_tolerance or abs(residual_g) > config.g_tolerance:
+    if (
+        abs(residual_B) > config.B_tolerance
+        or abs(residual_g) > config.g_tolerance
+        or float(np.sum(point[:2] ** 2)) > 1.0 + config.merge_tolerance
+    ):
         return None
     return point
+
+
+def _max_triangle_edge_length(surface: SurfaceMesh) -> float:
+    """Largest marching-triangle edge length, with seam triangles unwrapped.
+
+    Marching triangles live inside single background tetrahedra, so this is
+    a per-extraction proxy for the background cell size in logical units.
+    """
+    if not len(surface.triangles):
+        return 0.0
+    vertices = surface.points[surface.triangles].copy()
+    for index in (1, 2):
+        difference = vertices[:, index, 2] - vertices[:, 0, 2]
+        vertices[:, index, 2] -= surface.period * np.round(difference / surface.period)
+    edges = np.stack(
+        (
+            vertices[:, 1] - vertices[:, 0],
+            vertices[:, 2] - vertices[:, 1],
+            vertices[:, 0] - vertices[:, 2],
+        )
+    )
+    return float(np.max(np.linalg.norm(edges, axis=-1)))
 
 
 def _distance_to_segment(

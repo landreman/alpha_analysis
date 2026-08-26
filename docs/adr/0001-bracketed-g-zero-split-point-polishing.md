@@ -33,14 +33,25 @@ when the local Newton solve escapes, and §21.2 forbids hiding the failure.
    back to (a) `brentq` on \(g\) along the edge chord with each sample projected onto
    \(B=b\) by a damped, displacement-capped gradient descent (single-sheeted case),
    and if the projection jumps sheets, (b) predictor–corrector continuation of the
-   intersection curve of \(B=b\) with the plane through the edge, traced in both
-   orientations with orientation continuity, until the bracketed sign change of
-   \(g\) is met and polished on a short single-sheeted sub-chord. Every stage is
-   bracketed by the opposite-sign endpoint values and bounded by displacement caps
-   and an arc-length budget, so a distant root cannot be returned; total failure
-   still raises `ROOT_FAILURE`. Costs: more code, and hard edges spend up to a few
-   hundred field evaluations (measured: the worst level in a 100-level W7-X sweep
-   took 6.8 s total versus ~2 s typical).
+   intersection curve of \(B=b\) with planes through the edge. The continuation
+   traces a pencil of cutting planes rotated about the chord (seeded by the
+   \(\nabla B\) direction — a single plane can meet a thin tube in two disconnected
+   curves, one per endpoint, with no bracket on either), in both directions per
+   plane, polishing every sign change of \(g\) on its short single-sheeted
+   sub-chord, and returns the crossing **nearest the edge** — the first crossing
+   met can be a spurious one many edge lengths away on the long way around the
+   tube. Every stage is bracketed and bounded: displacement caps, an arc-length
+   budget of 8 locality scales per direction, rejection of any candidate outside
+   the unit disk (the surface patch a triangle approximates lies inside its
+   background tetrahedron and hence inside the disk; beyond \(x^2+y^2=1\) the
+   field is unphysical extrapolation), and a final acceptance radius of
+   \(\max(4\,L_{\mathrm{edge}},\ 2\,L_{\mathrm{patch}})\), where
+   \(L_{\mathrm{patch}}\) — the largest marching-triangle edge of the full
+   surface — proxies the background cell size so that marching edges much
+   shorter than their cell are not held to an arbitrarily small radius. Total
+   failure still raises `ROOT_FAILURE`. Costs: more code, and hard edges spend
+   up to a few thousand field evaluations (measured: the worst level in a
+   100-level W7-X sweep took ~20 s total versus ~2 s typical).
 3. **Globally subdivide any triangle whose split point fails** — changes mesh
    topology during extraction, complicating parent-edge provenance and the seam
    contract, and still needs a robust root-finder for the subdivided edges.
@@ -59,9 +70,14 @@ record is pending.
   levels reported failing (2.34479, 2.39608, 2.44736) are included in the sweep and
   in `test_w7x_split_points_polish_on_the_thin_tube_near_min_B`.
 - Split points on strongly curved sheets may legitimately lie farther from the edge
-  chord than the planar solve's normal-displacement limit; the fallback's locality
-  guarantee is path-connectedness on the surface within a bounded arc length
-  (16 edge lengths), not distance to the chord.
+  chord than the planar solve's normal-displacement limit; the fallback accepts the
+  nearest in-disk crossing within \(\max(4\,L_{\mathrm{edge}}, 2\,L_{\mathrm{patch}})\)
+  of the edge (measured worst case across resolutions 4×16×8 to 10×32×16 and
+  \(b\) sweeps: 3.03 edge lengths on a short edge — 0.46 in logical units, under
+  one background cell — with all split points strictly inside the unit disk).
+  Vertices many edge lengths from their parent triangle, or outside
+  \(x^2+y^2=1\), were a defect of the first first-crossing implementation and are
+  regression-tested against.
 - `test_g_zero_projection_rejects_a_root_beyond_the_local_edge` is replaced: a
   rejected planar root now recovers through the fallback
   (`test_g_zero_planar_runaway_root_is_replaced_by_a_local_bracketed_root`), and

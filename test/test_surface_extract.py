@@ -429,6 +429,71 @@ def test_g_zero_polish_raises_when_no_local_root_exists(monkeypatch):
     assert caught.value.status is SurfaceStatus.ROOT_FAILURE
 
 
+def _record_split_point_locality(monkeypatch):
+    """Wrap ``_polish_g_crossing`` to record how local each split point is.
+
+    Returns two lists that fill during extraction: the number of planar-solve
+    rejections (the fallback exercised), and per split point the pair
+    ``(distance to the parent edge / edge length, x^2 + y^2)``.
+    """
+    import alpha_analysis.j_connectivity.surface_extract as module
+
+    planar = module._polish_g_crossing_planar
+    rejections = []
+
+    def counting_planar(*args, **kwargs):
+        result = planar(*args, **kwargs)
+        if result is None:
+            rejections.append(1)
+        return result
+
+    polish = module._polish_g_crossing
+    locality = []
+
+    def recording_polish(
+        first, second, first_g, second_g, field, b, period, config, **kwargs
+    ):
+        point = polish(
+            first, second, first_g, second_g, field, b, period, config, **kwargs
+        )
+        second_local = module._unwrap_point_relative(second, first, period)
+        distance = module._distance_to_segment(
+            module._unwrap_point_relative(point, first, period), first, second_local
+        )
+        edge_length = float(np.linalg.norm(second_local - first))
+        locality.append((distance, edge_length, float(np.sum(point[:2] ** 2))))
+        return point
+
+    monkeypatch.setattr(module, "_polish_g_crossing_planar", counting_planar)
+    monkeypatch.setattr(module, "_polish_g_crossing", recording_polish)
+    return rejections, locality
+
+
+def _assert_thin_tube_extraction_is_sound(extraction, field, b, rejections, locality):
+    # The scenario must actually exercise the fallback, or it tests nothing.
+    assert rejections
+    assert len(extraction.incoming.triangles) > 0
+    assert len(extraction.outgoing.triangles) > 0
+    assert len(extraction.g_zero.segments) > 0
+    for surface in (extraction.full, extraction.incoming, extraction.outgoing):
+        s, theta, zeta = _coordinates(surface.points)
+        np.testing.assert_allclose(field.B(s, theta, zeta), b, atol=1.0e-10)
+    np.testing.assert_allclose(extraction.g_zero.B, b, atol=1.0e-10)
+    np.testing.assert_allclose(extraction.g_zero.g, 0.0, atol=1.0e-10)
+    # Split points must be local to their parent edge and inside the plasma
+    # domain: a polished root far from its edge or beyond x^2+y^2=1 is a
+    # spurious solution of the simultaneous system, not the local crossing.
+    # The locality scale is the acceptance radius of the bracketed fallback:
+    # four edge lengths, or twice the background patch scale for marching
+    # edges much shorter than their background cell.
+    import alpha_analysis.j_connectivity.surface_extract as module
+
+    patch_scale = module._max_triangle_edge_length(extraction.full)
+    for distance, edge_length, radius_squared in locality:
+        assert distance <= max(4.0 * edge_length, 2.0 * patch_scale) + 1.0e-6
+        assert radius_squared <= 1.0 + 1.0e-9
+
+
 @pytest.mark.parametrize(
     "b,resolution",
     [
@@ -443,9 +508,8 @@ def test_split_points_survive_thin_tube_sheet_jumps_near_min_B(
     # B = (s-1/2)^2 + 0.01 cos(3 zeta) + helical m=1: near min(B) the level
     # set is a thin helical tube crossed by background edges, the planar
     # Newton solve escapes to distant roots, and the projected chord solve is
-    # multi-sheeted.  The bracketed fallbacks must still split every edge.
-    import alpha_analysis.j_connectivity.surface_extract as module
-
+    # multi-sheeted.  The bracketed fallbacks must still split every edge
+    # with points that are local and inside the unit disk.
     field = _field(
         radial_coefficients=[0.25, -1.0, 1.0],
         toroidal_cosine=0.01,
@@ -454,70 +518,49 @@ def test_split_points_survive_thin_tube_sheet_jumps_near_min_B(
     background = StructuredPrismMeshBackend(BackgroundMeshConfig(*resolution)).build(
         field
     )
-    planar = module._polish_g_crossing_planar
-    rejections = []
-
-    def counting_planar(*args, **kwargs):
-        result = planar(*args, **kwargs)
-        if result is None:
-            rejections.append(1)
-        return result
-
-    monkeypatch.setattr(module, "_polish_g_crossing_planar", counting_planar)
+    rejections, locality = _record_split_point_locality(monkeypatch)
 
     extraction = MarchingTetrahedraExtractor().extract(background, field, b)
 
-    # The scenario must actually exercise the fallback, or it tests nothing.
-    assert rejections
-    assert len(extraction.incoming.triangles) > 0
-    assert len(extraction.outgoing.triangles) > 0
-    assert len(extraction.g_zero.segments) > 0
-    for surface in (extraction.full, extraction.incoming, extraction.outgoing):
-        s, theta, zeta = _coordinates(surface.points)
-        np.testing.assert_allclose(field.B(s, theta, zeta), b, atol=1.0e-10)
-    np.testing.assert_allclose(extraction.g_zero.B, b, atol=1.0e-10)
-    np.testing.assert_allclose(extraction.g_zero.g, 0.0, atol=1.0e-10)
+    _assert_thin_tube_extraction_is_sound(extraction, field, b, rejections, locality)
 
 
-def test_w7x_split_points_polish_on_the_thin_tube_near_min_B(monkeypatch):
-    # Regression for the ROOT_FAILUREs reported for the W7-X boozmn file at
-    # b near min(B): the B=b level set is a thin tube whose g=0 waist the
-    # planar Newton solve escaped from.  b = 2.44736 is one of the reported
-    # failing levels on the example script's default background mesh.
-    import alpha_analysis.j_connectivity.surface_extract as module
-
+@pytest.mark.parametrize(
+    "b,resolution",
+    [
+        # 2.44736 is one of the originally reported ROOT_FAILURE levels on
+        # the example script's default background mesh.
+        pytest.param(2.44736, (6, 24, 12), id="reported-root-failure"),
+        # At 2.34 the first crossing met by a fixed-orientation plane trace
+        # sits more than ten edge lengths away; the nearest crossing must be
+        # returned instead.
+        pytest.param(2.34, (6, 24, 12), id="far-first-crossing"),
+        # At 2.38 on the coarse mesh the gradient-seeded cutting plane meets
+        # the thin tube in two disconnected curves and its crossings leave
+        # the unit disk; the rotated cutting planes must find the local
+        # in-disk crossing.
+        pytest.param(2.38, (4, 16, 8), id="disconnected-plane-cut"),
+    ],
+)
+def test_w7x_split_points_polish_on_the_thin_tube_near_min_B(
+    monkeypatch, b, resolution
+):
+    # Regression for the W7-X boozmn levels near min(B): extraction must
+    # succeed, and the split points must stay local to their parent edges
+    # and inside the unit disk (no wild vertices).
     field = BoozerField.from_boozmn(
         os.path.join(
             DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
         )
     )
-    background = StructuredPrismMeshBackend(BackgroundMeshConfig(6, 24, 12)).build(
+    background = StructuredPrismMeshBackend(BackgroundMeshConfig(*resolution)).build(
         field
     )
-    planar = module._polish_g_crossing_planar
-    rejections = []
+    rejections, locality = _record_split_point_locality(monkeypatch)
 
-    def counting_planar(*args, **kwargs):
-        result = planar(*args, **kwargs)
-        if result is None:
-            rejections.append(1)
-        return result
-
-    monkeypatch.setattr(module, "_polish_g_crossing_planar", counting_planar)
-
-    b = 2.44736
     extraction = MarchingTetrahedraExtractor().extract(background, field, b)
 
-    # The level must actually stress the fallback, or this tests nothing.
-    assert rejections
-    assert len(extraction.incoming.triangles) > 0
-    assert len(extraction.outgoing.triangles) > 0
-    assert len(extraction.g_zero.segments) > 0
-    for surface in (extraction.full, extraction.incoming, extraction.outgoing):
-        s, theta, zeta = _coordinates(surface.points)
-        np.testing.assert_allclose(field.B(s, theta, zeta), b, atol=1.0e-10)
-    np.testing.assert_allclose(extraction.g_zero.B, b, atol=1.0e-10)
-    np.testing.assert_allclose(extraction.g_zero.g, 0.0, atol=1.0e-10)
+    _assert_thin_tube_extraction_is_sound(extraction, field, b, rejections, locality)
 
 
 def test_pyvista_prototype_returns_plain_arrays(monkeypatch):
