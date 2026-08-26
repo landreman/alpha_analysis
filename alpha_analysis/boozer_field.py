@@ -53,6 +53,7 @@ class BoozerField:
         self._iota_spline: CubicSpline | None = None
         self._bmnc_spline: CubicSpline | None = None
         self._bmns_spline: CubicSpline | None = None
+        self._coefficient_s0: float | None = None
 
     @classmethod
     def from_boozmn(cls, boozmn_file: str | Path) -> "BoozerField":
@@ -176,11 +177,11 @@ class BoozerField:
         return self._evaluate_spline(self._iota_spline, s)
 
     def bmnc(self, s: np.ndarray | float) -> np.ndarray | float:
-        return self._evaluate_spline(self._bmnc_spline, s)
+        return self._evaluate_coefficient_spline(self._bmnc_spline, s)
 
     def bmns(self, s: np.ndarray | float) -> np.ndarray | float:
         """Return sine Fourier coefficients at normalized toroidal flux ``s``."""
-        return self._evaluate_spline(self._bmns_spline, s)
+        return self._evaluate_coefficient_spline(self._bmns_spline, s)
 
     def B(self, s, theta, zeta) -> np.ndarray:
         """Evaluate the general Fourier field pointwise (DESIGN.md §7.1).
@@ -226,9 +227,11 @@ class BoozerField:
         )
         spline_order = 1 if derivative == "s" else 0
         cosine = np.asarray(
-            self._evaluate_spline(self._bmnc_spline, s_arr, spline_order)
+            self._evaluate_coefficient_spline(self._bmnc_spline, s_arr, spline_order)
         )
-        sine = np.asarray(self._evaluate_spline(self._bmns_spline, s_arr, spline_order))
+        sine = np.asarray(
+            self._evaluate_coefficient_spline(self._bmns_spline, s_arr, spline_order)
+        )
         base = cosine * np.cos(phase) + sine * np.sin(phase)
         first = -cosine * np.sin(phase) + sine * np.cos(phase)
         if derivative in ("B", "s"):
@@ -334,6 +337,58 @@ class BoozerField:
         self._bmns_spline = CubicSpline(
             fourier_s, self.bmns_data, axis=0, extrapolate=True
         )
+        # Innermost coefficient surface: below it the axis-regular harmonic
+        # continuation of DESIGN.md §7.3 replaces spline extrapolation.
+        first = float(fourier_s[0])
+        self._coefficient_s0 = first if first > 0.0 else None
+
+    def _evaluate_coefficient_spline(
+        self,
+        spline: CubicSpline | None,
+        s: np.ndarray | float,
+        derivative_order: int = 0,
+    ) -> np.ndarray:
+        """Evaluate Fourier-coefficient splines with an axis-regular core.
+
+        Below the innermost coefficient surface ``s0`` the cubic spline would
+        extrapolate without physical constraint, leaving ``m != 0`` harmonics
+        finite at the axis and making ``|B|`` multivalued there. DESIGN.md
+        §7.3 (option 1) requires the poloidal-harmonic scaling ``rho^|m|``
+        with ``rho = sqrt(s)``, so each ``m != 0`` coefficient is continued
+        for ``s < s0`` as ``c(s0) (s/s0)^{|m|/2}``: smooth in the logical
+        ``(x, y)`` plane and continuous at ``s0``. ``m = 0`` harmonics keep
+        their spline values. The ``s`` derivative of an ``|m| = 1`` harmonic
+        is genuinely singular at ``s = 0`` and evaluates to ``inf`` there
+        rather than a finite substitute.
+        """
+        if spline is None:
+            raise ValueError("The requested field has not been loaded")
+        s_arr = np.asarray(s, dtype=float)
+        flat = np.atleast_1d(s_arr).ravel()
+        value = np.asarray(spline(flat, nu=derivative_order), dtype=float)
+        s0 = self._coefficient_s0
+        if s0 is not None and self.xm is not None:
+            mask = flat < s0
+            if np.any(mask):
+                if derivative_order not in (0, 1):
+                    raise ValueError(
+                        "axis-regular coefficient continuation supports "
+                        "derivative orders 0 and 1 only"
+                    )
+                m = np.abs(np.asarray(self.xm, dtype=float))
+                nonzero = m > 0.0
+                exponent = 0.5 * m[nonzero]
+                anchor = np.asarray(spline(s0), dtype=float)[nonzero]
+                ratio = (flat[mask] / s0)[:, np.newaxis]
+                with np.errstate(divide="ignore"):
+                    if derivative_order == 0:
+                        continued = anchor * ratio**exponent
+                    else:
+                        continued = anchor * exponent * ratio ** (exponent - 1.0) / s0
+                block = value[mask]
+                block[:, nonzero] = continued
+                value[mask] = block
+        return value.reshape(s_arr.shape + value.shape[-1:])
 
     @staticmethod
     def _evaluate_spline(

@@ -756,21 +756,61 @@ def _polish_g_crossing(
     period: float,
     config: SurfaceExtractionConfig,
 ) -> np.ndarray:
+    """Locate the ``B=b``, ``g=0`` point on one bracketed surface edge (§8.3).
+
+    A planar two-equation Newton solve is the fast path. It searches an
+    affine plane through the edge and can escape to a distant root when the
+    edge skims a weak-``|grad B|`` valley (a ``b`` near ``min B``), so any
+    result that fails the locality or residual checks falls back to
+    bracketed solves that cannot leave the edge: first ``brentq`` on ``g``
+    along the chord with every sample projected onto ``B=b`` under a hard
+    displacement cap, then — if that projection jumps between sheets of a
+    strongly curved surface — a predictor-corrector trace of the ``B=b``
+    curve in the plane through the edge (ADR 0001).
+    """
     if first_g * second_g >= 0.0:
         raise SurfaceExtractionError(
             SurfaceStatus.ROOT_FAILURE, "g=0 surface edge is not bracketed"
         )
     second_local = _unwrap_point_relative(second, first, period)
     tangent = second_local - first
+    displacement_limit = config.merge_tolerance + float(np.linalg.norm(tangent))
+    point = _polish_g_crossing_planar(
+        first, tangent, first_g, second_g, field, b, config, displacement_limit
+    )
+    if point is None:
+        point = _polish_g_crossing_bracketed(
+            first, tangent, first_g, second_g, field, b, config, displacement_limit
+        )
+    if point is None:
+        raise SurfaceExtractionError(
+            SurfaceStatus.ROOT_FAILURE,
+            "simultaneous B=b and g=0 split-point polishing failed: both the "
+            "planar Newton solve and the bracketed projected fallback were "
+            "rejected by the locality and residual checks "
+            f"(edge length={np.linalg.norm(tangent):.3g}, "
+            f"g bracket=({first_g:.3g}, {second_g:.3g}))",
+        )
+    return _canonicalize_point(point, period, config.merge_tolerance)
+
+
+def _polish_g_crossing_planar(
+    first: np.ndarray,
+    tangent: np.ndarray,
+    first_g: float,
+    second_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    displacement_limit: float,
+) -> np.ndarray | None:
+    """Fast planar Newton solve; ``None`` when its checks reject the root."""
     initial_parameter = first_g / (first_g - second_g)
     initial = first + initial_parameter * tangent
     gradient = _logical_B_gradient(field, initial)
     gradient_norm = np.linalg.norm(gradient)
     if gradient_norm <= np.finfo(float).eps:
-        raise SurfaceExtractionError(
-            SurfaceStatus.DEGENERATE,
-            "cannot project a g=0 split point where logical grad B vanishes",
-        )
+        return None
     normal = gradient / gradient_norm
 
     def equations(parameters: np.ndarray) -> np.ndarray:
@@ -791,23 +831,291 @@ def _polish_g_crossing(
     parameter = initial_parameter + solution.x[0]
     point = initial + solution.x[0] * tangent + solution.x[1] * normal
     residual = equations(solution.x)
-    normal_displacement_limit = config.merge_tolerance + np.linalg.norm(tangent)
     if (
         not np.all(np.isfinite(solution.x))
         or not -config.merge_tolerance <= parameter <= 1.0 + config.merge_tolerance
-        or abs(solution.x[1]) > normal_displacement_limit
+        or abs(solution.x[1]) > displacement_limit
         or abs(residual[0]) > config.B_tolerance
         or abs(residual[1]) > config.g_tolerance
     ):
-        raise SurfaceExtractionError(
-            SurfaceStatus.ROOT_FAILURE,
-            "simultaneous B=b and g=0 split-point polishing failed "
-            f"(success={solution.success}, parameter={parameter:.6g}, "
-            f"normal_displacement={solution.x[1]:.3g}, "
-            f"normal_limit={normal_displacement_limit:.3g}, "
-            f"residual=({residual[0]:.3g}, {residual[1]:.3g}))",
+        return None
+    return point
+
+
+def _polish_g_crossing_bracketed(
+    first: np.ndarray,
+    tangent: np.ndarray,
+    first_g: float,
+    second_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    displacement_limit: float,
+) -> np.ndarray | None:
+    """Bracketed fallback that cannot leave the edge neighborhood.
+
+    Both endpoints lie on ``B=b`` with ``g`` of opposite signs, so ``g``
+    after projecting a chord point back onto ``B=b`` is a bracketed scalar
+    function of the chord parameter — unless the surface curves so strongly
+    between the endpoints (a thin tube near ``min B``) that the projection
+    jumps sheets and the projected ``g`` is discontinuous. When the direct
+    chord solve is rejected for that reason, the crossing is bracketed by
+    tracing the closed intersection curve of ``B=b`` with the plane through
+    the edge; the trace's arc-length budget keeps every candidate on the
+    surface patch spanned by the edge, so a distant root can never be
+    returned (§21.2).
+    """
+    second = first + tangent
+    point = _brentq_projected_chord(first, second, first_g, second_g, field, b, config)
+    if point is not None and (
+        _distance_to_segment(point, first, second) <= displacement_limit
+    ):
+        return point
+    return _trace_plane_curve_to_g_zero(
+        first, second, first_g, second_g, field, b, config
+    )
+
+
+def _trace_plane_curve_to_g_zero(
+    first: np.ndarray,
+    second: np.ndarray,
+    first_g: float,
+    second_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+) -> np.ndarray | None:
+    """Trace ``B=b`` within the plane through the edge until ``g`` flips.
+
+    The plane spanned by the chord and ``grad B`` cuts the level set in a
+    one-dimensional implicit curve through both endpoints (around the tube
+    cross-section when ``b`` is near ``min B``). Predictor steps follow the
+    in-plane curve tangent with orientation continuity — no
+    step-toward-the-target heuristic, which stalls when the far endpoint
+    sits on the opposite sheet — and corrector steps are damped in-plane
+    Newton back onto ``B=b``. ``g`` is continuous along the curve and has
+    opposite signs at the endpoints, so a sign flip is met before the trace
+    returns to the far endpoint; the flip is then polished on the short
+    bracketing sub-chord. The arc-length budget bounds the explored patch.
+    """
+    chord = second - first
+    length = float(np.linalg.norm(chord))
+    if length <= 0.0:
+        return None
+    u = chord / length
+    w = None
+    for probe in (0.5 * (first + second), first, second):
+        gradient = _logical_B_gradient(field, probe)
+        candidate = gradient - float(np.dot(gradient, u)) * u
+        candidate_norm = float(np.linalg.norm(candidate))
+        if candidate_norm > 1.0e-8 * max(1.0, float(np.linalg.norm(gradient))):
+            w = candidate / candidate_norm
+            break
+    if w is None:
+        return None
+
+    def plane_point(a: float, c: float) -> np.ndarray:
+        return first + a * u + c * w
+
+    def plane_residual(a: float, c: float) -> float:
+        return float(_evaluate_B(field, plane_point(a, c)[np.newaxis, :])[0] - b)
+
+    def plane_gradient(a: float, c: float) -> np.ndarray:
+        gradient = _logical_B_gradient(field, plane_point(a, c))
+        return np.array([float(np.dot(gradient, u)), float(np.dot(gradient, w))])
+
+    def correct(a: float, c: float, cap: float) -> tuple[float, float] | None:
+        position = np.array([a, c])
+        start_position = position.copy()
+        residual = plane_residual(*position)
+        for _ in range(30):
+            if abs(residual) <= config.B_tolerance:
+                return float(position[0]), float(position[1])
+            gradient2 = plane_gradient(*position)
+            norm_squared = float(np.dot(gradient2, gradient2))
+            if norm_squared <= np.finfo(float).eps:
+                return None
+            step = (-residual / norm_squared) * gradient2
+            improved = None
+            for _halving in range(20):
+                trial = position + step
+                if np.linalg.norm(trial - start_position) > cap:
+                    step = 0.5 * step
+                    continue
+                trial_residual = plane_residual(*trial)
+                if abs(trial_residual) < abs(residual):
+                    improved = (trial, trial_residual)
+                    break
+                step = 0.5 * step
+            if improved is None:
+                return None
+            position, residual = improved
+        return None
+
+    nominal_step = length / 16.0
+    arc_budget = 16.0 * length
+    for orientation in (1.0, -1.0):
+        a, c = 0.0, 0.0
+        current = np.asarray(first, dtype=np.float64)
+        current_g = float(first_g)
+        previous_direction: np.ndarray | None = None
+        traveled = 0.0
+        step_size = nominal_step
+        for _ in range(1024):
+            if traveled > arc_budget:
+                break
+            gradient2 = plane_gradient(a, c)
+            norm2 = float(np.linalg.norm(gradient2))
+            if norm2 <= np.finfo(float).eps:
+                break
+            tangent2 = np.array([-gradient2[1], gradient2[0]]) / norm2
+            if previous_direction is None:
+                if orientation * tangent2[0] < 0.0:
+                    tangent2 = -tangent2
+            elif float(np.dot(tangent2, previous_direction)) < 0.0:
+                tangent2 = -tangent2
+            corrected = None
+            while step_size >= nominal_step * 2.0**-20:
+                trial = (a + step_size * tangent2[0], c + step_size * tangent2[1])
+                corrected = correct(*trial, cap=step_size)
+                if corrected is not None:
+                    break
+                step_size *= 0.5
+            if corrected is None:
+                break
+            a_next, c_next = corrected
+            advance = float(np.hypot(a_next - a, c_next - c))
+            if advance <= config.merge_tolerance:
+                break
+            point = plane_point(a_next, c_next)
+            point_g = float(_physical_g(field, point[np.newaxis, :])[0])
+            if abs(point_g) <= config.g_tolerance:
+                return point
+            if current_g * point_g < 0.0:
+                return _brentq_projected_chord(
+                    current, point, current_g, point_g, field, b, config
+                )
+            if np.hypot(a_next - length, c_next) <= step_size:
+                return _brentq_projected_chord(
+                    point, second, point_g, second_g, field, b, config
+                )
+            previous_direction = (
+                np.array([a_next - a, c_next - c], dtype=np.float64) / advance
+            )
+            traveled += advance
+            a, c = a_next, c_next
+            current, current_g = point, point_g
+            step_size = min(2.0 * step_size, nominal_step)
+    return None
+
+
+def _brentq_projected_chord(
+    left: np.ndarray,
+    right: np.ndarray,
+    left_g: float,
+    right_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+) -> np.ndarray | None:
+    """Solve ``g=0`` along one surface chord via projection; ``None`` on any
+    projection failure or residual-check rejection."""
+    tangent = right - left
+    cap = float(np.linalg.norm(tangent)) + config.merge_tolerance
+
+    def projected(parameter: float) -> np.ndarray | None:
+        return _project_to_level_near(left + parameter * tangent, field, b, config, cap)
+
+    def projected_g(parameter: float) -> float:
+        if parameter <= 0.0:
+            return left_g
+        if parameter >= 1.0:
+            return right_g
+        point = projected(parameter)
+        if point is None:
+            raise _LocalProjectionFailure()
+        return float(_physical_g(field, point[np.newaxis, :])[0])
+
+    try:
+        parameter = brentq(
+            projected_g,
+            0.0,
+            1.0,
+            xtol=config.parameter_tolerance,
+            rtol=4.0 * np.finfo(float).eps,
+            maxiter=200,
         )
-    return _canonicalize_point(point, period, config.merge_tolerance)
+    except (_LocalProjectionFailure, ValueError):
+        return None
+    point = projected(float(np.clip(parameter, 0.0, 1.0)))
+    if point is None:
+        return None
+    residual_B = float(_evaluate_B(field, point[np.newaxis, :])[0] - b)
+    residual_g = float(_physical_g(field, point[np.newaxis, :])[0])
+    if abs(residual_B) > config.B_tolerance or abs(residual_g) > config.g_tolerance:
+        return None
+    return point
+
+
+def _distance_to_segment(
+    point: np.ndarray, start: np.ndarray, end: np.ndarray
+) -> float:
+    """Euclidean distance from ``point`` to the segment ``start``–``end``,
+    all in the same locally unwrapped coordinates."""
+    direction = end - start
+    length_squared = float(np.dot(direction, direction))
+    if length_squared == 0.0:
+        return float(np.linalg.norm(point - start))
+    parameter = np.clip(
+        float(np.dot(point - start, direction)) / length_squared, 0.0, 1.0
+    )
+    return float(np.linalg.norm(point - (start + parameter * direction)))
+
+
+class _LocalProjectionFailure(Exception):
+    """The displacement-capped projection onto ``B=b`` did not converge."""
+
+
+def _project_to_level_near(
+    point: np.ndarray,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    max_displacement: float,
+) -> np.ndarray | None:
+    """Project ``point`` onto ``B=b`` along the local gradient, staying local.
+
+    Damped Newton with a monotone-residual line search; the iterate never
+    moves farther than ``max_displacement`` from the seed, which pins the
+    result to the ``B=b`` sheet nearest the seed. Returns ``None`` when no
+    such local projection is found — never a distant substitute (§21.2).
+    """
+    start = np.asarray(point, dtype=np.float64)
+    current = start.copy()
+    residual = float(_evaluate_B(field, current[np.newaxis, :])[0] - b)
+    for _ in range(60):
+        if abs(residual) <= config.B_tolerance:
+            return current
+        gradient = _logical_B_gradient(field, current)
+        norm_squared = float(np.dot(gradient, gradient))
+        if norm_squared <= np.finfo(float).eps:
+            return None
+        step = (-residual / norm_squared) * gradient
+        improved = None
+        for _halving in range(30):
+            trial = current + step
+            if np.linalg.norm(trial - start) > max_displacement:
+                step = 0.5 * step
+                continue
+            trial_residual = float(_evaluate_B(field, trial[np.newaxis, :])[0] - b)
+            if abs(trial_residual) < abs(residual):
+                improved = (trial, trial_residual)
+                break
+            step = 0.5 * step
+        if improved is None:
+            return None
+        current, residual = improved
+    return None
 
 
 def _project_point_to_level(

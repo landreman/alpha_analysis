@@ -48,7 +48,9 @@ move it into `docs/DESIGN.md` and delete it here.
 - Milestone 4's Gmsh backend embeds the logical axis, returns exact lower/upper seam pairs, supports axis/critical/low-gradient sizing, and finalizes its owned Gmsh session before returning plain arrays; full background-resolution convergence remains Milestone 17 validation work.
 - Milestone 5's signed-half meshes include the shared `G_ZERO` closure; regular incoming vertices have physical `g<0`, split-created vertices use parent edge `(-1, -1)`, and periodic cells require local zeta unwrapping.
 - Milestone 5's common extractor contract runs against both marching tetrahedra and real PyVista/VTK in CI; PyVista empty levels return empty meshes, seam copies are matched one-to-one, `OUTER` provenance uses a dedicated indicator because VTK interpolates packed masks arithmetically, projection is constrained to `s <= 1`, and parent provenance IDs intentionally remain `-1`.
-- Milestone 5 uses a temporary centered Cartesian finite difference for the axis gradient only as a projection direction, followed by residual checks; near-axis `dB_dtheta / s` amplification also remains uncontrolled, so §7.3 axis-regular interpolation or an excluded-core bound is required before a production result includes axis topology.
+- Milestone 5 uses a temporary centered Cartesian finite difference for the axis gradient only as a projection direction, followed by residual checks; near-axis `dB_dtheta / s` amplification also remains uncontrolled.
+- The §7.3 option-1 axis-regular interpolation is implemented: `BoozerField` continues `m != 0` coefficients below the innermost half-grid surface with the `s^{|m|/2}` harmonic scaling (ADR 0002), so `|B|` is single-valued at the axis; values at `s >= s0` are unchanged.
+- `g=0` split-point polishing backs the planar Newton solve with bracketed, locality-bounded fallbacks (projected chord solve, then plane-curve continuation; ADR 0001); thin-tube levels near `min B` extract for the W7-X reference file at every swept `b`.
 
 ## Accepted deviations
 

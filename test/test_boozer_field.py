@@ -185,3 +185,44 @@ def test_get_min_max():
     B_min, B_max = booz.get_min_max(n_s=20, n_theta=32, n_phi=33)
     np.testing.assert_allclose(B_min, B_min_ref, rtol=2e-4)
     np.testing.assert_allclose(B_max, B_max_ref, rtol=1e-13, atol=1e-13)
+
+
+def test_B_is_axis_regular():
+    """The Fourier interpolation must be single-valued and continuous at the
+    axis, with the physical rho^|m| harmonic scaling (DESIGN.md section 7.3,
+    option 1).  Unconstrained spline extrapolation below the innermost
+    coefficient surface leaves m != 0 harmonics finite at s=0 and makes |B|
+    multivalued there by about 1e-3 for this file."""
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    s0 = float(booz.s_bmnc[0])
+    zeta = 0.3
+
+    # Single-valued at the axis: the poloidal spread of B at s -> 0 must
+    # vanish like sqrt(s), so at s = 1e-14 it is far below the ~1e-3 spread
+    # the unconstrained extrapolation produces.
+    theta = np.linspace(0.0, 2.0 * np.pi, 17)
+    spread = np.ptp(booz.B(1.0e-14, theta, zeta))
+    assert spread < 1.0e-6
+
+    # Continuous across the innermost coefficient surface where the
+    # continuation hands over to the spline.
+    below = float(booz.B(s0 * (1.0 - 1.0e-9), 0.7, zeta))
+    above = float(booz.B(s0 * (1.0 + 1.0e-9), 0.7, zeta))
+    np.testing.assert_allclose(below, above, rtol=0.0, atol=1.0e-6)
+
+    # Harmonic scaling: the m-odd part of B scales as sqrt(s) in the
+    # continuation region, so quartering s halves the poloidal asymmetry.
+    def odd_part(s):
+        return 0.5 * float(booz.B(s, 0.0, zeta) - booz.B(s, np.pi, zeta))
+
+    ratio = odd_part(s0 / 4.0) / odd_part(s0 / 16.0)
+    np.testing.assert_allclose(ratio, 2.0, rtol=0.05)
+
+    # The continued radial derivative must be consistent with B itself.
+    s_probe, step = s0 / 2.0, s0 * 1.0e-5
+    finite_difference = (
+        float(booz.B(s_probe + step, 0.7, zeta) - booz.B(s_probe - step, 0.7, zeta))
+    ) / (2.0 * step)
+    np.testing.assert_allclose(
+        float(booz.dB_ds(s_probe, 0.7, zeta)), finite_difference, rtol=1.0e-5
+    )

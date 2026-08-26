@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import os
 from collections import Counter
 from types import SimpleNamespace
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+
+from alpha_analysis import DATA_DIR, BoozerField
 
 from alpha_analysis.j_connectivity.background_mesh import (
     BackgroundMeshConfig,
@@ -348,7 +351,12 @@ def test_extractors_report_undefined_physical_field_direction(extractor_type):
     assert caught.value.status is SurfaceStatus.DEGENERATE
 
 
-def test_g_zero_projection_rejects_a_root_beyond_the_local_edge(monkeypatch):
+def test_g_zero_planar_runaway_root_is_replaced_by_a_local_bracketed_root(
+    monkeypatch,
+):
+    # The planar Newton solve claims a root two edge lengths off the edge;
+    # the locality check must discard it and the bracketed fallback must
+    # return a point on the edge instead of the distant impostor.
     import alpha_analysis.j_connectivity.surface_extract as module
 
     field = _field(radial_coefficients=[2.0, 0.3], toroidal_cosine=0.1)
@@ -374,10 +382,42 @@ def test_g_zero_projection_rejects_a_root_beyond_the_local_edge(monkeypatch):
         lambda _field, points: np.zeros(len(points)),
     )
 
-    with pytest.raises(SurfaceExtractionError, match="normal_displacement") as caught:
+    point = module._polish_g_crossing(
+        first,
+        second,
+        first_g=-1.0,
+        second_g=1.0,
+        field=field,
+        b=2.15,
+        period=period,
+        config=module.SurfaceExtractionConfig(),
+    )
+
+    assert module._distance_to_segment(point, first, second) < 1.0e-9
+
+
+def test_g_zero_polish_raises_when_no_local_root_exists(monkeypatch):
+    # g pretends to be +1 everywhere while the endpoint bracket claims a sign
+    # change: every stage must reject rather than fabricate a split point.
+    import alpha_analysis.j_connectivity.surface_extract as module
+
+    field = _field(radial_coefficients=[2.0, 0.3], toroidal_cosine=0.1)
+    period = 2.0 * np.pi / field.nfp
+    monkeypatch.setattr(
+        module,
+        "_evaluate_B",
+        lambda _field, points: np.full(len(points), 2.15),
+    )
+    monkeypatch.setattr(
+        module,
+        "_physical_g",
+        lambda _field, points: np.ones(len(points)),
+    )
+
+    with pytest.raises(SurfaceExtractionError, match="split-point") as caught:
         module._polish_g_crossing(
-            first,
-            second,
+            np.array([0.6, 0.0, 0.2]),
+            np.array([0.0, 0.6, 0.4]),
             first_g=-1.0,
             second_g=1.0,
             field=field,
@@ -387,6 +427,97 @@ def test_g_zero_projection_rejects_a_root_beyond_the_local_edge(monkeypatch):
         )
 
     assert caught.value.status is SurfaceStatus.ROOT_FAILURE
+
+
+@pytest.mark.parametrize(
+    "b,resolution",
+    [
+        pytest.param(-0.009, (6, 12, 8), id="deep-thin-tube"),
+        pytest.param(-0.005, (6, 12, 8), id="mid-thin-tube"),
+        pytest.param(0.001, (6, 8, 6), id="coarse-mesh"),
+    ],
+)
+def test_split_points_survive_thin_tube_sheet_jumps_near_min_B(
+    monkeypatch, b, resolution
+):
+    # B = (s-1/2)^2 + 0.01 cos(3 zeta) + helical m=1: near min(B) the level
+    # set is a thin helical tube crossed by background edges, the planar
+    # Newton solve escapes to distant roots, and the projected chord solve is
+    # multi-sheeted.  The bracketed fallbacks must still split every edge.
+    import alpha_analysis.j_connectivity.surface_extract as module
+
+    field = _field(
+        radial_coefficients=[0.25, -1.0, 1.0],
+        toroidal_cosine=0.01,
+        helical_sine=0.01,
+    )
+    background = StructuredPrismMeshBackend(BackgroundMeshConfig(*resolution)).build(
+        field
+    )
+    planar = module._polish_g_crossing_planar
+    rejections = []
+
+    def counting_planar(*args, **kwargs):
+        result = planar(*args, **kwargs)
+        if result is None:
+            rejections.append(1)
+        return result
+
+    monkeypatch.setattr(module, "_polish_g_crossing_planar", counting_planar)
+
+    extraction = MarchingTetrahedraExtractor().extract(background, field, b)
+
+    # The scenario must actually exercise the fallback, or it tests nothing.
+    assert rejections
+    assert len(extraction.incoming.triangles) > 0
+    assert len(extraction.outgoing.triangles) > 0
+    assert len(extraction.g_zero.segments) > 0
+    for surface in (extraction.full, extraction.incoming, extraction.outgoing):
+        s, theta, zeta = _coordinates(surface.points)
+        np.testing.assert_allclose(field.B(s, theta, zeta), b, atol=1.0e-10)
+    np.testing.assert_allclose(extraction.g_zero.B, b, atol=1.0e-10)
+    np.testing.assert_allclose(extraction.g_zero.g, 0.0, atol=1.0e-10)
+
+
+def test_w7x_split_points_polish_on_the_thin_tube_near_min_B(monkeypatch):
+    # Regression for the ROOT_FAILUREs reported for the W7-X boozmn file at
+    # b near min(B): the B=b level set is a thin tube whose g=0 waist the
+    # planar Newton solve escaped from.  b = 2.44736 is one of the reported
+    # failing levels on the example script's default background mesh.
+    import alpha_analysis.j_connectivity.surface_extract as module
+
+    field = BoozerField.from_boozmn(
+        os.path.join(
+            DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
+        )
+    )
+    background = StructuredPrismMeshBackend(BackgroundMeshConfig(6, 24, 12)).build(
+        field
+    )
+    planar = module._polish_g_crossing_planar
+    rejections = []
+
+    def counting_planar(*args, **kwargs):
+        result = planar(*args, **kwargs)
+        if result is None:
+            rejections.append(1)
+        return result
+
+    monkeypatch.setattr(module, "_polish_g_crossing_planar", counting_planar)
+
+    b = 2.44736
+    extraction = MarchingTetrahedraExtractor().extract(background, field, b)
+
+    # The level must actually stress the fallback, or this tests nothing.
+    assert rejections
+    assert len(extraction.incoming.triangles) > 0
+    assert len(extraction.outgoing.triangles) > 0
+    assert len(extraction.g_zero.segments) > 0
+    for surface in (extraction.full, extraction.incoming, extraction.outgoing):
+        s, theta, zeta = _coordinates(surface.points)
+        np.testing.assert_allclose(field.B(s, theta, zeta), b, atol=1.0e-10)
+    np.testing.assert_allclose(extraction.g_zero.B, b, atol=1.0e-10)
+    np.testing.assert_allclose(extraction.g_zero.g, 0.0, atol=1.0e-10)
 
 
 def test_pyvista_prototype_returns_plain_arrays(monkeypatch):
