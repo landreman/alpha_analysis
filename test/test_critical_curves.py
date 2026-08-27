@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import matplotlib.pyplot as plt
 import numpy as np
 
 from alpha_analysis.j_connectivity import (
     BackgroundMeshConfig,
     CriticalCurveConfig,
+    CriticalCurveStatus,
     CriticalKind,
     MarchingTetrahedraExtractor,
     StructuredPrismMeshBackend,
     SurfaceCurveMesh,
     SurfaceMesh,
+    SurfaceStatus,
     extract_critical_curves,
 )
 from alpha_analysis.j_connectivity.synthetic_fields import SyntheticFourierField
@@ -54,7 +58,7 @@ def test_production_extraction_recovers_analytic_critical_locations():
     ).build(field)
 
     surface = MarchingTetrahedraExtractor().extract(background, field, b)
-    result = extract_critical_curves(surface.g_zero, field, b)
+    result = extract_critical_curves(surface, field, b)
 
     assert len(result.polylines) == 2
     by_kind = {polyline.kind: polyline for polyline in result.polylines}
@@ -66,6 +70,17 @@ def test_production_extraction_recovers_analytic_critical_locations():
     np.testing.assert_allclose(np.sum(minimum[:, :2] ** 2, axis=1), b - 1.25)
     np.testing.assert_allclose(minimum[:, 2], np.pi, atol=1.0e-12)
     assert all(polyline.closed for polyline in result.polylines)
+    unresolved = extract_critical_curves(
+        replace(
+            surface,
+            status=SurfaceStatus.UNRESOLVED,
+            n_unresolved_splits=1,
+        ),
+        field,
+        b,
+    )
+    assert unresolved.status is CriticalCurveStatus.UNRESOLVED
+    assert unresolved.report.source_unresolved_split_count == 1
 
 
 def test_analytic_min_max_curves_are_classified_and_periodically_stitched(tmp_path):
@@ -141,20 +156,19 @@ def _sign_changing_point(theta: float) -> np.ndarray:
 
 def test_ambiguous_segment_refines_to_analytic_degenerate_point():
     field = _sign_changing_field()
-    points = np.vstack(
-        (_sign_changing_point(np.pi / 4), _sign_changing_point(3 * np.pi / 4))
-    )
+    input_theta = np.array([np.pi / 6, 3 * np.pi / 4, 7 * np.pi / 6, 7 * np.pi / 4])
+    points = np.vstack([_sign_changing_point(value) for value in input_theta])
     theta = np.arctan2(points[:, 1], points[:, 0])
     s = np.sum(points[:, :2] ** 2, axis=1)
     curve = SurfaceCurveMesh(
         period=2.0 * np.pi,
         points=points,
-        segments=np.array([[0, 1]], dtype=np.int64),
+        segments=np.column_stack((np.arange(4), np.roll(np.arange(4), -1))),
         B=np.asarray(field.B(s, theta, points[:, 2])),
         g=np.asarray(
             field.B(s, theta, points[:, 2]) * field.D_B(s, theta, points[:, 2])
         ),
-        boundary_tags=np.full(2, SurfaceMesh.G_ZERO, dtype=np.int64),
+        boundary_tags=np.full(4, SurfaceMesh.G_ZERO, dtype=np.int64),
     )
 
     result = extract_critical_curves(
@@ -165,12 +179,25 @@ def test_ambiguous_segment_refines_to_analytic_degenerate_point():
     )
 
     degenerate = result.point_kind == CriticalKind.DEGENERATE
-    assert np.count_nonzero(degenerate) == 1
-    point = result.points[degenerate][0]
-    theta = np.mod(np.arctan2(point[1], point[0]), 2.0 * np.pi)
-    np.testing.assert_allclose(theta, np.pi / 2.0, atol=1.0e-8)
-    np.testing.assert_allclose(np.sum(point[:2] ** 2), 0.5, atol=1.0e-9)
-    np.testing.assert_allclose(point[2], 0.0, atol=1.0e-10)
+    assert np.count_nonzero(degenerate) == 2
+    degenerate_points = result.points[degenerate]
+    theta = np.sort(
+        np.mod(
+            np.arctan2(degenerate_points[:, 1], degenerate_points[:, 0]),
+            2.0 * np.pi,
+        )
+    )
+    np.testing.assert_allclose(theta, [np.pi / 2.0, 3.0 * np.pi / 2.0], atol=1.0e-8)
+    np.testing.assert_allclose(
+        np.sum(degenerate_points[:, :2] ** 2, axis=1), 0.5, atol=1.0e-9
+    )
+    np.testing.assert_allclose(degenerate_points[:, 2], 0.0, atol=1.0e-10)
+    s = np.sum(result.points[:, :2] ** 2, axis=1)
+    theta = np.arctan2(result.points[:, 1], result.points[:, 0])
+    B = np.asarray(field.B(s, theta, result.points[:, 2]))
+    g = B * np.asarray(field.D_B(s, theta, result.points[:, 2]))
+    np.testing.assert_allclose(B, 2.0, atol=1.0e-10)
+    np.testing.assert_allclose(g, 0.0, atol=1.0e-10)
     assert {polyline.kind for polyline in result.polylines} == {
         CriticalKind.GAMMA_MIN,
         CriticalKind.GAMMA_MAX,
@@ -178,6 +205,24 @@ def test_ambiguous_segment_refines_to_analytic_degenerate_point():
     assert result.report.refined_segment_count >= 1
     assert result.report.unresolved_segment_count == 0
     assert (
-        result.report.max_ambiguous_segment_length[-1]
-        < result.report.max_ambiguous_segment_length[0]
+        result.report.ambiguous_segment_length_history[-1]
+        < result.report.ambiguous_segment_length_history[0]
     )
+
+
+def test_unphysical_curve_gap_is_never_reported_regular():
+    field = _radial_field()
+    points = _circle_points(0.25, 0.0, 4)[:2]
+    curve = SurfaceCurveMesh(
+        period=2.0 * np.pi,
+        points=points,
+        segments=np.array([[0, 1]], dtype=np.int64),
+        B=np.full(2, 2.0),
+        g=np.zeros(2),
+        boundary_tags=np.full(2, SurfaceMesh.G_ZERO, dtype=np.int64),
+    )
+
+    result = extract_critical_curves(curve, field, b=2.0)
+
+    assert result.status is CriticalCurveStatus.UNRESOLVED
+    assert result.report.unresolved_endpoint_count == 2

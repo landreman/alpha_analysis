@@ -17,8 +17,8 @@ import numpy as np
 from scipy.optimize import root
 
 from .field import BoozerFieldLike
-from .surface_extract import SurfaceCurveMesh, SurfaceMesh
-from .types import FloatArray, IntArray
+from .surface_extract import SurfaceCurveMesh, SurfaceExtraction, SurfaceMesh
+from .types import FloatArray, IntArray, SurfaceStatus
 
 
 class CriticalCurveError(RuntimeError):
@@ -98,7 +98,9 @@ class CriticalCurveReport:
 
     refined_segment_count: int
     unresolved_segment_count: int
-    max_ambiguous_segment_length: tuple[float, ...]
+    unresolved_endpoint_count: int
+    source_unresolved_split_count: int
+    ambiguous_segment_length_history: tuple[float, ...]
 
 
 @dataclass(frozen=True)
@@ -264,7 +266,7 @@ def _stitch_periodic_endpoints(
 
 def _midpoint_coordinates(
     first: FloatArray, second: FloatArray, period: float
-) -> tuple[np.ndarray, np.ndarray]:
+) -> np.ndarray:
     s0 = float(np.dot(first[:2], first[:2]))
     s1 = float(np.dot(second[:2], second[:2]))
     theta0 = float(np.arctan2(first[1], first[0]))
@@ -272,9 +274,7 @@ def _midpoint_coordinates(
     theta1 = theta0 + (theta1 - theta0 + np.pi) % (2.0 * np.pi) - np.pi
     zeta0 = float(first[2])
     zeta1 = zeta0 + (float(second[2]) - zeta0 + 0.5 * period) % period - 0.5 * period
-    q0 = np.array([s0, theta0, zeta0])
-    q1 = np.array([s1, theta1, zeta1])
-    return 0.5 * (q0 + q1), q1 - q0
+    return 0.5 * (np.array([s0, theta0, zeta0]) + np.array([s1, theta1, zeta1]))
 
 
 def _point_from_coordinates(coordinates: np.ndarray, period: float) -> FloatArray:
@@ -283,7 +283,7 @@ def _point_from_coordinates(coordinates: np.ndarray, period: float) -> FloatArra
     return np.array([rho * np.cos(theta), rho * np.sin(theta), zeta % period])
 
 
-def _critical_midpoint(
+def _degenerate_point(
     first: FloatArray,
     second: FloatArray,
     field: BoozerFieldLike,
@@ -291,48 +291,47 @@ def _critical_midpoint(
     period: float,
     config: CriticalCurveConfig,
 ) -> FloatArray:
-    seed, tangent = _midpoint_coordinates(first, second, period)
-    tangent_norm = float(np.linalg.norm(tangent))
-    if tangent_norm == 0.0:
-        raise CriticalCurveError("critical-curve segment has coincident endpoints")
-    tangent /= tangent_norm
+    seed = _midpoint_coordinates(first, second, period)
 
     def residual(coordinates: np.ndarray) -> np.ndarray:
         point = _point_from_coordinates(coordinates, period)
-        B, g, _ = _field_values(field, point[np.newaxis, :])
+        B, g, D2_B = _field_values(field, point[np.newaxis, :])
         return np.array(
             [
                 float(B[0] - b),
                 float(g[0]),
-                float(np.dot(coordinates - seed, tangent)),
+                float(D2_B[0]),
             ]
         )
 
     initial_residual = residual(seed)
-    if max(abs(initial_residual[0]), abs(initial_residual[1])) <= min(
-        config.B_tolerance, config.g_tolerance
+    if (
+        abs(initial_residual[0]) <= config.B_tolerance
+        and abs(initial_residual[1]) <= config.g_tolerance
+        and abs(initial_residual[2]) <= config.D2_tolerance
     ):
         solution = seed
     else:
         solved = root(residual, seed)
         if not solved.success:
             raise CriticalCurveError(
-                "ambiguous critical segment midpoint projection did not converge"
+                "degenerate-point solve on an ambiguous segment did not converge"
             )
         solution = np.asarray(solved.x, dtype=np.float64)
     point = _point_from_coordinates(solution, period)
-    B, g, _ = _field_values(field, point[np.newaxis, :])
+    B, g, D2_B = _field_values(field, point[np.newaxis, :])
     edge_length = float(np.linalg.norm(_periodic_delta(first, second, period)))
     seed_point = _point_from_coordinates(seed, period)
     if (
         not (0.0 <= solution[0] <= 1.0 + config.merge_tolerance)
         or abs(float(B[0] - b)) > config.B_tolerance
         or abs(float(g[0])) > config.g_tolerance
+        or abs(float(D2_B[0])) > config.D2_tolerance
         or np.linalg.norm(_periodic_delta(seed_point, point, period))
         > config.max_midpoint_displacement_ratio * edge_length
     ):
         raise CriticalCurveError(
-            "ambiguous critical segment midpoint violates residual or locality bounds"
+            "degenerate point violates B, g, D2_B, or locality bounds"
         )
     return point
 
@@ -438,24 +437,33 @@ def _walk_polylines(
 
 
 def extract_critical_curves(
-    curve: SurfaceCurveMesh,
+    curve: SurfaceCurveMesh | SurfaceExtraction,
     field: BoozerFieldLike,
     b: float,
     config: CriticalCurveConfig | None = None,
 ) -> CriticalCurves:
     """Extract and classify ``Gamma_min``, ``Gamma_max``, and degeneracies.
 
-    The input is the recorded ``B=b, g=0`` boundary of a pitch-surface
-    extraction.  Classification uses the analytic second parallel derivative
+    The preferred input is the complete ``SurfaceExtraction`` so its status
+    and unresolved split count cannot be lost; a standalone recorded
+    ``B=b, g=0`` boundary is accepted for synthetic and staged callers.
+    Classification uses the analytic second parallel derivative
     from DESIGN.md §5.1: positive is ``GAMMA_MIN``, negative is
     ``GAMMA_MAX``, and magnitude at or below ``D2_tolerance`` is
-    ``DEGENERATE``.  Oppositely classified endpoints trigger local midpoint
-    projection and bisection.  If the refinement cap is reached, that segment
-    remains explicitly degenerate and the result status is ``UNRESOLVED``.
+    ``DEGENERATE``.  Oppositely classified endpoints trigger a local solve of
+    ``B-b = g = D_parallel^2 B = 0`` and insertion of that degenerate point.
+    If the refinement cap is reached, that segment remains explicitly
+    degenerate and the result status is ``UNRESOLVED``.
     """
     cfg = config or CriticalCurveConfig()
     if not np.isfinite(b):
         raise ValueError("b must be finite")
+    source_status = SurfaceStatus.REGULAR
+    source_unresolved_splits = 0
+    if isinstance(curve, SurfaceExtraction):
+        source_status = curve.status
+        source_unresolved_splits = int(curve.n_unresolved_splits)
+        curve = curve.g_zero
     if not np.isclose(curve.period, 2.0 * np.pi / field.nfp):
         raise CriticalCurveError("curve period disagrees with the field period")
     points, segments, tags = _stitch_periodic_endpoints(curve, cfg.merge_tolerance)
@@ -471,8 +479,19 @@ def extract_critical_curves(
             segment_kind=np.empty(0, dtype=np.int64),
             boundary_tags=tags,
             polylines=(),
-            status=CriticalCurveStatus.REGULAR,
-            report=CriticalCurveReport(0, 0, (0.0,)),
+            status=(
+                CriticalCurveStatus.REGULAR
+                if source_status is SurfaceStatus.REGULAR
+                and source_unresolved_splits == 0
+                else CriticalCurveStatus.UNRESOLVED
+            ),
+            report=CriticalCurveReport(
+                refined_segment_count=0,
+                unresolved_segment_count=0,
+                unresolved_endpoint_count=0,
+                source_unresolved_split_count=source_unresolved_splits,
+                ambiguous_segment_length_history=(0.0,),
+            ),
         )
     B, g, D2_B = _field_values(field, points)
     if np.max(np.abs(B - b)) > cfg.B_tolerance:
@@ -504,7 +523,7 @@ def extract_critical_curves(
             if not ambiguous[segment_id]:
                 replacement.append((first, second))
                 continue
-            midpoint = _critical_midpoint(
+            midpoint = _degenerate_point(
                 np.asarray(points_list[first]),
                 np.asarray(points_list[second]),
                 field,
@@ -530,12 +549,23 @@ def extract_critical_curves(
     segment_kind = _classify_segments(segments, point_kind, unresolved)
     polylines = _walk_polylines(points, segments, segment_kind, curve.period)
     unresolved_count = int(np.count_nonzero(unresolved))
+    degree = np.bincount(segments.ravel(), minlength=len(points))
+    tag_array = np.asarray(tags_list, dtype=np.int64)
+    physical_endpoint = (
+        tag_array & (SurfaceMesh.EDGE | SurfaceMesh.AXIS | SurfaceMesh.PERIODIC_SEAM)
+    ) != 0
+    unresolved_endpoint_count = int(
+        np.count_nonzero((degree == 1) & ~physical_endpoint)
+    )
+    source_unresolved = (
+        source_status is not SurfaceStatus.REGULAR or source_unresolved_splits > 0
+    )
     has_degenerate = np.any(point_kind == CriticalKind.DEGENERATE.value) or np.any(
         segment_kind == CriticalKind.DEGENERATE.value
     )
     status = (
         CriticalCurveStatus.UNRESOLVED
-        if unresolved_count
+        if unresolved_count or unresolved_endpoint_count or source_unresolved
         else (
             CriticalCurveStatus.DEGENERATE
             if has_degenerate
@@ -550,12 +580,14 @@ def extract_critical_curves(
         D2_B=D2_B,
         point_kind=point_kind,
         segment_kind=segment_kind,
-        boundary_tags=np.asarray(tags_list, dtype=np.int64),
+        boundary_tags=tag_array,
         polylines=polylines,
         status=status,
         report=CriticalCurveReport(
             refined_segment_count=refined_count,
             unresolved_segment_count=unresolved_count,
-            max_ambiguous_segment_length=tuple(history),
+            unresolved_endpoint_count=unresolved_endpoint_count,
+            source_unresolved_split_count=source_unresolved_splits,
+            ambiguous_segment_length_history=tuple(history),
         ),
     )
