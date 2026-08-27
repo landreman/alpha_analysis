@@ -53,8 +53,9 @@ class SurfaceExtractionConfig:
 class SurfaceMesh:
     """Authoritative triangular mesh on the one-field-period quotient (§8.1).
 
-    Points use dimensionless logical ``(x, y, zeta)`` coordinates, with zeta
-    in radians and canonicalized to ``0 <= zeta < period``. ``B`` retains the
+    Points use dimensionless logical ``(x, y, zeta)`` coordinates. On
+    construction, zeta is reduced in radians to ``0 <= zeta < period`` and
+    values within roundoff of either seam are snapped to zero. ``B`` retains the
     field's units and ``g`` stores the physical signed
     ``B D_parallel B / (G + iota I)`` from DESIGN.md §5.1. Point parent edges
     are canonical background-node IDs; a ``(-1, -1)`` entry denotes a point

@@ -688,9 +688,9 @@ def _refine_edges(
         points.append(sample.point)
         B_values.append(sample.B)
         g_values.append(sample.g)
-        tags.append(
-            int(surface.boundary_tags[edge[0]] & surface.boundary_tags[edge[1]])
-        )
+        # A shared provenance boundary would have been refinement_blocked, so
+        # every inserted midpoint is deliberately an untagged surface point.
+        tags.append(0)
         parent_edges.append(np.array([-1, -1], dtype=np.int64))
 
     result_points = np.asarray(points, dtype=float)

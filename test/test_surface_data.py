@@ -190,6 +190,23 @@ def test_smooth_manufactured_action_converges_under_projected_refinement(tmp_pat
 
 def test_return_map_discontinuity_candidates_sharpen_with_refinement():
     field = _field(split=True)
+    off_critical = evaluate_surface_data(
+        _surface(field, b=1.4, s_values=(0.45, 0.55)), field, _TRACE_CONFIG
+    )
+    left, right = off_critical.traces[0], off_critical.traces[2]
+    assert left.status is right.status is TraceStatus.REGULAR
+    assert (left.n_internal_maxima, right.n_internal_maxima) == (1, 0)
+    assert not itineraries_are_continuous(
+        left, right, off_critical.surface.period, tolerance=0.2
+    )
+    changed_kinds = replace(
+        left,
+        extrema_kind=np.ones_like(left.extrema_kind),
+        n_internal_maxima=0,
+    )
+    assert not itineraries_are_continuous(
+        left, changed_kinds, off_critical.surface.period, tolerance=0.2
+    )
     original = _surface(field, b=1.4, s_values=(0.2, 0.5, 0.8))
 
     result = refine_surface_data(
