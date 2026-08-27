@@ -267,8 +267,8 @@ def _stitch_periodic_endpoints(
     return points, compact[segments], tags[used]
 
 
-def _midpoint_coordinates(
-    first: FloatArray, second: FloatArray, period: float
+def _interpolated_coordinates(
+    first: FloatArray, second: FloatArray, fraction: float, period: float
 ) -> np.ndarray:
     s0 = float(np.dot(first[:2], first[:2]))
     s1 = float(np.dot(second[:2], second[:2]))
@@ -277,7 +277,15 @@ def _midpoint_coordinates(
     theta1 = theta0 + (theta1 - theta0 + np.pi) % (2.0 * np.pi) - np.pi
     zeta0 = float(first[2])
     zeta1 = zeta0 + (float(second[2]) - zeta0 + 0.5 * period) % period - 0.5 * period
-    return 0.5 * (np.array([s0, theta0, zeta0]) + np.array([s1, theta1, zeta1]))
+    first_coordinates = np.array([s0, theta0, zeta0])
+    second_coordinates = np.array([s1, theta1, zeta1])
+    return first_coordinates + fraction * (second_coordinates - first_coordinates)
+
+
+def _midpoint_coordinates(
+    first: FloatArray, second: FloatArray, period: float
+) -> np.ndarray:
+    return _interpolated_coordinates(first, second, 0.5, period)
 
 
 def _point_from_coordinates(coordinates: np.ndarray, period: float) -> FloatArray:
@@ -294,8 +302,6 @@ def _degenerate_point(
     period: float,
     config: CriticalCurveConfig,
 ) -> FloatArray:
-    seed = _midpoint_coordinates(first, second, period)
-
     def residual(coordinates: np.ndarray) -> np.ndarray:
         point = _point_from_coordinates(coordinates, period)
         B, g, D2_B = _field_values(field, point[np.newaxis, :])
@@ -307,32 +313,55 @@ def _degenerate_point(
             ]
         )
 
-    initial_residual = residual(seed)
-    if (
-        abs(initial_residual[0]) <= config.B_tolerance
-        and abs(initial_residual[1]) <= config.g_tolerance
-        and abs(initial_residual[2]) <= config.D2_tolerance
-    ):
-        solution = seed
-    else:
-        solved = root(residual, seed, options={"xtol": 1.0e-12})
-        solution = np.asarray(solved.x, dtype=np.float64)
-    point = _point_from_coordinates(solution, period)
-    B, g, D2_B = _field_values(field, point[np.newaxis, :])
     edge_length = float(np.linalg.norm(_periodic_delta(first, second, period)))
-    seed_point = _point_from_coordinates(seed, period)
-    if (
-        not (0.0 <= solution[0] <= 1.0 + config.merge_tolerance)
-        or abs(float(B[0] - b)) > config.B_tolerance
-        or abs(float(g[0])) > config.g_tolerance
-        or abs(float(D2_B[0])) > config.D2_tolerance
-        or np.linalg.norm(_periodic_delta(seed_point, point, period))
-        > config.max_midpoint_displacement_ratio * edge_length
-    ):
-        raise CriticalCurveError(
-            "degenerate point violates B, g, D2_B, or locality bounds"
-        )
-    return point
+    endpoint_D2 = np.array(
+        [
+            _field_values(field, endpoint[np.newaxis, :])[2][0]
+            for endpoint in (first, second)
+        ]
+    )
+    degenerate_endpoints = [
+        endpoint
+        for endpoint, D2_B in zip((first, second), endpoint_D2)
+        if abs(float(D2_B)) <= config.D2_tolerance
+    ]
+    # HYBR can choose a different basin after tiny platform-dependent changes.
+    # Fixed interior fallback starts avoid making that basin choice decisive;
+    # the physical residual, domain, and locality gates below remain
+    # authoritative instead of the solver's success flag.
+    for fraction in (0.5, 0.375, 0.625):
+        seed = _interpolated_coordinates(first, second, fraction, period)
+        initial_residual = residual(seed)
+        if (
+            abs(initial_residual[0]) <= config.B_tolerance
+            and abs(initial_residual[1]) <= config.g_tolerance
+            and abs(initial_residual[2]) <= config.D2_tolerance
+        ):
+            solution = seed
+        else:
+            solved = root(residual, seed, options={"xtol": 1.0e-12})
+            solution = np.asarray(solved.x, dtype=np.float64)
+        if solution.shape != (3,) or not np.all(np.isfinite(solution)):
+            continue
+        point = _point_from_coordinates(solution, period)
+        B, g, D2_B = _field_values(field, point[np.newaxis, :])
+        seed_point = _point_from_coordinates(seed, period)
+        if (
+            not (0.0 <= solution[0] <= 1.0 + config.merge_tolerance)
+            or abs(float(B[0] - b)) > config.B_tolerance
+            or abs(float(g[0])) > config.g_tolerance
+            or abs(float(D2_B[0])) > config.D2_tolerance
+            or np.linalg.norm(_periodic_delta(seed_point, point, period))
+            > config.max_midpoint_displacement_ratio * edge_length
+            or any(
+                np.linalg.norm(_periodic_delta(endpoint, point, period))
+                <= config.merge_tolerance
+                for endpoint in degenerate_endpoints
+            )
+        ):
+            continue
+        return point
+    raise CriticalCurveError("degenerate point violates B, g, D2_B, or locality bounds")
 
 
 def _segment_midpoint_data(
