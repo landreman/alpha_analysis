@@ -41,6 +41,13 @@ from .surface_extract import (
     SurfaceMesh,
     surface_flux,
 )
+from .surface_refine import (
+    SurfaceDownsamplingConfig,
+    SurfaceDownsamplingError,
+    SurfaceDownsamplingReport,
+    SurfaceDownsamplingResult,
+    downsample_surface,
+)
 from .types import (
     BackgroundMesh,
     FloodFillStatus,
@@ -78,6 +85,10 @@ __all__ = [
     "SourceProfile",
     "StructuredPrismMeshBackend",
     "SurfaceCurveMesh",
+    "SurfaceDownsamplingConfig",
+    "SurfaceDownsamplingError",
+    "SurfaceDownsamplingReport",
+    "SurfaceDownsamplingResult",
     "SurfaceExtraction",
     "SurfaceExtractionConfig",
     "SurfaceExtractionError",
@@ -90,6 +101,7 @@ __all__ = [
     "WellProfile",
     "UniformSourceProfile",
     "compute_denominator",
+    "downsample_surface",
     "denominator_convergence",
     "find_global_B_bounds",
     "optional_import",

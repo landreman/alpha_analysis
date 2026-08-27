@@ -612,7 +612,8 @@ flowchart TD
     B --> D[Choose adaptive B_b midpoint nodes]
     D --> E[Extract B = B_b surface]
     E --> F[Split by g = b dot grad B and retain incoming half]
-    F --> G[Trace every regular well; compute A, K, exit, extrema, itinerary]
+    F --> F2[Downsample the incoming surface]
+    F2 --> G[Trace every regular well; compute A, K, exit, extrema, itinerary]
     G --> H[Extract Gamma_min and Gamma_max]
     H --> I[Construct companion transition curves T]
     I --> J[Cut mesh into continuous-return sheets]
@@ -630,14 +631,15 @@ For each \(b\), the algorithm is:
 
 1. Extract the level surface \(B=b\) from the shared tetrahedral mesh.
 2. Split it along \(g=\mathbf b\cdot\nabla B=0\), retain \(g<0\), and preserve the \(g=0\) curves.
-3. At every regular surface vertex, trace the unique well and compute \(A\), \(K\), exit data, extrema, and a lifted return itinerary.
-4. Adaptively refine where field interpolation, \(A\), \(K\), return itinerary, or critical curves are under-resolved.
-5. Construct \(\Gamma_{\max}\) and the companion transition curve \(T\), cut the mesh, and add pointwise transition hyperedges.
-6. Treat \(A\) as a continuous piecewise-linear scalar on each cut sheet.
-7. Seed all \(A\)-contours that intersect `EDGE` as reachable.
-8. Propagate reachable action intervals through ordinary triangles and transition hyperedges to a fixed point.
-9. Integrate \(hK|\omega|\) only over the reachable sub-polygons of each triangle.
-10. Return \(Q(b)\), diagnostics, unresolved-weight bounds, and visualization objects.
+3. Typically downsample the incoming surface while preserving its topology and tagged boundaries.
+4. At every regular surface vertex, trace the unique well and compute \(A\), \(K\), exit data, extrema, and a lifted return itinerary.
+5. Adaptively refine where field interpolation, \(A\), \(K\), return itinerary, or critical curves are under-resolved.
+6. Construct \(\Gamma_{\max}\) and the companion transition curve \(T\), cut the mesh, and add pointwise transition hyperedges.
+7. Treat \(A\) as a continuous piecewise-linear scalar on each cut sheet.
+8. Seed all \(A\)-contours that intersect `EDGE` as reachable.
+9. Propagate reachable action intervals through ordinary triangles and transition hyperedges to a fixed point.
+10. Integrate \(hK|\omega|\) only over the reachable sub-polygons of each triangle.
+11. Return \(Q(b)\), diagnostics, unresolved-weight bounds, and visualization objects.
 
 ---
 
@@ -791,6 +793,32 @@ The output is the full \(B=b\) surface. A second marching-triangles operation on
 ### 8.4 Surface refinement
 
 A pitch slice must be independently refinable without modifying unrelated \(b\) slices.
+
+During a calculation of \(f\), the incoming pitch surface should typically be
+downsampled after extraction and the \(g=0\) split, but before bounce integrals
+are evaluated at its vertices. The background volume mesh may need to be fine
+enough to recover the correct level-set topology without the later surface
+calculation needing to inherit its full triangle count. Prefer
+topology-preserving shortest-edge collapse or an equivalent method that also
+reduces the population of very small triangles and makes triangle sizes more
+uniform. Downsampling must preserve every connected component and all `EDGE`,
+`AXIS`, periodic-seam, `G_ZERO`, and unresolved-boundary provenance; moved
+vertices must be projected back to \(B=b\), and no accepted collapse may change
+the physical sign of \(g\) or invert a triangle. Bound drift in the scalar
+axis-regular \(|ds\wedge d\alpha|\) measure both globally and separately on
+every connected component during coarsening; triangle count alone is not an
+accuracy criterion. A downsampling result must report the achieved triangle
+count and rejection counts for its safety checks so a binding constraint is
+visible. These scalar measure budgets prevent cancellation between components,
+but they do not prevent local or within-component cancellation and do not
+directly bound weighted bounce integrals. The requested reduction remains
+subordinate to these invariants, later adaptive refinement, and convergence of
+the final \(f\).
+
+Downsampling occurs before \(A\), \(K\), and return-map data are attached to
+vertices. Later adaptive refinement may add vertices back where those
+quantities or the critical curves require more resolution. Never downsample
+across a transition cut.
 
 Refinement indicators include:
 
