@@ -226,3 +226,32 @@ def test_unphysical_curve_gap_is_never_reported_regular():
 
     assert result.status is CriticalCurveStatus.UNRESOLVED
     assert result.report.unresolved_endpoint_count == 2
+
+
+def test_failed_degenerate_solve_returns_explicit_unresolved_segments():
+    field = _sign_changing_field()
+    input_theta = np.array([np.pi / 6, 3 * np.pi / 4, 7 * np.pi / 6, 7 * np.pi / 4])
+    points = np.vstack([_sign_changing_point(value) for value in input_theta])
+    theta = np.arctan2(points[:, 1], points[:, 0])
+    s = np.sum(points[:, :2] ** 2, axis=1)
+    curve = SurfaceCurveMesh(
+        period=2.0 * np.pi,
+        points=points,
+        segments=np.column_stack((np.arange(4), np.roll(np.arange(4), -1))),
+        B=np.asarray(field.B(s, theta, points[:, 2])),
+        g=np.asarray(
+            field.B(s, theta, points[:, 2]) * field.D_B(s, theta, points[:, 2])
+        ),
+        boundary_tags=np.full(4, SurfaceMesh.G_ZERO, dtype=np.int64),
+    )
+
+    result = extract_critical_curves(
+        curve,
+        field,
+        b=2.0,
+        config=CriticalCurveConfig(max_midpoint_displacement_ratio=1.0e-3),
+    )
+
+    assert result.status is CriticalCurveStatus.UNRESOLVED
+    assert result.report.unresolved_segment_count == 2
+    assert result.report.degenerate_solve_failure_count == 2

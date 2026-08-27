@@ -47,9 +47,10 @@ class CriticalCurveConfig:
 
     ``B_tolerance`` is in field units, ``g_tolerance`` is in physical
     ``b dot grad B`` units, and ``D2_tolerance`` is in field units per radian
-    squared.  ``merge_tolerance`` and logical coordinates are dimensionless;
-    ``max_refinement_levels`` bounds only classification refinement and never
-    converts an unresolved segment to a regular one.
+    squared.  ``merge_tolerance`` and logical coordinates are dimensionless.
+    Zero ``max_refinement_levels`` disables junction refinement; a positive
+    value permits the direct degenerate-point solve. A failed solve is reported
+    as an unresolved segment rather than guessed or discarded.
     """
 
     B_tolerance: float = 1.0e-9
@@ -98,6 +99,7 @@ class CriticalCurveReport:
 
     refined_segment_count: int
     unresolved_segment_count: int
+    degenerate_solve_failure_count: int
     unresolved_endpoint_count: int
     source_unresolved_split_count: int
     ambiguous_segment_length_history: tuple[float, ...]
@@ -109,8 +111,9 @@ class CriticalCurves:
 
     Points use dimensionless logical ``(x,y,zeta)`` coordinates with zeta in
     radians on ``0 <= zeta < period``.  Segment and point kinds are explicit;
-    a segment left ambiguous at the refinement cap is ``DEGENERATE`` and the
-    overall status is ``UNRESOLVED`` rather than a guessed minimum or maximum.
+    A segment left ambiguous because refinement is disabled or its local solve
+    fails is ``DEGENERATE`` and the overall status is ``UNRESOLVED`` rather
+    than a guessed minimum or maximum.
     """
 
     period: float
@@ -452,8 +455,9 @@ def extract_critical_curves(
     ``GAMMA_MAX``, and magnitude at or below ``D2_tolerance`` is
     ``DEGENERATE``.  Oppositely classified endpoints trigger a local solve of
     ``B-b = g = D_parallel^2 B = 0`` and insertion of that degenerate point.
-    If the refinement cap is reached, that segment remains explicitly
-    degenerate and the result status is ``UNRESOLVED``.
+    If refinement is disabled or the local solve fails its residual/locality
+    gates, the original segment remains explicitly degenerate and the result
+    status is ``UNRESOLVED``.
     """
     cfg = config or CriticalCurveConfig()
     if not np.isfinite(b):
@@ -488,6 +492,7 @@ def extract_critical_curves(
             report=CriticalCurveReport(
                 refined_segment_count=0,
                 unresolved_segment_count=0,
+                degenerate_solve_failure_count=0,
                 unresolved_endpoint_count=0,
                 source_unresolved_split_count=source_unresolved_splits,
                 ambiguous_segment_length_history=(0.0,),
@@ -505,6 +510,7 @@ def extract_critical_curves(
     D2_list = list(D2_B)
     kind_list = list(point_kind)
     refined_count = 0
+    solve_failure_count = 0
     history: list[float] = []
 
     for level in range(cfg.max_refinement_levels + 1):
@@ -519,18 +525,25 @@ def extract_critical_curves(
         if not np.any(ambiguous) or level == cfg.max_refinement_levels:
             break
         replacement: list[tuple[int, int]] = []
+        solve_failed = False
         for segment_id, (first, second) in enumerate(segments_list):
             if not ambiguous[segment_id]:
                 replacement.append((first, second))
                 continue
-            midpoint = _degenerate_point(
-                np.asarray(points_list[first]),
-                np.asarray(points_list[second]),
-                field,
-                b,
-                curve.period,
-                cfg,
-            )
+            try:
+                midpoint = _degenerate_point(
+                    np.asarray(points_list[first]),
+                    np.asarray(points_list[second]),
+                    field,
+                    b,
+                    curve.period,
+                    cfg,
+                )
+            except CriticalCurveError:
+                replacement.append((first, second))
+                solve_failure_count += 1
+                solve_failed = True
+                continue
             _, _, midpoint_D2 = _field_values(field, midpoint[np.newaxis, :])
             midpoint_id = len(points_list)
             points_list.append(midpoint)
@@ -540,6 +553,8 @@ def extract_critical_curves(
             replacement.extend(((first, midpoint_id), (midpoint_id, second)))
             refined_count += 1
         segments_list = replacement
+        if solve_failed:
+            break
 
     points = np.asarray(points_list, dtype=np.float64).reshape(-1, 3)
     segments = np.asarray(segments_list, dtype=np.int64).reshape(-1, 2)
@@ -586,6 +601,7 @@ def extract_critical_curves(
         report=CriticalCurveReport(
             refined_segment_count=refined_count,
             unresolved_segment_count=unresolved_count,
+            degenerate_solve_failure_count=solve_failure_count,
             unresolved_endpoint_count=unresolved_endpoint_count,
             source_unresolved_split_count=source_unresolved_splits,
             ambiguous_segment_length_history=tuple(history),
