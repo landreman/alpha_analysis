@@ -6,6 +6,7 @@ from dataclasses import replace
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.optimize import brentq
 
 from alpha_analysis.j_connectivity import (
     BackgroundMeshConfig,
@@ -257,13 +258,16 @@ def test_failed_degenerate_solve_returns_explicit_unresolved_segments():
     assert result.report.degenerate_solve_failure_count == 2
 
 
-def _generic_junction_field() -> SyntheticFourierField:
+def _fold_junction_field() -> SyntheticFourierField:
     # Along a field line with iota=0.4, alpha=5 theta-2 zeta is constant and
-    # B=2+0.1s-cos(u)+(0.3+0.1s^3 cos(alpha))cos(2u), u=zeta-0.23.
-    # Its generic extrema births satisfy B=b, D_B=D2_B=0 at isolated points.
+    # B=2+0.1s-cos(u)+(0.3+0.1s^3 cos(alpha))cos(2u)
+    #   +0.02 cos(3u+0.9), u=zeta-0.23.
+    # The unlocked third-harmonic phase makes its extrema births true folds:
+    # B=b, D_B=D2_B=0 at isolated points with nonsingular transverse data.
     phase = 0.23
-    cosine = np.zeros((5, 4))
-    sine = np.zeros((5, 4))
+    third_phase = 0.9 - 3.0 * phase
+    cosine = np.zeros((6, 4))
+    sine = np.zeros((6, 4))
     cosine[0, :2] = [2.0, 0.1]
     cosine[1, 0] = -np.cos(phase)
     sine[1, 0] = np.sin(phase)
@@ -273,10 +277,12 @@ def _generic_junction_field() -> SyntheticFourierField:
     sine[3, 3] = -0.05 * np.sin(2.0 * phase)
     cosine[4, 3] = 0.05 * np.cos(2.0 * phase)
     sine[4, 3] = 0.05 * np.sin(2.0 * phase)
+    cosine[5, 0] = 0.02 * np.cos(third_phase)
+    sine[5, 0] = 0.02 * np.sin(third_phase)
     return SyntheticFourierField(
         nfp=1,
-        m=np.array([0, 0, 0, 5, 5]),
-        n=np.array([0, 1, 2, 4, 0]),
+        m=np.array([0, 0, 0, 5, 5, 0]),
+        n=np.array([0, 1, 2, 4, 0, 3]),
         cosine_coefficients=cosine,
         sine_coefficients=sine,
         iota_coefficients=np.array([0.4]),
@@ -285,9 +291,53 @@ def _generic_junction_field() -> SyntheticFourierField:
     )
 
 
-def test_generic_production_junctions_pass_physical_residual_gates():
-    field = _generic_junction_field()
-    b = 1.34
+def _analytic_fold_junctions(b: float) -> tuple[float, np.ndarray, float]:
+    """Return analytic ``(s, theta, zeta)`` junction data for the fold field."""
+    amplitude = 0.02
+    delta = 0.9
+
+    def second_harmonic_amplitude(u: float) -> float:
+        return (np.cos(u) - 9.0 * amplitude * np.cos(3.0 * u + delta)) / (
+            4.0 * np.cos(2.0 * u)
+        )
+
+    def first_parallel_derivative(u: float) -> float:
+        coefficient = second_harmonic_amplitude(u)
+        return (
+            np.sin(u)
+            - 2.0 * coefficient * np.sin(2.0 * u)
+            - 3.0 * amplitude * np.sin(3.0 * u + delta)
+        )
+
+    u = brentq(first_parallel_derivative, -0.6, -0.2, xtol=1.0e-14)
+    coefficient = second_harmonic_amplitude(u)
+    s = 10.0 * (
+        b
+        - 2.0
+        + np.cos(u)
+        - coefficient * np.cos(2.0 * u)
+        - amplitude * np.cos(3.0 * u + delta)
+    )
+    cos_alpha = (coefficient - 0.3) / (0.1 * s**3)
+    alpha = np.array([np.arccos(cos_alpha), -np.arccos(cos_alpha)])
+    zeta = (u + 0.23) % (2.0 * np.pi)
+    theta = np.sort(
+        np.mod(
+            np.concatenate(
+                [
+                    (value + 2.0 * zeta + 2.0 * np.pi * np.arange(5)) / 5.0
+                    for value in alpha
+                ]
+            ),
+            2.0 * np.pi,
+        )
+    )
+    return float(s), theta, float(zeta)
+
+
+def test_production_fold_junctions_match_analytic_locations_and_residuals():
+    field = _fold_junction_field()
+    b = 1.36
     background = StructuredPrismMeshBackend(
         BackgroundMeshConfig(n_radial=8, n_poloidal=24, n_zeta=25)
     ).build(field)
@@ -301,12 +351,60 @@ def test_generic_production_junctions_pass_physical_residual_gates():
     degenerate_points = result.points[result.point_kind == CriticalKind.DEGENERATE]
     s = np.sum(degenerate_points[:, :2] ** 2, axis=1)
     theta = np.arctan2(degenerate_points[:, 1], degenerate_points[:, 0])
+    expected_s, expected_theta, expected_zeta = _analytic_fold_junctions(b)
+    np.testing.assert_allclose(s, expected_s, atol=1.0e-10)
+    np.testing.assert_allclose(
+        np.sort(np.mod(theta, 2.0 * np.pi)), expected_theta, atol=1.0e-10
+    )
+    np.testing.assert_allclose(degenerate_points[:, 2], expected_zeta, atol=1.0e-10)
     B = np.asarray(field.B(s, theta, degenerate_points[:, 2]))
     g = B * np.asarray(field.D_B(s, theta, degenerate_points[:, 2]))
     D2_B = np.asarray(field.D2_B(s, theta, degenerate_points[:, 2]))
     np.testing.assert_allclose(B, b, atol=1.0e-9)
     np.testing.assert_allclose(g, 0.0, atol=1.0e-9)
     np.testing.assert_allclose(D2_B, 0.0, atol=1.0e-8)
+
+
+def test_near_zero_midpoint_stays_unresolved_when_refinement_is_disabled():
+    # On zeta=0, D2_B=-0.1(1+cos(theta)) touches zero at theta=pi without
+    # changing sign.  Same-kind endpoints must not classify through that event.
+    field = SyntheticFourierField(
+        nfp=1,
+        m=np.array([0, 0, 1, 1]),
+        n=np.array([0, 1, 1, -1]),
+        cosine_coefficients=np.array(
+            [[1.5, 1.0], [0.1, 0.0], [0.05, 0.0], [0.05, 0.0]]
+        ),
+        sine_coefficients=np.zeros((4, 2)),
+        iota_coefficients=np.array([0.0]),
+        G_coefficients=np.array([1.0]),
+        I_coefficients=np.array([0.0]),
+    )
+    theta = np.array([np.pi - 0.4, np.pi + 0.4])
+    amplitude = 0.1 * (1.0 + np.cos(theta))
+    s = 0.5 - amplitude
+    points = np.column_stack(
+        (np.sqrt(s) * np.cos(theta), np.sqrt(s) * np.sin(theta), np.zeros(2))
+    )
+    curve = SurfaceCurveMesh(
+        period=2.0 * np.pi,
+        points=points,
+        segments=np.array([[0, 1]], dtype=np.int64),
+        B=np.full(2, 2.0),
+        g=np.zeros(2),
+        boundary_tags=np.full(2, SurfaceMesh.G_ZERO, dtype=np.int64),
+    )
+
+    result = extract_critical_curves(
+        curve,
+        field,
+        b=2.0,
+        config=CriticalCurveConfig(max_refinement_levels=0),
+    )
+
+    assert result.report.unresolved_segment_count == 1
+    assert result.segment_kind[0] == CriticalKind.DEGENERATE
+    assert result.status is CriticalCurveStatus.UNRESOLVED
 
 
 def test_midpoint_sampling_finds_two_type_changes_inside_each_coarse_segment():

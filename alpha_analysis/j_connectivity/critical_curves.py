@@ -4,8 +4,9 @@ This module implements DESIGN.md §§5.1–5.4 and 10.1.  It consumes the
 authoritative NumPy ``B=b, g=0`` curve mesh produced by surface extraction,
 stitches only provenance-marked copies across the one-field-period seam,
 classifies points and segments with analytic ``D_parallel^2 B``, and refines
-segments that straddle a change of critical type.  Angles are radians and
-``D2_B`` has the field's units per radian squared.
+segments whose endpoints or intrinsic midpoint straddle or approach a change
+of critical type.  Angles are radians and ``D2_B`` has the field's units per
+radian squared.
 """
 
 from __future__ import annotations
@@ -48,6 +49,9 @@ class CriticalCurveConfig:
     ``B_tolerance`` is in field units, ``g_tolerance`` is in physical
     ``b dot grad B`` units, and ``D2_tolerance`` is in field units per radian
     squared.  ``merge_tolerance`` and logical coordinates are dimensionless.
+    ``max_midpoint_displacement_ratio`` bounds periodic logical displacement
+    from each fixed interior solve seed; it is a locality gate, not a claim
+    that the curved solution lies on the endpoint chord.
     Zero ``max_refinement_levels`` disables junction refinement; a positive
     value permits the direct degenerate-point solve. A failed solve is reported
     as an unresolved segment rather than guessed or discarded.
@@ -438,6 +442,8 @@ def _classify_segments(
     result = np.full(len(segments), CriticalKind.DEGENERATE.value, dtype=np.int64)
     for segment_id, (first, second) in enumerate(segments):
         if unresolved[segment_id]:
+            # A near-zero midpoint can be unresolved even when both regular
+            # endpoints have the same kind; never classify through that event.
             continue
         endpoint_kinds = {
             int(point_kind[first]),
@@ -446,10 +452,6 @@ def _classify_segments(
         } - {CriticalKind.DEGENERATE.value}
         if len(endpoint_kinds) == 1:
             result[segment_id] = endpoint_kinds.pop()
-        elif not endpoint_kinds:
-            result[segment_id] = CriticalKind.DEGENERATE.value
-        else:
-            result[segment_id] = CriticalKind.DEGENERATE.value
     return result
 
 
@@ -539,7 +541,8 @@ def extract_critical_curves(
     Classification uses the analytic second parallel derivative
     from DESIGN.md §5.1: positive is ``GAMMA_MIN``, negative is
     ``GAMMA_MAX``, and magnitude at or below ``D2_tolerance`` is
-    ``DEGENERATE``.  Oppositely classified endpoints trigger a local solve of
+    ``DEGENERATE``.  Endpoint and intrinsic-midpoint samples that straddle or
+    approach a type change trigger a local solve of
     ``B-b = g = D_parallel^2 B = 0`` and insertion of that degenerate point.
     If refinement is disabled or the local solve fails its residual/locality
     gates, the original segment remains explicitly degenerate and the result
