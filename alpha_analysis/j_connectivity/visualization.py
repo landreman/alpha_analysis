@@ -343,6 +343,87 @@ def plot_pitch_surface(extraction):
     return figure, (component_axis, split_axis)
 
 
+def plot_surface_data(data, *, output_path=None, metadata=None):
+    """Plot surface-wide return data and conspicuous failures (§§17.1, 17.3).
+
+    ``A`` and ``K`` use the length units of the Boozer current profiles; exit
+    zeta is in radians and the remaining quantities are integer categories.
+    Non-regular vertices are overplotted as magenta crosses on every numerical
+    map instead of disappearing through ``NaN`` colors. Optional ``metadata``
+    is rendered in the title for equilibrium hashes, tolerances, and commits.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Line3DCollection
+
+    maps = (
+        (data.action_length, r"$A$ action length", "viridis"),
+        (data.bounce_time_length, r"$K$ bounce-time length", "magma"),
+        (data.zeta_out_unwrapped, r"unwrapped $\zeta_+$ [rad]", "twilight"),
+        (data.field_period_count, "field-period count", "cividis"),
+        (data.n_internal_maxima, "internal maximum count", "plasma"),
+        (data.trace_status, "trace status code", "tab10"),
+    )
+    figure = plt.figure(figsize=(15, 9), constrained_layout=True)
+    axes = tuple(
+        figure.add_subplot(2, 3, index + 1, projection="3d") for index in range(6)
+    )
+    points = data.surface.points
+    edge_segments = []
+    for triangle in data.surface.triangles:
+        vertices = points[triangle].copy()
+        for index in (1, 2):
+            difference = vertices[index, 2] - vertices[0, 2]
+            vertices[index, 2] -= data.surface.period * np.round(
+                difference / data.surface.period
+            )
+        edge_segments.extend((vertices[[0, 1]], vertices[[1, 2]], vertices[[2, 0]]))
+    failed = ~data.regular
+    for axis, (values, title, color_map) in zip(axes, maps):
+        if edge_segments:
+            axis.add_collection3d(
+                Line3DCollection(edge_segments, colors="0.75", linewidths=0.35)
+            )
+        plotted = (
+            np.ones(len(points), dtype=bool)
+            if values is data.trace_status
+            else data.regular
+        )
+        plotted_values = np.asarray(values)[plotted]
+        if plotted_values.size:
+            artist = axis.scatter(
+                *points[plotted].T,
+                c=plotted_values,
+                cmap=color_map,
+                s=18,
+                depthshade=False,
+            )
+            figure.colorbar(artist, ax=axis, shrink=0.62, pad=0.08)
+        if np.any(failed):
+            axis.scatter(
+                *points[failed].T,
+                color="magenta",
+                marker="x",
+                s=42,
+                linewidths=1.6,
+                label="non-regular",
+            )
+            axis.legend(fontsize="x-small")
+        axis.set_title(title)
+        axis.set_xlabel("x")
+        axis.set_ylabel("y")
+        axis.set_zlabel(r"$\zeta$ [rad]")
+    context = ""
+    if metadata:
+        context = "\n" + ", ".join(f"{key}={value}" for key, value in metadata.items())
+    figure.suptitle(
+        f"B=b incoming surface: b={data.surface.level:.8g}, "
+        f"{len(points)} points, {len(data.surface.triangles)} triangles{context}"
+    )
+    if output_path is not None:
+        figure.savefig(output_path, dpi=160)
+    return figure, axes
+
+
 def _periodic_plot_triangles(surface):
     triangles = []
     for triangle in surface.triangles:
