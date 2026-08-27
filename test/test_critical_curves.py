@@ -352,11 +352,16 @@ def test_production_fold_junctions_match_analytic_locations_and_residuals():
     s = np.sum(degenerate_points[:, :2] ** 2, axis=1)
     theta = np.arctan2(degenerate_points[:, 1], degenerate_points[:, 0])
     expected_s, expected_theta, expected_zeta = _analytic_fold_junctions(b)
-    np.testing.assert_allclose(s, expected_s, atol=1.0e-10)
+    np.testing.assert_allclose(s, expected_s, rtol=0.0, atol=1.0e-10)
     np.testing.assert_allclose(
-        np.sort(np.mod(theta, 2.0 * np.pi)), expected_theta, atol=1.0e-10
+        np.sort(np.mod(theta, 2.0 * np.pi)),
+        expected_theta,
+        rtol=0.0,
+        atol=1.0e-10,
     )
-    np.testing.assert_allclose(degenerate_points[:, 2], expected_zeta, atol=1.0e-10)
+    np.testing.assert_allclose(
+        degenerate_points[:, 2], expected_zeta, rtol=0.0, atol=1.0e-10
+    )
     B = np.asarray(field.B(s, theta, degenerate_points[:, 2]))
     g = B * np.asarray(field.D_B(s, theta, degenerate_points[:, 2]))
     D2_B = np.asarray(field.D2_B(s, theta, degenerate_points[:, 2]))
