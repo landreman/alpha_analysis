@@ -20,7 +20,7 @@ lowest-numbered unchecked row.
 | 3 | Deterministic periodic background mesh | Build the axis-regular logical mesh without Gmsh | [x] | #6 |
 | 4 | Gmsh background backend | Add the production mesher behind the same interface | [x] | #7 |
 | 5 | \(B=b\) surface extraction | Extract all level-surface components and incoming/outgoing halves | [x] | #8 |
-| 6 | Regular well tracer | Trace every regular surface vertex, not only the well near \(\pi/N_{\mathrm{fp}}\) | [ ] | |
+| 6 | Regular well tracer | Trace every regular surface vertex, not only the well near \(\pi/N_{\mathrm{fp}}\) | [x] | #10 |
 | 7 | Surface data, refinement, and sheet candidates | Evaluate action data over a whole pitch surface and refine discontinuity candidates | [ ] | |
 | 8 | Critical curves | Robustly extract and classify \(\Gamma_{\min}\), \(\Gamma_{\max}\), and degenerate portions | [ ] | |
 | 9 | Transition mapping and action additivity | Construct \(T\) and matched parent/child ports without yet cutting the full mesh | [ ] | |
@@ -52,6 +52,7 @@ move it into `docs/DESIGN.md` and delete it here.
 - The §7.3 option-1 axis-regular interpolation is implemented: `BoozerField` continues `m != 0` coefficients below the innermost half-grid surface with the `s^{|m|/2}` harmonic scaling (ADR 0002), so `|B|` is single-valued at the axis; values at `s >= s0` are unchanged.
 - `g=0` split-point polishing backs the planar Newton solve with bracketed, locality-bounded fallbacks (projected chord solve, plane-curve continuation over a pencil of cutting planes returning the nearest in-disk crossing, and — when the `g=0` curve exits the domain near the outer boundary — a trace of the surface's boundary curve on the `x^2+y^2=1` cylinder; ADR 0001). Thin-tube levels near `min B` extract for the W7-X reference file at every swept `b` on structured and gmsh meshes, with split points local to their parent edge and inside `x^2+y^2<=1`; boundary-exit split points carry `EDGE|G_ZERO` provenance.
 - A marching triangle that bridges two sheets of an under-resolved surface (coarse gmsh meshes near `min B`) has no local `g=0` point; its split vertex is placed at the `g` sign discontinuity, tagged `G_JUMP`, excluded from the `g=0` curve, and counted in `SurfaceExtraction.n_unresolved_splits` with status `UNRESOLVED` (ADR 0001). Downstream milestones must treat `UNRESOLVED` extractions as needing background refinement before production use.
+- Milestone 6 traces in the physical direction `sign(G + iota I)`, stores authoritative half-bounce `A` and `K` plus lifted exits and extrema itineraries, and leaves `MAX_PERIODS` action/time as `NaN` with an explicit scanned-period count; downstream surface/pipeline stages must carry that status into unresolved-weight bounds rather than `Theta=0`.
 
 ## Accepted deviations
 
