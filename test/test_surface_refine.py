@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import replace
 
 import numpy as np
 
@@ -81,6 +82,20 @@ def _edge_lengths(surface):
     )
 
 
+def _component_fluxes(surface, field):
+    result = []
+    for component_id in np.unique(surface.component_ids):
+        selected = surface.component_ids == component_id
+        component = replace(
+            surface,
+            triangles=surface.triangles[selected],
+            triangle_parent_tetrahedra=surface.triangle_parent_tetrahedra[selected],
+            component_ids=np.zeros(np.count_nonzero(selected), dtype=np.int64),
+        )
+        result.append(surface_flux(component, field))
+    return np.sort(result)
+
+
 def test_downsampling_reduces_triangle_count_preserves_topology_and_projects():
     field = _field()
     background = StructuredPrismMeshBackend(
@@ -89,9 +104,12 @@ def test_downsampling_reduces_triangle_count_preserves_topology_and_projects():
     original = MarchingTetrahedraExtractor().extract(background, field, b=0.04).full
     config = SurfaceDownsamplingConfig(target_reduction=0.5)
 
-    reduced = downsample_surface(original, field, config)
+    result = downsample_surface(original, field, config)
+    reduced = result.surface
 
     assert len(reduced.triangles) <= 0.51 * len(original.triangles)
+    assert result.report.reached_target
+    assert result.report.achieved_reduction >= 0.49
     assert _topology(reduced) == _topology(original) == [(0, 0), (0, 0)]
     s, theta, zeta = _coordinates(reduced.points)
     np.testing.assert_allclose(field.B(s, theta, zeta), 0.04, atol=1.0e-10)
@@ -102,6 +120,13 @@ def test_downsampling_reduces_triangle_count_preserves_topology_and_projects():
     assert (
         abs(reduced_flux - original_flux) / original_flux
         <= config.max_flux_relative_error
+    )
+    original_component_fluxes = _component_fluxes(original, field)
+    reduced_component_fluxes = _component_fluxes(reduced, field)
+    np.testing.assert_allclose(
+        reduced_component_fluxes,
+        original_component_fluxes,
+        rtol=config.max_flux_relative_error,
     )
 
     # Shortest-edge collapse removes the extreme small-edge tail instead of
@@ -128,11 +153,12 @@ def test_downsampling_keeps_incoming_boundary_vertices_and_sign():
         )
     }
 
-    reduced = downsample_surface(
+    result = downsample_surface(
         original,
         field,
         SurfaceDownsamplingConfig(target_reduction=0.5),
     )
+    reduced = result.surface
     reduced_records = {
         (tuple(point), int(tag))
         for point, tag in zip(reduced.points, reduced.boundary_tags)
@@ -257,11 +283,14 @@ def test_downsampling_refuses_a_collapse_that_crosses_g_zero():
     original = _guard_surface(field)
     assert original.g[4] < 0.0 and original.g[5] < 0.0
 
-    reduced = downsample_surface(original, field, _permissive_guard_config())
+    result = downsample_surface(original, field, _permissive_guard_config())
+    reduced = result.surface
 
     # The midpoint has g>0, so accepting edge 4--5 would remove two faces.
     assert float(field.D_B(0.0, 0.0, 0.0)) > 0.0
     assert len(reduced.triangles) == len(original.triangles)
+    assert not result.report.reached_target
+    assert result.report.g_sign_rejections > 0
 
 
 def test_downsampling_refuses_a_collapse_that_inverts_a_face(monkeypatch):
@@ -277,12 +306,14 @@ def test_downsampling_refuses_a_collapse_that_inverts_a_face(monkeypatch):
         lambda *_args, **_kwargs: np.array([0.6, 0.7, 0.0]),
     )
 
-    reduced = downsample_surface(original, field, _permissive_guard_config())
+    result = downsample_surface(original, field, _permissive_guard_config())
+    reduced = result.surface
 
     assert len(reduced.triangles) == len(original.triangles)
+    assert result.report.face_validity_rejections > 0
 
 
-def test_downsampling_is_a_no_op_for_zero_reduction():
+def test_downsampling_is_a_no_op_for_empty_surface():
     field = _field()
     empty = SurfaceMesh(
         level=0.04,
@@ -297,4 +328,26 @@ def test_downsampling_is_a_no_op_for_zero_reduction():
         component_ids=np.empty(0, dtype=np.int64),
     )
 
-    assert downsample_surface(empty, field) is empty
+    result = downsample_surface(empty, field)
+
+    assert result.surface is empty
+    assert result.report.reached_target
+    assert result.report.achieved_reduction == 0.0
+
+
+def test_downsampling_is_a_no_op_for_zero_reduction():
+    field = _GuardField(hostile_g=False)
+    original = _guard_surface(field)
+
+    result = downsample_surface(
+        original,
+        field,
+        SurfaceDownsamplingConfig(target_reduction=0.0),
+    )
+
+    assert result.surface is original
+    assert result.report.input_triangle_count == len(original.triangles)
+    assert result.report.target_triangle_count == len(original.triangles)
+    assert result.report.output_triangle_count == len(original.triangles)
+    assert result.report.reached_target
+    assert result.report.achieved_reduction == 0.0

@@ -162,11 +162,12 @@ def main() -> None:
     downsampling_config = SurfaceDownsamplingConfig(
         target_reduction=args.target_reduction
     )
-    reduced = downsample_surface(
+    result = downsample_surface(
         original,
         field,
         downsampling_config,
     )
+    reduced = result.surface
 
     before = mesh_statistics(original)
     after = mesh_statistics(reduced)
@@ -174,8 +175,21 @@ def main() -> None:
     print(f"sampled B range: [{B_min:.6g}, {B_max:.6g}], b = {b:.6g}")
     print_statistics("before", before)
     print_statistics("after", after)
-    achieved = 1.0 - after["triangles"] / before["triangles"]
-    print(f"achieved triangle reduction: {achieved:.1%}")
+    report = result.report
+    print(
+        f"triangle target/output: {report.target_triangle_count:,} / "
+        f"{report.output_triangle_count:,}; achieved reduction: "
+        f"{report.achieved_reduction:.1%}; reached target: {report.reached_target}"
+    )
+    print(
+        "candidate rejections (tag/link/projection/g/face/measure): "
+        f"{report.tag_protected_rejections:,} / "
+        f"{report.link_condition_rejections:,} / "
+        f"{report.projection_rejections:,} / "
+        f"{report.g_sign_rejections:,} / "
+        f"{report.face_validity_rejections:,} / "
+        f"{report.flux_budget_rejections:,}"
+    )
     original_flux = surface_flux(original, field)
     reduced_flux = surface_flux(reduced, field)
     relative_flux_drift = abs(reduced_flux - original_flux) / original_flux

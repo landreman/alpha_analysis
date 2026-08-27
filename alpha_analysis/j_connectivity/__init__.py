@@ -44,6 +44,8 @@ from .surface_extract import (
 from .surface_refine import (
     SurfaceDownsamplingConfig,
     SurfaceDownsamplingError,
+    SurfaceDownsamplingReport,
+    SurfaceDownsamplingResult,
     downsample_surface,
 )
 from .types import (
@@ -85,6 +87,8 @@ __all__ = [
     "SurfaceCurveMesh",
     "SurfaceDownsamplingConfig",
     "SurfaceDownsamplingError",
+    "SurfaceDownsamplingReport",
+    "SurfaceDownsamplingResult",
     "SurfaceExtraction",
     "SurfaceExtractionConfig",
     "SurfaceExtractionError",

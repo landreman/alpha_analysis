@@ -804,10 +804,16 @@ reduces the population of very small triangles and makes triangle sizes more
 uniform. Downsampling must preserve every connected component and all `EDGE`,
 `AXIS`, periodic-seam, `G_ZERO`, and unresolved-boundary provenance; moved
 vertices must be projected back to \(B=b\), and no accepted collapse may change
-the physical sign of \(g\) or invert a triangle. Bound drift in the
-axis-regular \(|ds\wedge d\alpha|\) measure during coarsening; triangle count
-alone is not an accuracy criterion. The requested reduction is subordinate to
-these invariants and to convergence of the final \(f\).
+the physical sign of \(g\) or invert a triangle. Bound drift in the scalar
+axis-regular \(|ds\wedge d\alpha|\) measure both globally and separately on
+every connected component during coarsening; triangle count alone is not an
+accuracy criterion. A downsampling result must report the achieved triangle
+count and rejection counts for its safety checks so a binding constraint is
+visible. These scalar measure budgets prevent cancellation between components,
+but they do not prevent local or within-component cancellation and do not
+directly bound weighted bounce integrals. The requested reduction remains
+subordinate to these invariants, later adaptive refinement, and convergence of
+the final \(f\).
 
 Downsampling occurs before \(A\), \(K\), and return-map data are attached to
 vertices. Later adaptive refinement may add vertices back where those

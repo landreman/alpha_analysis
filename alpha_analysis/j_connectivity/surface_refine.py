@@ -30,15 +30,56 @@ class SurfaceDownsamplingError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class SurfaceDownsamplingReport:
+    """Triangle counts and candidate-rejection diagnostics for one coarsening.
+
+    Rejection counts describe candidate heap entries rejected by each safety
+    check. Stale entries are not counted, and the same geometric edge can be
+    reconsidered after a neighboring collapse.
+    """
+
+    input_triangle_count: int
+    target_triangle_count: int
+    output_triangle_count: int
+    tag_protected_rejections: int = 0
+    link_condition_rejections: int = 0
+    projection_rejections: int = 0
+    g_sign_rejections: int = 0
+    face_validity_rejections: int = 0
+    flux_budget_rejections: int = 0
+
+    @property
+    def achieved_reduction(self) -> float:
+        """Fraction of input triangles removed (zero for an empty input)."""
+        if self.input_triangle_count == 0:
+            return 0.0
+        return 1.0 - self.output_triangle_count / self.input_triangle_count
+
+    @property
+    def reached_target(self) -> bool:
+        """Whether the requested triangle-count target was reached."""
+        return self.output_triangle_count <= self.target_triangle_count
+
+
+@dataclass(frozen=True)
+class SurfaceDownsamplingResult:
+    """A downsampled pitch surface together with its diagnostics."""
+
+    surface: SurfaceMesh
+    report: SurfaceDownsamplingReport
+
+
+@dataclass(frozen=True)
 class SurfaceDownsamplingConfig:
     """Controls topology-preserving pitch-surface downsampling.
 
     ``target_reduction`` is the requested fraction of triangles to remove;
-    for example, ``0.8`` requests about 20 percent of the input triangles.
+    for example, ``0.8`` requests removal of about 80 percent of the input.
     The target is a request rather than a guarantee because boundary
     preservation, topology, projection, surface-flux, and triangle-quality
     checks take precedence. ``max_flux_relative_error`` bounds drift in the
-    axis-regular ``|ds wedge d alpha|`` measure from DESIGN.md \u00a74.4.
+    axis-regular ``|ds wedge d alpha|`` measure from DESIGN.md \u00a74.4 both
+    globally and separately on every original connected component.
 
     Edge lengths and triangle quality use the logical ``(x, y, zeta)``
     coordinates of DESIGN.md \u00a73.2, with periodic zeta differences locally
@@ -88,7 +129,7 @@ def downsample_surface(
     surface: SurfaceMesh,
     field: BoozerFieldLike,
     config: SurfaceDownsamplingConfig | None = None,
-) -> SurfaceMesh:
+) -> SurfaceDownsamplingResult:
     """Reduce a pitch surface before evaluating bounce integrals.
 
     The shortest legal edge is collapsed first, preferentially removing tiny
@@ -99,23 +140,46 @@ def downsample_surface(
     boundary.  Each interior replacement point is projected locally to
     ``B=surface.level`` and is rejected if it flips the physical sign of ``g``
     or makes an incident triangle invert or become degenerate. Each collapse
-    must also keep the total axis-regular surface measure within
-    ``max_flux_relative_error`` of the input mesh.
+    must also keep the global and each connected component's axis-regular
+    surface measure within ``max_flux_relative_error`` of the input mesh.
 
-    The returned mesh may contain more triangles than requested when no more
-    safe collapse exists.  Parent-edge and parent-tetrahedron provenance are
-    retained only where geometry and connectivity are unchanged; changed
-    entries are set to ``-1`` rather than assigned a false parent.
+    The result report makes a shortfall from the requested reduction and the
+    binding rejection checks visible. Parent-edge and parent-tetrahedron
+    provenance are retained only where geometry and connectivity are
+    unchanged; changed entries are set to ``-1`` rather than assigned a false
+    parent.
     """
     config = config or SurfaceDownsamplingConfig()
     n_triangles = len(surface.triangles)
+    target_triangles = (
+        max(1, int(np.ceil((1.0 - config.target_reduction) * n_triangles)))
+        if n_triangles
+        else 0
+    )
+    rejection_counts = {
+        "tag_protected_rejections": 0,
+        "link_condition_rejections": 0,
+        "projection_rejections": 0,
+        "g_sign_rejections": 0,
+        "face_validity_rejections": 0,
+        "flux_budget_rejections": 0,
+    }
+
+    def make_result(result_surface: SurfaceMesh) -> SurfaceDownsamplingResult:
+        return SurfaceDownsamplingResult(
+            surface=result_surface,
+            report=SurfaceDownsamplingReport(
+                input_triangle_count=n_triangles,
+                target_triangle_count=target_triangles,
+                output_triangle_count=len(result_surface.triangles),
+                **rejection_counts,
+            ),
+        )
+
     if n_triangles == 0 or config.target_reduction == 0.0:
-        return surface
+        return make_result(surface)
 
     original_signature = _topology_signature(surface.triangles)
-    target_triangles = max(
-        1, int(np.ceil((1.0 - config.target_reduction) * n_triangles))
-    )
     points = np.asarray(surface.points, dtype=np.float64).copy()
     triangles = np.asarray(surface.triangles, dtype=np.int64).copy()
     g_values = np.asarray(surface.g, dtype=np.float64).copy()
@@ -134,6 +198,18 @@ def downsample_surface(
             "a nonempty surface must have positive finite |ds wedge d alpha| measure"
         )
     current_flux = original_flux
+    _, face_component_indices = np.unique(
+        np.asarray(surface.component_ids, dtype=np.int64), return_inverse=True
+    )
+    original_component_flux = np.bincount(face_component_indices, weights=face_flux)
+    if np.any(~np.isfinite(original_component_flux)) or np.any(
+        original_component_flux <= 0.0
+    ):
+        raise SurfaceDownsamplingError(
+            "each nonempty component must have positive finite "
+            "|ds wedge d alpha| measure"
+        )
+    current_component_flux = original_component_flux.copy()
 
     n_points = len(points)
     point_alive = np.ones(n_points, dtype=bool)
@@ -194,13 +270,16 @@ def downsample_surface(
         # All provenance-bearing vertices are fixed.  In particular, this
         # leaves the physical edge, g=0 boundary, and quotient seam unchanged.
         if tags[first] != 0 or tags[second] != 0:
+            rejection_counts["tag_protected_rejections"] += 1
             continue
         shared_faces = vertex_faces[first] & vertex_faces[second]
         if len(shared_faces) not in (1, 2):
+            rejection_counts["link_condition_rejections"] += 1
             continue
         if not _satisfies_link_condition(
             first, second, shared_faces, triangles, vertex_faces
         ):
+            rejection_counts["link_condition_rejections"] += 1
             continue
 
         keep, remove = first, second
@@ -217,22 +296,27 @@ def downsample_surface(
             maximum_displacement,
         )
         if replacement is None:
+            rejection_counts["projection_rejections"] += 1
             continue
         replacement = _canonicalize_point(
             replacement, surface.period, config.merge_tolerance
         )
         if np.sum(replacement[:2] ** 2) > 1.0 + config.merge_tolerance:
+            rejection_counts["projection_rejections"] += 1
             continue
         replacement_B = float(_evaluate_B(field, replacement[np.newaxis, :])[0])
         if abs(replacement_B - surface.level) > config.B_tolerance:
+            rejection_counts["projection_rejections"] += 1
             continue
         try:
             replacement_g = float(_physical_g(field, replacement[np.newaxis, :])[0])
         except SurfaceExtractionError:
+            rejection_counts["projection_rejections"] += 1
             continue
         if not _preserves_g_sign(
             g_values[keep], g_values[remove], replacement_g, config.g_tolerance
         ):
+            rejection_counts["g_sign_rejections"] += 1
             continue
 
         affected_faces = vertex_faces[keep] | vertex_faces[remove]
@@ -251,6 +335,7 @@ def downsample_surface(
             minimum_normal_cosine,
             config.min_triangle_quality,
         ):
+            rejection_counts["face_validity_rejections"] += 1
             continue
         flux_updates = _replacement_flux_updates(
             keep,
@@ -269,10 +354,21 @@ def downsample_surface(
         candidate_flux = (
             current_flux - old_local_flux + float(np.sum(list(flux_updates.values())))
         )
-        if (
-            abs(candidate_flux - original_flux)
-            > config.max_flux_relative_error * original_flux
+        candidate_component_flux = current_component_flux.copy()
+        for face_id in affected_faces:
+            if face_alive[face_id]:
+                candidate_component_flux[face_component_indices[face_id]] -= face_flux[
+                    face_id
+                ]
+        for face_id, value in flux_updates.items():
+            candidate_component_flux[face_component_indices[face_id]] += value
+        if abs(
+            candidate_flux - original_flux
+        ) > config.max_flux_relative_error * original_flux or np.any(
+            np.abs(candidate_component_flux - original_component_flux)
+            > config.max_flux_relative_error * original_component_flux
         ):
+            rejection_counts["flux_budget_rejections"] += 1
             continue
 
         old_keep_point = points[keep].copy()
@@ -306,6 +402,7 @@ def downsample_surface(
             for vertex in new_triangle:
                 vertex_faces[int(vertex)].add(face_id)
         current_flux = candidate_flux
+        current_component_flux = candidate_component_flux
 
         # Moving ``keep`` invalidates parent-tetrahedron provenance for its
         # entire one-ring, including faces whose vertex IDs did not change.
@@ -353,19 +450,29 @@ def downsample_surface(
         minimum_normal_cosine,
         config.min_triangle_quality,
     )
-    result_flux = float(
-        np.sum(
-            _triangle_flux_measures(
-                result_points[result_triangles], field, surface.period
-            )
-        )
+    result_face_flux = _triangle_flux_measures(
+        result_points[result_triangles], field, surface.period
     )
+    result_flux = float(np.sum(result_face_flux))
     if (
         abs(result_flux - original_flux)
         > config.max_flux_relative_error * original_flux
     ):
         raise SurfaceDownsamplingError(
             "downsampled |ds wedge d alpha| measure exceeds its error budget"
+        )
+    result_component_flux = np.bincount(
+        face_component_indices[active_faces],
+        weights=result_face_flux,
+        minlength=len(original_component_flux),
+    )
+    if np.any(
+        np.abs(result_component_flux - original_component_flux)
+        > config.max_flux_relative_error * original_component_flux
+    ):
+        raise SurfaceDownsamplingError(
+            "a downsampled component's |ds wedge d alpha| measure exceeds "
+            "its error budget"
         )
     result_components = _component_ids(result_triangles)
     result_signature = _topology_signature(result_triangles)
@@ -376,7 +483,7 @@ def downsample_surface(
 
     result_parent_edges = parent_edges[used_points]
     result_parent_edges[point_moved[used_points]] = -1
-    return SurfaceMesh(
+    result_surface = SurfaceMesh(
         level=surface.level,
         period=surface.period,
         points=result_points,
@@ -388,6 +495,7 @@ def downsample_surface(
         triangle_parent_tetrahedra=parent_tetrahedra[active_faces],
         component_ids=result_components,
     )
+    return make_result(result_surface)
 
 
 def _face_key(triangle: np.ndarray) -> tuple[int, int, int]:
