@@ -279,6 +279,41 @@ def test_shallow_wells_narrower_than_one_scan_cell_remain_regular():
         )
 
 
+def test_first_cell_backoff_returns_first_crossing_among_multiple_roots():
+    # B = 2 + 0.1 sin(6 zeta). Hiding the Fourier metadata exercises the
+    # four-sample fallback cell, which contains three crossings after back-off.
+    field = _fourier_field(
+        nfp=1,
+        m=[0, 0],
+        n=[0, 6],
+        cosine=[2.0, 0.0],
+        sine=[0.0, -0.1],
+        C=-3.0,
+    )
+
+    class ModeBlindField:
+        nfp = field.nfp
+
+        def __getattr__(self, name):
+            if name in {"m", "n", "xm", "xn"}:
+                raise AttributeError(name)
+            return getattr(field, name)
+
+    trace = trace_regular_well(
+        ModeBlindField(),
+        2.0,
+        np.array([0.4, 0.7, 0.0]),
+        config=WellTraceConfig(samples_per_field_period=4),
+    )
+
+    assert trace.status is TraceStatus.REGULAR
+    np.testing.assert_allclose(trace.zeta_out_unwrapped, -np.pi / 6.0, atol=2e-11)
+    np.testing.assert_array_equal(trace.extrema_kind, [1])
+    np.testing.assert_allclose(
+        trace.extrema_zeta_unwrapped, [-np.pi / 12.0], atol=2e-11
+    )
+
+
 def test_underresolved_scan_cannot_walk_past_a_hidden_first_exit():
     mode = 32
     phase = 0.125 * np.pi
@@ -448,8 +483,8 @@ def test_W7X_near_threshold_internal_maximum_has_honest_quadrature():
         0.0,
         1.0,
         points=extrema_x,
-        epsabs=1.0e-10,
-        epsrel=1.0e-10,
+        epsabs=1.0e-12,
+        epsrel=1.0e-12,
         limit=500,
     )[0]
     expected_K = quad(

@@ -474,6 +474,7 @@ def trace_regular_well(
                 # incoming root. A shallow well can enter and leave before the
                 # first regular scan point, so geometrically back off from that
                 # point until a strictly interior negative value is resolved.
+                last_outside = right
                 interior = 0.5 * right
                 for _ in range(64):
                     f_interior = F(interior)
@@ -484,7 +485,7 @@ def trace_regular_well(
                             crossing = brentq(
                                 F,
                                 interior,
-                                right,
+                                last_outside,
                                 xtol=cfg.root_atol_zeta,
                                 rtol=max(cfg.root_rtol, 4.0 * np.finfo(float).eps),
                             )
@@ -500,6 +501,7 @@ def trace_regular_well(
                                 extrema_kind=extrema_kinds,
                             )
                         break
+                    last_outside = interior
                     interior *= 0.5
 
             extremum = None
