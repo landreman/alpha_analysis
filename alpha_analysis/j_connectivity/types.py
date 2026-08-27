@@ -64,6 +64,94 @@ class QuadratureStatus(Enum):
 
 
 @dataclass(frozen=True)
+class WellTrace:
+    """One first-return well trace; values follow DESIGN.md §§9.1 and 9.4.
+
+    Coordinates and lifted ``zeta`` are in radians. ``action_length`` and
+    ``bounce_time_length`` store the half-bounce ``A`` and ``K`` of §4.2 in
+    length units; they are never the legacy normalized ``J``. Extrema kinds
+    are ``-1`` for maxima and ``+1`` for minima; nearly tangent contacts are
+    recorded separately for §17.4 diagnostics. Non-regular statuses retain
+    ``NaN`` rather than a plausible zero action.
+    """
+
+    status: TraceStatus
+    b: float
+    q_in: FloatArray
+    q_out_reduced: FloatArray
+    zeta_out_unwrapped: float
+    field_period_count: int
+    action_length: float
+    bounce_time_length: float
+    extrema_zeta_unwrapped: FloatArray
+    extrema_B: FloatArray
+    extrema_kind: IntArray
+    tangent_zeta_unwrapped: FloatArray
+    tangent_B: FloatArray
+    n_internal_maxima: int
+    itinerary_hash: np.uint64
+    B_residual_in: float
+    B_residual_out: float
+    quadrature_error_A: float
+    quadrature_error_K: float
+
+    def __post_init__(self) -> None:
+        q_in = np.asarray(self.q_in, dtype=np.float64)
+        q_out = np.asarray(self.q_out_reduced, dtype=np.float64)
+        extrema_zeta = np.asarray(self.extrema_zeta_unwrapped, dtype=np.float64)
+        extrema_B = np.asarray(self.extrema_B, dtype=np.float64)
+        extrema_kind = np.asarray(self.extrema_kind, dtype=np.int64)
+        tangent_zeta = np.asarray(self.tangent_zeta_unwrapped, dtype=np.float64)
+        tangent_B = np.asarray(self.tangent_B, dtype=np.float64)
+        if q_in.shape != (3,) or not np.all(np.isfinite(q_in)):
+            raise ValueError("q_in must be a finite reduced (s, theta, zeta) point")
+        if q_out.shape != (3,):
+            raise ValueError("q_out_reduced must have shape (3,)")
+        if extrema_zeta.ndim != 1 or extrema_B.shape != extrema_zeta.shape:
+            raise ValueError("extrema positions and values must be equal-length arrays")
+        if extrema_kind.shape != extrema_zeta.shape:
+            raise ValueError("extrema_kind must have one entry per extremum")
+        if np.any((extrema_kind != -1) & (extrema_kind != 1)):
+            raise ValueError("extrema_kind entries must be -1 or +1")
+        if not np.all(np.isfinite(extrema_zeta)) or not np.all(np.isfinite(extrema_B)):
+            raise ValueError("extrema arrays must be finite")
+        if tangent_zeta.ndim != 1 or tangent_B.shape != tangent_zeta.shape:
+            raise ValueError("tangent positions and values must be equal-length arrays")
+        if not np.all(np.isfinite(tangent_zeta)) or not np.all(np.isfinite(tangent_B)):
+            raise ValueError("tangent candidate arrays must be finite")
+        if self.field_period_count < 0:
+            raise ValueError("field_period_count must be nonnegative")
+        if self.n_internal_maxima != int(np.count_nonzero(extrema_kind == -1)):
+            raise ValueError("n_internal_maxima disagrees with extrema_kind")
+        if self.status is TraceStatus.REGULAR:
+            regular_scalars = (
+                self.zeta_out_unwrapped,
+                self.action_length,
+                self.bounce_time_length,
+                self.B_residual_out,
+                self.quadrature_error_A,
+                self.quadrature_error_K,
+            )
+            if not np.all(np.isfinite(regular_scalars)) or not np.all(
+                np.isfinite(q_out)
+            ):
+                raise ValueError("a regular trace must contain finite outputs")
+            if self.action_length < 0.0 or self.bounce_time_length < 0.0:
+                raise ValueError("regular A and K must be nonnegative")
+        for name, values in (
+            ("q_in", q_in),
+            ("q_out_reduced", q_out),
+            ("extrema_zeta_unwrapped", extrema_zeta),
+            ("extrema_B", extrema_B),
+            ("extrema_kind", extrema_kind),
+            ("tangent_zeta_unwrapped", tangent_zeta),
+            ("tangent_B", tangent_B),
+        ):
+            object.__setattr__(self, name, values)
+        object.__setattr__(self, "itinerary_hash", np.uint64(self.itinerary_hash))
+
+
+@dataclass(frozen=True)
 class RunMetadata:
     """Reproducibility context saved with a J-connectivity result (§13.4).
 
