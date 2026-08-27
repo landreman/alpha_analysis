@@ -139,7 +139,10 @@ gh pr ready <number>
 
 If the review workflow is configured and runs, periodically check for the
 `claude-review` workflow run. Address findings flagged as `blocking` or `should-fix`
-when appropriate. A failed, unavailable, or unconfigured Claude review must not block
+when appropriate. While doing so, anticipate any objections the review agent might
+raise in the next round of review, considering the review instructions in
+`.claude/commands/review-milestone.md`, to ensure that your work will pass review.
+A failed, unavailable, or unconfigured Claude review must not block
 the milestone or the start of the next one; only the `Tests` workflow is required.
 Before pushing more commits that you don't want reviewed immediately (e.g. you're still
 iterating on the same round of fixes), convert the PR back to draft:
