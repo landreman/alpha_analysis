@@ -195,6 +195,8 @@ def test_fourier_aware_scan_finds_a_narrow_high_mode_first_return():
     trace = trace_regular_well(field, b, np.array([0.4, 0.7, -root]))
     assert trace.status is TraceStatus.REGULAR
     np.testing.assert_allclose(trace.zeta_out_unwrapped, root, atol=2e-12)
+    np.testing.assert_array_equal(trace.extrema_kind, [1])
+    np.testing.assert_allclose(trace.extrema_zeta_unwrapped, [0.0], atol=2e-12)
     expected_A = quad(
         lambda zeta: 3.0
         / (2.0 - np.cos(mode * zeta))
@@ -206,18 +208,75 @@ def test_fourier_aware_scan_finds_a_narrow_high_mode_first_return():
     )[0]
     np.testing.assert_allclose(trace.action_length, expected_A, rtol=2e-10)
 
+    class ModeBlindField:
+        nfp = field.nfp
+
+        def __getattr__(self, name):
+            if name in {"m", "n", "xm", "xn"}:
+                raise AttributeError(name)
+            return getattr(field, name)
+
     under_resolved = trace_regular_well(
-        field,
-        b,
-        np.array([0.4, 0.7, -root]),
-        config=WellTraceConfig(
-            samples_per_field_period=4,
-            samples_per_wavelength=4,
-            max_field_periods=1,
-        ),
+        ModeBlindField(), b, np.array([0.4, 0.7, -root])
     )
-    assert under_resolved.status is not TraceStatus.REGULAR
-    assert np.isnan(under_resolved.action_length)
+    assert not (
+        under_resolved.status is TraceStatus.REGULAR
+        and np.array_equal(under_resolved.extrema_kind, [1])
+    )
+
+
+def test_shallow_wells_narrower_than_one_scan_cell_remain_regular():
+    field = _simple_well()
+    default_scan_step = 2.0 * np.pi / WellTraceConfig().samples_per_field_period
+
+    for depth in (1.0e-3, 1.0e-4, 1.0e-5):
+        b = 1.0 + depth
+        root = np.arccos(1.0 - depth)
+        assert 2.0 * root < default_scan_step
+
+        trace = trace_regular_well(field, b, np.array([0.4, 0.7, -root]))
+
+        # For B=2-cos(zeta), this product form evaluates b-B without the
+        # endpoint cancellation that the production field evaluator faces.
+        def independent_pair(t):
+            zeta = root * np.sin(t)
+            jacobian = root * np.cos(t)
+            B_value = 2.0 - np.cos(zeta)
+            radicand = (
+                2.0 * np.sin(0.5 * (root + zeta)) * np.sin(0.5 * (root - zeta)) / b
+            )
+            if radicand <= 0.0:
+                return 0.0, 3.0 * np.sqrt(2.0 * root / (b * np.sin(root)))
+            common = 3.0 * jacobian / B_value
+            return common * np.sqrt(radicand), common / np.sqrt(radicand)
+
+        expected_A = quad(
+            lambda t: independent_pair(t)[0],
+            -0.5 * np.pi,
+            0.5 * np.pi,
+            epsabs=1.0e-13,
+            epsrel=1.0e-12,
+        )[0]
+        expected_K = quad(
+            lambda t: independent_pair(t)[1],
+            -0.5 * np.pi,
+            0.5 * np.pi,
+            epsabs=1.0e-12,
+            epsrel=1.0e-12,
+        )[0]
+
+        assert trace.status is TraceStatus.REGULAR
+        np.testing.assert_allclose(trace.zeta_out_unwrapped, root, atol=2e-11)
+        np.testing.assert_allclose(trace.action_length, expected_A, rtol=2e-10)
+        np.testing.assert_allclose(trace.bounce_time_length, expected_K, rtol=2e-10)
+        assert trace.quadrature_error_A <= max(
+            WellTraceConfig().quadrature_atol,
+            WellTraceConfig().quadrature_rtol * abs(trace.action_length),
+        )
+        assert trace.quadrature_error_K <= max(
+            WellTraceConfig().quadrature_atol,
+            WellTraceConfig().quadrature_rtol * abs(trace.bounce_time_length),
+        )
 
 
 def test_entry_and_in_trace_tangent_contacts_are_not_regular_wells():

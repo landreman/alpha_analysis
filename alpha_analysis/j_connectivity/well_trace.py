@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-import warnings
 
 import numpy as np
-from scipy.integrate import IntegrationWarning, cumulative_trapezoid, quad
+from scipy.integrate import cumulative_trapezoid, quad
 from scipy.optimize import brentq
 
 from .field import BoozerFieldLike
 from .types import FloatArray, IntArray, TraceStatus, WellTrace
+
+_ENDPOINT_GAUSS_NODES, _ENDPOINT_GAUSS_WEIGHTS = np.polynomial.legendre.leggauss(16)
 
 
 @dataclass(frozen=True)
@@ -208,6 +209,31 @@ def _regularized_integrands(
     limit_in = np.pi * C_abs * np.sqrt(u_out / (b * -slope_in))
     limit_out = np.pi * C_abs * np.sqrt(u_out / (b * slope_out))
 
+    def endpoint_field_difference(x: float, u: float) -> float:
+        """Evaluate ``b-B`` near an endpoint without subtracting close fields."""
+        if x < 0.5:
+            lo, hi, orientation = 0.0, u, -1.0
+        else:
+            lo, hi, orientation = u, u_out, 1.0
+        half_width = 0.5 * (hi - lo)
+        if half_width <= 0.0:
+            return 0.0
+        points = half_width * _ENDPOINT_GAUSS_NODES + 0.5 * (hi + lo)
+        zeta = zeta_in + sigma * points
+        theta = theta_in + iota * (zeta - zeta_in)
+        derivative_values = sigma * np.asarray(field.D_B(s, theta, zeta), dtype=float)
+        if derivative_values.shape != points.shape or not np.all(
+            np.isfinite(derivative_values)
+        ):
+            raise _QuadratureDomainError(
+                "D_B must remain finite and preserve coordinate shape"
+            )
+        return float(
+            orientation
+            * half_width
+            * np.dot(_ENDPOINT_GAUSS_WEIGHTS, derivative_values)
+        )
+
     def pair(x: float) -> tuple[float, float]:
         if x <= 0.0:
             return 0.0, float(limit_in)
@@ -216,21 +242,35 @@ def _regularized_integrands(
         sine = np.sin(0.5 * np.pi * x)
         u = u_out * sine * sine
         jacobian = 0.5 * np.pi * u_out * np.sin(np.pi * x)
+        if u <= 0.0:
+            return 0.0, float(limit_in)
+        if u_out - u <= 0.0:
+            return 0.0, float(limit_out)
         zeta = zeta_in + sigma * u
         theta = theta_in + iota * (zeta - zeta_in)
         B_value = _scalar(field.B(s, theta, zeta))
         if not np.isfinite(B_value) or B_value <= 0.0:
             raise _QuadratureDomainError("B must remain finite and positive")
-        radicand = 1.0 - B_value / b
+        field_difference = b - B_value
+        cancellation_scale = np.cbrt(np.finfo(float).eps) * max(
+            abs(b), abs(B_value), 1.0
+        )
+        if abs(field_difference) <= cancellation_scale:
+            field_difference = endpoint_field_difference(x, u)
+        radicand = field_difference / b
         if radicand <= 0.0:
             if radicand < -root_tolerance / abs(b):
                 raise _QuadratureDomainError("trace left the B < b well")
             if x < 0.5:
                 endpoint_distance = u
                 slope = -slope_in
+                endpoint_value = limit_in
             else:
                 endpoint_distance = u_out - u
                 slope = slope_out
+                endpoint_value = limit_out
+            if endpoint_distance <= 0.0:
+                return 0.0, float(endpoint_value)
             endpoint_tolerance = max(
                 100.0 * np.finfo(float).eps * u_out,
                 root_tolerance / slope,
@@ -406,6 +446,38 @@ def trace_regular_well(
                         extrema_B=extrema_values,
                         extrema_kind=extrema_kinds,
                     )
+            elif period_index == 0 and index == 0 and f_right >= 0.0:
+                # The prescribed scan begins just inside the well, not at the
+                # incoming root. A shallow well can enter and leave before the
+                # first regular scan point, so geometrically back off from that
+                # point until a strictly interior negative value is resolved.
+                interior = 0.5 * right
+                for _ in range(64):
+                    f_interior = F(interior)
+                    if not np.isfinite(f_interior):
+                        break
+                    if f_interior < 0.0:
+                        try:
+                            crossing = brentq(
+                                F,
+                                interior,
+                                right,
+                                xtol=cfg.root_atol_zeta,
+                                rtol=max(cfg.root_rtol, 4.0 * np.finfo(float).eps),
+                            )
+                        except ValueError:
+                            return _failed_trace(
+                                TraceStatus.ROOT_FAILURE,
+                                b=b,
+                                q_in=q_reduced,
+                                B_residual_in=residual_in,
+                                field_period_count=period_index,
+                                extrema_zeta=extrema_zeta,
+                                extrema_B=extrema_values,
+                                extrema_kind=extrema_kinds,
+                            )
+                        break
+                    interior *= 0.5
 
             extremum = None
             if d_left == 0.0 and left > cfg.root_atol_zeta:
@@ -547,25 +619,27 @@ def trace_regular_well(
         root_tolerance=cfg.root_atol_B,
     )
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", IntegrationWarning)
-            action, error_A = quad(
-                lambda x: pair(x)[0],
-                0.0,
-                1.0,
-                epsabs=cfg.quadrature_atol,
-                epsrel=cfg.quadrature_rtol,
-                limit=200,
-            )
-            bounce_time, error_K = quad(
-                lambda x: pair(x)[1],
-                0.0,
-                1.0,
-                epsabs=cfg.quadrature_atol,
-                epsrel=cfg.quadrature_rtol,
-                limit=200,
-            )
-    except (IntegrationWarning, _QuadratureDomainError, ValueError, FloatingPointError):
+        action_result = quad(
+            lambda x: pair(x)[0],
+            0.0,
+            1.0,
+            epsabs=cfg.quadrature_atol,
+            epsrel=cfg.quadrature_rtol,
+            limit=200,
+            full_output=1,
+        )
+        bounce_time_result = quad(
+            lambda x: pair(x)[1],
+            0.0,
+            1.0,
+            epsabs=cfg.quadrature_atol,
+            epsrel=cfg.quadrature_rtol,
+            limit=200,
+            full_output=1,
+        )
+        action, error_A = action_result[:2]
+        bounce_time, error_K = bounce_time_result[:2]
+    except (_QuadratureDomainError, ValueError, FloatingPointError):
         return _failed_trace(
             TraceStatus.QUADRATURE_FAILURE,
             b=b,
