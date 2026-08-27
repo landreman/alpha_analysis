@@ -448,8 +448,8 @@ def test_W7X_near_threshold_internal_maximum_has_honest_quadrature():
         0.0,
         1.0,
         points=extrema_x,
-        epsabs=1.0e-8,
-        epsrel=1.0e-8,
+        epsabs=1.0e-10,
+        epsrel=1.0e-10,
         limit=500,
     )[0]
     expected_K = quad(
@@ -462,7 +462,7 @@ def test_W7X_near_threshold_internal_maximum_has_honest_quadrature():
         limit=500,
     )[0]
 
-    np.testing.assert_allclose(trace.action_length, expected_A, rtol=2.0e-7)
+    np.testing.assert_allclose(trace.action_length, expected_A, rtol=1.0e-12)
     np.testing.assert_allclose(trace.bounce_time_length, expected_K, rtol=2.0e-8)
 
 

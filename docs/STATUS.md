@@ -54,6 +54,7 @@ move it into `docs/DESIGN.md` and delete it here.
 - A marching triangle that bridges two sheets of an under-resolved surface (coarse gmsh meshes near `min B`) has no local `g=0` point; its split vertex is placed at the `g` sign discontinuity, tagged `G_JUMP`, excluded from the `g=0` curve, and counted in `SurfaceExtraction.n_unresolved_splits` with status `UNRESOLVED` (ADR 0001). Downstream milestones must treat `UNRESOLVED` extractions as needing background refinement before production use.
 - Milestone 6 traces in the physical direction `sign(G + iota I)`, stores authoritative half-bounce `A` and `K` plus lifted exits and extrema itineraries, and leaves `MAX_PERIODS` action/time as `NaN` with an explicit scanned-period count; downstream surface/pipeline stages must carry that status into unresolved-weight bounds rather than `Theta=0`.
 - Milestone 6's conservative Fourier-aware scan includes every retained mode regardless of amplitude (about 1125 samples per field period on the W7-X reference surface); Milestone 7 should profile this cost and add a demonstrated amplitude-aware cutoff before batch tracing if needed.
+- Milestone 6's `quadrature_error_K` is an adaptive-subdivision estimate, not a floating-point cancellation bound near an internal maximum with `B_max` close to `b`; Milestones 8–9 own special treatment of that `Gamma_max` band, and surface-wide tracing should track its explicit failure fraction.
 
 ## Accepted deviations
 
