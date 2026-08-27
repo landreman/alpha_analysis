@@ -127,10 +127,11 @@ PR body must contain, in this order:
 - open ADRs blocking merge, or "none"
 - anything you were unsure about and want the reviewer to look at hardest
 
-## 9. Optionally address Claude review findings
+## 9. Address Claude review findings
 
 The review only runs when the PR transitions to ready-for-review, so trigger it
-explicitly once the PR is in the state you want reviewed:
+explicitly once the PR is in the state you want reviewed, by first converting the
+PR to draft if it is not already, and then running
 
 ```bash
 gh pr ready <number>
@@ -147,9 +148,11 @@ iterating on the same round of fixes), convert the PR back to draft:
 gh pr ready <number> --undo
 ```
 
-Push your fixes, then mark it ready again to trigger the next review pass.
+Push your fixes, then mark it ready again (after converting it to a draft if it is not
+already a draft) to trigger the next review pass.
 
-Iterate until the review is satisfied. For items flagged as `note`, it is up to your
+If the claude review workflow suceeds and recommends "fix-first" instead of "merge", 
+then iterate until the review recommends "merge". For items flagged as `note`, it is up to your
 judgement whether to address them. If you disagree with a finding, write an ADR and name
 it in the PR body.
 
