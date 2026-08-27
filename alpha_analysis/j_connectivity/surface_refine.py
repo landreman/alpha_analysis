@@ -20,7 +20,6 @@ from .surface_extract import (
     _canonicalize_point,
     _component_ids,
     _evaluate_B,
-    _orient_triangles,
     _physical_g,
     _project_to_level_near,
 )
@@ -37,8 +36,9 @@ class SurfaceDownsamplingConfig:
     ``target_reduction`` is the requested fraction of triangles to remove;
     for example, ``0.8`` requests about 20 percent of the input triangles.
     The target is a request rather than a guarantee because boundary
-    preservation, topology, projection, and triangle-quality checks take
-    precedence.
+    preservation, topology, projection, surface-flux, and triangle-quality
+    checks take precedence. ``max_flux_relative_error`` bounds drift in the
+    axis-regular ``|ds wedge d alpha|`` measure from DESIGN.md \u00a74.4.
 
     Edge lengths and triangle quality use the logical ``(x, y, zeta)``
     coordinates of DESIGN.md \u00a73.2, with periodic zeta differences locally
@@ -48,13 +48,14 @@ class SurfaceDownsamplingConfig:
     length while being projected to ``B=b``.
     """
 
-    target_reduction: float = 0.8
+    target_reduction: float = 0.5
     B_tolerance: float = 1.0e-10
     g_tolerance: float = 1.0e-10
     merge_tolerance: float = 1.0e-10
+    max_flux_relative_error: float = 5.0e-3
     max_projection_distance_ratio: float = 0.5
-    max_normal_deviation_degrees: float = 75.0
-    min_triangle_quality: float = 1.0e-4
+    max_normal_deviation_degrees: float = 30.0
+    min_triangle_quality: float = 5.0e-2
 
     def __post_init__(self) -> None:
         if not np.isfinite(self.target_reduction) or not (
@@ -65,6 +66,7 @@ class SurfaceDownsamplingConfig:
             "B_tolerance",
             "g_tolerance",
             "merge_tolerance",
+            "max_flux_relative_error",
             "max_projection_distance_ratio",
         ):
             value = getattr(self, name)
@@ -96,7 +98,9 @@ def downsample_surface(
     moved or removed, so downsampling cannot erase a physical or diagnostic
     boundary.  Each interior replacement point is projected locally to
     ``B=surface.level`` and is rejected if it flips the physical sign of ``g``
-    or makes an incident triangle invert or become degenerate.
+    or makes an incident triangle invert or become degenerate. Each collapse
+    must also keep the total axis-regular surface measure within
+    ``max_flux_relative_error`` of the input mesh.
 
     The returned mesh may contain more triangles than requested when no more
     safe collapse exists.  Parent-edge and parent-tetrahedron provenance are
@@ -120,6 +124,16 @@ def downsample_surface(
     parent_tetrahedra = np.asarray(
         surface.triangle_parent_tetrahedra, dtype=np.int64
     ).copy()
+    reference_normals, reference_qualities = _triangle_normals_and_qualities(
+        points[triangles], surface.period
+    )
+    face_flux = _triangle_flux_measures(points[triangles], field, surface.period)
+    original_flux = float(np.sum(face_flux))
+    if not np.isfinite(original_flux) or original_flux <= 0.0:
+        raise SurfaceDownsamplingError(
+            "a nonempty surface must have positive finite |ds wedge d alpha| measure"
+        )
+    current_flux = original_flux
 
     n_points = len(points)
     point_alive = np.ones(n_points, dtype=bool)
@@ -231,9 +245,33 @@ def downsample_surface(
             face_alive,
             face_owner,
             points,
+            reference_normals,
+            reference_qualities,
             surface.period,
             minimum_normal_cosine,
             config.min_triangle_quality,
+        ):
+            continue
+        flux_updates = _replacement_flux_updates(
+            keep,
+            remove,
+            replacement,
+            affected_faces,
+            triangles,
+            face_alive,
+            points,
+            field,
+            surface.period,
+        )
+        old_local_flux = float(
+            np.sum([face_flux[face_id] for face_id in affected_faces])
+        )
+        candidate_flux = (
+            current_flux - old_local_flux + float(np.sum(list(flux_updates.values())))
+        )
+        if (
+            abs(candidate_flux - original_flux)
+            > config.max_flux_relative_error * original_flux
         ):
             continue
 
@@ -255,16 +293,19 @@ def downsample_surface(
         for face_id, old_triangle in old_faces.items():
             if keep in old_triangle and remove in old_triangle:
                 face_alive[face_id] = False
+                face_flux[face_id] = 0.0
                 parent_tetrahedra[face_id] = -1
                 alive_triangles -= 1
                 continue
             new_triangle = old_triangle.copy()
             new_triangle[new_triangle == remove] = keep
             triangles[face_id] = new_triangle
+            face_flux[face_id] = flux_updates[face_id]
             parent_tetrahedra[face_id] = -1
             face_owner[_face_key(new_triangle)] = face_id
             for vertex in new_triangle:
                 vertex_faces[int(vertex)].add(face_id)
+        current_flux = candidate_flux
 
         # Moving ``keep`` invalidates parent-tetrahedron provenance for its
         # entire one-ring, including faces whose vertex IDs did not change.
@@ -302,9 +343,30 @@ def downsample_surface(
     if len(result_B) and np.max(np.abs(result_B - surface.level)) > config.B_tolerance:
         raise SurfaceDownsamplingError("a downsampled vertex is not on B=b")
     result_g = _physical_g(field, result_points)
-    result_triangles = _orient_triangles(
-        result_points, result_triangles, field, surface.period
+    _validate_reference_geometry(
+        points,
+        triangles,
+        active_faces,
+        reference_normals,
+        reference_qualities,
+        surface.period,
+        minimum_normal_cosine,
+        config.min_triangle_quality,
     )
+    result_flux = float(
+        np.sum(
+            _triangle_flux_measures(
+                result_points[result_triangles], field, surface.period
+            )
+        )
+    )
+    if (
+        abs(result_flux - original_flux)
+        > config.max_flux_relative_error * original_flux
+    ):
+        raise SurfaceDownsamplingError(
+            "downsampled |ds wedge d alpha| measure exceeds its error budget"
+        )
     result_components = _component_ids(result_triangles)
     result_signature = _topology_signature(result_triangles)
     if result_signature != original_signature:
@@ -367,6 +429,8 @@ def _valid_replacement_faces(
     face_alive: np.ndarray,
     face_owner: dict[tuple[int, int, int], int],
     points: np.ndarray,
+    reference_normals: np.ndarray,
+    reference_qualities: np.ndarray,
     period: float,
     minimum_normal_cosine: float,
     minimum_quality: float,
@@ -388,19 +452,126 @@ def _valid_replacement_faces(
             return False
         new_keys.add(key)
 
-        old_vertices = points[old_triangle]
         new_vertices = points[new_triangle].copy()
         new_vertices[new_triangle == keep] = replacement
-        old_normal, _ = _triangle_normal_and_quality(old_vertices, period)
         new_normal, new_quality = _triangle_normal_and_quality(new_vertices, period)
-        old_norm = float(np.linalg.norm(old_normal))
+        reference_normal = reference_normals[face_id]
+        reference_norm = float(np.linalg.norm(reference_normal))
         new_norm = float(np.linalg.norm(new_normal))
-        if old_norm == 0.0 or new_norm == 0.0 or new_quality < minimum_quality:
+        quality_floor = min(minimum_quality, reference_qualities[face_id])
+        if reference_norm == 0.0 or new_norm == 0.0 or new_quality < quality_floor:
             return False
-        normal_cosine = float(np.dot(old_normal, new_normal) / (old_norm * new_norm))
+        normal_cosine = float(
+            np.dot(reference_normal, new_normal) / (reference_norm * new_norm)
+        )
         if normal_cosine < minimum_normal_cosine:
             return False
     return True
+
+
+def _replacement_flux_updates(
+    keep: int,
+    remove: int,
+    replacement: np.ndarray,
+    affected_faces: set[int],
+    triangles: np.ndarray,
+    face_alive: np.ndarray,
+    points: np.ndarray,
+    field: BoozerFieldLike,
+    period: float,
+) -> dict[int, float]:
+    face_ids = []
+    vertices = []
+    for face_id in affected_faces:
+        if not face_alive[face_id]:
+            continue
+        old_triangle = triangles[face_id]
+        if keep in old_triangle and remove in old_triangle:
+            continue
+        new_triangle = old_triangle.copy()
+        new_triangle[new_triangle == remove] = keep
+        new_vertices = points[new_triangle].copy()
+        new_vertices[new_triangle == keep] = replacement
+        face_ids.append(face_id)
+        vertices.append(new_vertices)
+    measures = _triangle_flux_measures(np.asarray(vertices), field, period)
+    return {face_id: float(value) for face_id, value in zip(face_ids, measures)}
+
+
+def _validate_reference_geometry(
+    points: np.ndarray,
+    triangles: np.ndarray,
+    active_faces: np.ndarray,
+    reference_normals: np.ndarray,
+    reference_qualities: np.ndarray,
+    period: float,
+    minimum_normal_cosine: float,
+    minimum_quality: float,
+) -> None:
+    for face_id in active_faces:
+        normal, quality = _triangle_normal_and_quality(
+            points[triangles[face_id]], period
+        )
+        reference = reference_normals[face_id]
+        denominator = float(np.linalg.norm(normal) * np.linalg.norm(reference))
+        quality_floor = min(minimum_quality, reference_qualities[face_id])
+        if denominator == 0.0 or quality < (1.0 - 1.0e-12) * quality_floor:
+            raise SurfaceDownsamplingError(
+                "downsampling produced a degenerate or low-quality triangle "
+                f"at face {face_id}: quality={quality:.6g}, "
+                f"required={quality_floor:.6g}"
+            )
+        if float(np.dot(normal, reference) / denominator) < minimum_normal_cosine:
+            raise SurfaceDownsamplingError(
+                "downsampling inverted or over-rotated a triangle"
+            )
+
+
+def _triangle_normals_and_qualities(
+    vertices: np.ndarray, period: float
+) -> tuple[np.ndarray, np.ndarray]:
+    local = np.asarray(vertices, dtype=np.float64).copy().reshape(-1, 3, 3)
+    for index in (1, 2):
+        difference = local[:, index, 2] - local[:, 0, 2]
+        local[:, index, 2] -= period * np.round(difference / period)
+    first = local[:, 1] - local[:, 0]
+    second = local[:, 2] - local[:, 0]
+    third = local[:, 2] - local[:, 1]
+    normals = np.cross(first, second)
+    edge_square_sum = np.einsum("ij,ij->i", first, first)
+    edge_square_sum += np.einsum("ij,ij->i", second, second)
+    edge_square_sum += np.einsum("ij,ij->i", third, third)
+    qualities = np.divide(
+        2.0 * np.sqrt(3.0) * np.linalg.norm(normals, axis=1),
+        edge_square_sum,
+        out=np.zeros(len(local), dtype=np.float64),
+        where=edge_square_sum > 0.0,
+    )
+    return normals, qualities
+
+
+def _triangle_flux_measures(
+    vertices: np.ndarray, field: BoozerFieldLike, period: float
+) -> np.ndarray:
+    """Return per-triangle ``|ds wedge d alpha|`` midpoint measures (\u00a74.4)."""
+    local = np.asarray(vertices, dtype=np.float64).copy().reshape(-1, 3, 3)
+    if not len(local):
+        return np.empty(0, dtype=np.float64)
+    for index in (1, 2):
+        difference = local[:, index, 2] - local[:, 0, 2]
+        local[:, index, 2] -= period * np.round(difference / period)
+    first = local[:, 1] - local[:, 0]
+    second = local[:, 2] - local[:, 0]
+    centroids = np.mean(local, axis=1)
+    x = centroids[:, 0]
+    y = centroids[:, 1]
+    iota = np.asarray(field.iota(x * x + y * y), dtype=np.float64)
+    omega = 2.0 * (first[:, 0] * second[:, 1] - first[:, 1] * second[:, 0])
+    omega -= iota * (
+        (2.0 * x * first[:, 0] + 2.0 * y * first[:, 1]) * second[:, 2]
+        - (2.0 * x * second[:, 0] + 2.0 * y * second[:, 1]) * first[:, 2]
+    )
+    return 0.5 * np.abs(omega)
 
 
 def _triangle_normal_and_quality(

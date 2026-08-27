@@ -804,8 +804,10 @@ reduces the population of very small triangles and makes triangle sizes more
 uniform. Downsampling must preserve every connected component and all `EDGE`,
 `AXIS`, periodic-seam, `G_ZERO`, and unresolved-boundary provenance; moved
 vertices must be projected back to \(B=b\), and no accepted collapse may change
-the physical sign of \(g\) or invert a triangle. The requested reduction is
-subordinate to these invariants and to convergence of the final \(f\).
+the physical sign of \(g\) or invert a triangle. Bound drift in the
+axis-regular \(|ds\wedge d\alpha|\) measure during coarsening; triangle count
+alone is not an accuracy criterion. The requested reduction is subordinate to
+these invariants and to convergence of the final \(f\).
 
 Downsampling occurs before \(A\), \(K\), and return-map data are attached to
 vertices. Later adaptive refinement may add vertices back where those

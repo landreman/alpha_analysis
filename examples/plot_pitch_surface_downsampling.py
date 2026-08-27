@@ -15,7 +15,7 @@ same command remains usable with another boozmn file.
 Example::
 
     python examples/plot_pitch_surface_downsampling.py \
-        --target-reduction 0.85 \
+        --target-reduction 0.5 \
         --screenshot pitch_surface_downsampling.png
 """
 
@@ -46,6 +46,7 @@ from alpha_analysis.j_connectivity.background_mesh import (  # noqa: E402
 )
 from alpha_analysis.j_connectivity.surface_extract import (  # noqa: E402
     MarchingTetrahedraExtractor,
+    surface_flux,
 )
 from alpha_analysis.j_connectivity.surface_refine import (  # noqa: E402
     SurfaceDownsamplingConfig,
@@ -119,7 +120,7 @@ def main() -> None:
     parser.add_argument(
         "--target-reduction",
         type=float,
-        default=0.85,
+        default=0.5,
         help="requested fraction of incoming-surface triangles to remove",
     )
     parser.add_argument(
@@ -158,10 +159,13 @@ def main() -> None:
     b = B_min + args.level_fraction * (B_max - B_min)
     extraction = MarchingTetrahedraExtractor().extract(background, field, b)
     original = extraction.incoming
+    downsampling_config = SurfaceDownsamplingConfig(
+        target_reduction=args.target_reduction
+    )
     reduced = downsample_surface(
         original,
         field,
-        SurfaceDownsamplingConfig(target_reduction=args.target_reduction),
+        downsampling_config,
     )
 
     before = mesh_statistics(original)
@@ -172,6 +176,15 @@ def main() -> None:
     print_statistics("after", after)
     achieved = 1.0 - after["triangles"] / before["triangles"]
     print(f"achieved triangle reduction: {achieved:.1%}")
+    original_flux = surface_flux(original, field)
+    reduced_flux = surface_flux(reduced, field)
+    relative_flux_drift = abs(reduced_flux - original_flux) / original_flux
+    print(
+        "|ds wedge d alpha| measure before/after: "
+        f"{original_flux:.8g} / {reduced_flux:.8g}; "
+        f"relative drift = {relative_flux_drift:.3%} "
+        f"(budget {downsampling_config.max_flux_relative_error:.3%})"
+    )
 
     geometry = BoozerGeometry(args.boozmn)
     off_screen = args.screenshot is not None
