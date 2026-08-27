@@ -23,10 +23,60 @@ def plot_well_profile(field, trace, *, output_path=None, n_samples=513):
     if trace.status.name != "REGULAR":
         for axis in axes.ravel():
             axis.axis("off")
-        axes[0, 1].set_facecolor("mistyrose")
-        axes[0, 1].text(
-            0.5,
-            0.5,
+        figure.patch.set_facecolor("mistyrose")
+        field_axis = axes[0, 0]
+        field_axis.axis("on")
+        status_axis = axes[1, 2]
+
+        period = 2.0 * np.pi / field.nfp
+        s, theta_in, zeta_in = map(float, trace.q_in)
+        iota = float(np.asarray(field.iota(s)))
+        C = float(np.asarray(field.G(s))) + iota * float(np.asarray(field.I(s)))
+        sigma = float(np.sign(C))
+        if trace.tangent_zeta_unwrapped.size:
+            zeta_end = float(trace.tangent_zeta_unwrapped[-1])
+            while sigma * (zeta_end - zeta_in) < 0.0:
+                zeta_in -= sigma * period
+            u_end = sigma * (zeta_end - zeta_in)
+        else:
+            u_end = max(1, trace.field_period_count) * period
+        if u_end <= 1.0e-12:
+            u_end = period
+        u = np.linspace(0.0, u_end, n_samples)
+        zeta = zeta_in + sigma * u
+        theta = theta_in + iota * (zeta - zeta_in)
+        B_values = np.asarray(field.B(s, theta, zeta), dtype=float)
+        field_axis.plot(zeta, B_values, label=r"$B(\zeta)$")
+        field_axis.axhline(trace.b, color="black", linestyle="--", label=r"$b$")
+        field_axis.plot(zeta[0], B_values[0], "o", color="tab:blue", label="entry")
+        if trace.extrema_zeta_unwrapped.size:
+            field_axis.plot(
+                trace.extrema_zeta_unwrapped,
+                trace.extrema_B,
+                "^",
+                color="tab:orange",
+                linestyle="none",
+                label="scanned extrema",
+            )
+        if trace.tangent_zeta_unwrapped.size:
+            field_axis.plot(
+                trace.tangent_zeta_unwrapped,
+                trace.tangent_B,
+                "*",
+                color="darkred",
+                markersize=11,
+                linestyle="none",
+                label="tangent candidate",
+            )
+        field_axis.set_xlabel(r"unwrapped $\zeta$ [rad]")
+        field_axis.set_ylabel(r"$B$")
+        field_axis.set_title("Non-regular trace profile")
+        field_axis.grid(True)
+        field_axis.legend(fontsize="small")
+
+        status_axis.text(
+            0.0,
+            1.0,
             "\n".join(
                 (
                     f"UNRESOLVED WELL TRACE: {trace.status.name}",
@@ -36,8 +86,7 @@ def plot_well_profile(field, trace, *, output_path=None, n_samples=513):
                 )
             ),
             color="darkred",
-            ha="center",
-            va="center",
+            va="top",
             weight="bold",
         )
         figure.suptitle("Well first-return diagnostic: unresolved")

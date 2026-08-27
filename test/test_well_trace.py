@@ -7,6 +7,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import quad
+from scipy.optimize import brentq
 
 from alpha_analysis import (
     DATA_DIR,
@@ -30,16 +31,19 @@ def _fourier_field(
     m: list[int],
     n: list[int],
     cosine: list[float],
+    sine: list[float] | None = None,
     iota: float = 0.0,
     C: float = 3.0,
 ) -> SyntheticFourierField:
     """Return a radially constant analytic field with signed ``G+iota I=C``."""
+    if sine is None:
+        sine = np.zeros(len(m))
     return SyntheticFourierField(
         nfp=nfp,
         m=np.asarray(m),
         n=np.asarray(n),
         cosine_coefficients=np.asarray(cosine)[:, np.newaxis],
-        sine_coefficients=np.zeros((len(m), 1)),
+        sine_coefficients=np.asarray(sine)[:, np.newaxis],
         iota_coefficients=np.array([iota]),
         G_coefficients=np.array([C]),
         I_coefficients=np.array([0.0]),
@@ -49,6 +53,16 @@ def _fourier_field(
 def _simple_well(C: float = 3.0) -> SyntheticFourierField:
     # B(zeta) = 2 - cos(zeta), with b=2.5 roots at +/- 2*pi/3.
     return _fourier_field(nfp=1, m=[0, 0], n=[0, 1], cosine=[2.0, -1.0], C=C)
+
+
+def _split_well() -> SyntheticFourierField:
+    # B = 2 - cos(zeta) + 0.4 cos(2 zeta).
+    return _fourier_field(
+        nfp=1,
+        m=[0, 0, 0],
+        n=[0, 1, 2],
+        cosine=[2.0, -1.0, 0.4],
+    )
 
 
 def test_regular_trace_obeys_first_return_invariants_and_independent_A_K():
@@ -117,12 +131,7 @@ def test_physical_field_direction_uses_sign_of_G_plus_iota_I():
 def test_internal_extrema_and_itinerary_survive_a_periodic_shift():
     # B = 2 - cos(zeta) + 0.4 cos(2 zeta).  The b=2 well has two
     # minima separated by one sub-threshold internal maximum.
-    field = _fourier_field(
-        nfp=1,
-        m=[0, 0, 0],
-        n=[0, 1, 2],
-        cosine=[2.0, -1.0, 0.4],
-    )
+    field = _split_well()
     crossing_cosine = (1.0 - np.sqrt(2.28)) / 1.6
     root = np.arccos(crossing_cosine)
     q_in = np.array([0.6, 1.2, -root])
@@ -176,12 +185,73 @@ def test_long_well_preserves_period_count_and_cap_is_unresolved():
     assert np.isnan(capped.B_residual_out)
 
 
-def test_tangent_input_is_not_misreported_as_a_regular_well():
-    trace = trace_regular_well(_simple_well(), b=3.0, q_in=np.array([0.4, 0.7, np.pi]))
+def test_fourier_aware_scan_finds_a_narrow_high_mode_first_return():
+    mode = 128
+    b = 1.01
+    phase_root = np.arccos(0.99)
+    root = phase_root / mode
+    field = _fourier_field(nfp=1, m=[0, 0], n=[0, mode], cosine=[2.0, -1.0])
 
-    assert trace.status is TraceStatus.TANGENT_OR_TRANSITION
-    assert np.isnan(trace.action_length)
-    assert np.isnan(trace.bounce_time_length)
+    trace = trace_regular_well(field, b, np.array([0.4, 0.7, -root]))
+    assert trace.status is TraceStatus.REGULAR
+    np.testing.assert_allclose(trace.zeta_out_unwrapped, root, atol=2e-12)
+    expected_A = quad(
+        lambda zeta: 3.0
+        / (2.0 - np.cos(mode * zeta))
+        * np.sqrt(1.0 - (2.0 - np.cos(mode * zeta)) / b),
+        -root,
+        root,
+        epsabs=2e-13,
+        epsrel=2e-12,
+    )[0]
+    np.testing.assert_allclose(trace.action_length, expected_A, rtol=2e-10)
+
+    under_resolved = trace_regular_well(
+        field,
+        b,
+        np.array([0.4, 0.7, -root]),
+        config=WellTraceConfig(
+            samples_per_field_period=4,
+            samples_per_wavelength=4,
+            max_field_periods=1,
+        ),
+    )
+    assert under_resolved.status is not TraceStatus.REGULAR
+    assert np.isnan(under_resolved.action_length)
+
+
+def test_entry_and_in_trace_tangent_contacts_are_not_regular_wells():
+    entry = trace_regular_well(_simple_well(), b=3.0, q_in=np.array([0.4, 0.7, np.pi]))
+
+    field = _split_well()
+    b = 1.4 + 5.0e-10
+    critical = np.arccos(0.625)
+
+    def B(zeta):
+        return 2.0 - np.cos(zeta) + 0.4 * np.cos(2.0 * zeta)
+
+    incoming_root = brentq(lambda zeta: B(zeta) - b, -np.pi, -critical)
+    internal = trace_regular_well(field, b=b, q_in=np.array([0.4, 0.7, incoming_root]))
+
+    # B-b = 0.2 sin(zeta) - 0.1 sin(2 zeta) has a regular incoming
+    # root at -pi and a cubic, sign-changing outgoing contact at zero.
+    grazing_field = _fourier_field(
+        nfp=1,
+        m=[0, 0, 0],
+        n=[0, 1, 2],
+        cosine=[2.0, 0.0, 0.0],
+        sine=[0.0, -0.2, 0.1],
+    )
+    outgoing = trace_regular_well(
+        grazing_field, b=2.0, q_in=np.array([0.4, 0.7, -np.pi])
+    )
+
+    for trace in (entry, internal, outgoing):
+        assert trace.status is TraceStatus.TANGENT_OR_TRANSITION
+        assert np.isnan(trace.action_length)
+        assert np.isnan(trace.bounce_time_length)
+    np.testing.assert_allclose(internal.extrema_B[-1], 1.4, atol=2e-12)
+    np.testing.assert_allclose(outgoing.tangent_zeta_unwrapped[-1], 0.0, atol=2e-11)
 
 
 def test_selected_W7X_well_agrees_with_legacy_compute_J_invariant():
@@ -213,7 +283,7 @@ def test_selected_W7X_well_agrees_with_legacy_compute_J_invariant():
     assert trace.status is TraceStatus.REGULAR
     legacy_length_scale = field.R00 * 2.0 * np.pi / field.nfp
     np.testing.assert_allclose(
-        trace.action_length / legacy_length_scale, legacy["J"], rtol=2e-8
+        trace.action_length / legacy_length_scale, legacy["J"], rtol=1e-11
     )
     np.testing.assert_allclose(
         trace.q_out_reduced[1:],
@@ -235,3 +305,23 @@ def test_well_profile_plot_writes_the_required_static_diagnostic(tmp_path):
     assert np.asarray(axes).size == 6
     assert "REGULAR" in axes[1, 2].texts[0].get_text()
     plt.close(figure)
+
+    tangent_field = _split_well()
+    b = 1.4 + 5.0e-10
+    critical = np.arccos(0.625)
+    B = lambda zeta: 2.0 - np.cos(zeta) + 0.4 * np.cos(2.0 * zeta)
+    incoming_root = brentq(lambda zeta: B(zeta) - b, -np.pi, -critical)
+    tangent = trace_regular_well(tangent_field, b, np.array([0.4, 0.7, incoming_root]))
+    unresolved_output = tmp_path / "well-profile-unresolved.png"
+
+    unresolved_figure, unresolved_axes = plot_well_profile(
+        tangent_field, tangent, output_path=unresolved_output, n_samples=257
+    )
+
+    assert unresolved_output.exists()
+    assert len(unresolved_axes[0, 0].lines) >= 3
+    assert any(
+        line.get_label() == "tangent candidate" for line in unresolved_axes[0, 0].lines
+    )
+    assert "TANGENT_OR_TRANSITION" in unresolved_axes[1, 2].texts[0].get_text()
+    plt.close(unresolved_figure)

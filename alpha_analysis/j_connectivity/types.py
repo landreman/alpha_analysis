@@ -70,7 +70,8 @@ class WellTrace:
     Coordinates and lifted ``zeta`` are in radians. ``action_length`` and
     ``bounce_time_length`` store the half-bounce ``A`` and ``K`` of §4.2 in
     length units; they are never the legacy normalized ``J``. Extrema kinds
-    are ``-1`` for maxima and ``+1`` for minima. Non-regular statuses retain
+    are ``-1`` for maxima and ``+1`` for minima; nearly tangent contacts are
+    recorded separately for §17.4 diagnostics. Non-regular statuses retain
     ``NaN`` rather than a plausible zero action.
     """
 
@@ -85,6 +86,8 @@ class WellTrace:
     extrema_zeta_unwrapped: FloatArray
     extrema_B: FloatArray
     extrema_kind: IntArray
+    tangent_zeta_unwrapped: FloatArray
+    tangent_B: FloatArray
     n_internal_maxima: int
     itinerary_hash: np.uint64
     B_residual_in: float
@@ -98,6 +101,8 @@ class WellTrace:
         extrema_zeta = np.asarray(self.extrema_zeta_unwrapped, dtype=np.float64)
         extrema_B = np.asarray(self.extrema_B, dtype=np.float64)
         extrema_kind = np.asarray(self.extrema_kind, dtype=np.int64)
+        tangent_zeta = np.asarray(self.tangent_zeta_unwrapped, dtype=np.float64)
+        tangent_B = np.asarray(self.tangent_B, dtype=np.float64)
         if q_in.shape != (3,) or not np.all(np.isfinite(q_in)):
             raise ValueError("q_in must be a finite reduced (s, theta, zeta) point")
         if q_out.shape != (3,):
@@ -110,6 +115,10 @@ class WellTrace:
             raise ValueError("extrema_kind entries must be -1 or +1")
         if not np.all(np.isfinite(extrema_zeta)) or not np.all(np.isfinite(extrema_B)):
             raise ValueError("extrema arrays must be finite")
+        if tangent_zeta.ndim != 1 or tangent_B.shape != tangent_zeta.shape:
+            raise ValueError("tangent positions and values must be equal-length arrays")
+        if not np.all(np.isfinite(tangent_zeta)) or not np.all(np.isfinite(tangent_B)):
+            raise ValueError("tangent candidate arrays must be finite")
         if self.field_period_count < 0:
             raise ValueError("field_period_count must be nonnegative")
         if self.n_internal_maxima != int(np.count_nonzero(extrema_kind == -1)):
@@ -135,6 +144,8 @@ class WellTrace:
             ("extrema_zeta_unwrapped", extrema_zeta),
             ("extrema_B", extrema_B),
             ("extrema_kind", extrema_kind),
+            ("tangent_zeta_unwrapped", tangent_zeta),
+            ("tangent_B", tangent_B),
         ):
             object.__setattr__(self, name, values)
         object.__setattr__(self, "itinerary_hash", np.uint64(self.itinerary_hash))

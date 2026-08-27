@@ -24,7 +24,8 @@ class WellTraceConfig:
     samples per field period and, when the
     field exposes Fourier mode numbers, at least
     ``samples_per_wavelength`` samples for the fastest retained mode along the
-    field line. ``extrema_tolerance`` is in field units per radian.
+    field line. ``extrema_tolerance`` is in field units per radian and
+    ``second_derivative_tolerance`` is in field units per radian squared.
     Quadrature absolute errors have the units of ``A`` and ``K`` respectively;
     ``quadrature_rtol`` is dimensionless.
     """
@@ -34,6 +35,7 @@ class WellTraceConfig:
     root_rtol: float = 1.0e-12
     root_atol_B: float = 1.0e-10
     extrema_tolerance: float = 1.0e-10
+    second_derivative_tolerance: float = 1.0e-10
     quadrature_rtol: float = 1.0e-10
     quadrature_atol: float = 1.0e-10
     samples_per_wavelength: int = 24
@@ -46,6 +48,7 @@ class WellTraceConfig:
             "root_rtol",
             "root_atol_B",
             "extrema_tolerance",
+            "second_derivative_tolerance",
             "quadrature_rtol",
             "quadrature_atol",
             "root_atol_zeta",
@@ -70,7 +73,9 @@ class WellProfile:
     Angles are radians. ``action_integrand`` and ``bounce_time_integrand``
     are per radian of unwrapped ``|zeta|``. Their cumulative counterparts use
     the endpoint-regularized coordinate and have the length units of ``A``
-    and ``K`` from DESIGN.md §4.2.
+    and ``K`` from DESIGN.md §4.2. ``theta_unwrapped`` starts from the
+    canonical reduced incoming angle, so its path is defined up to one global
+    integer multiple of ``2*pi``; relative winding is authoritative.
     """
 
     zeta_unwrapped: FloatArray
@@ -125,10 +130,16 @@ def _failed_trace(
     extrema_zeta: list[float] | None = None,
     extrema_B: list[float] | None = None,
     extrema_kind: list[int] | None = None,
+    tangent_zeta: list[float] | None = None,
+    tangent_B: list[float] | None = None,
 ) -> WellTrace:
     zeta = np.asarray(extrema_zeta if extrema_zeta is not None else [], dtype=float)
     values = np.asarray(extrema_B if extrema_B is not None else [], dtype=float)
     kinds = np.asarray(extrema_kind if extrema_kind is not None else [], dtype=np.int64)
+    tangent_positions = np.asarray(
+        tangent_zeta if tangent_zeta is not None else [], dtype=float
+    )
+    tangent_values = np.asarray(tangent_B if tangent_B is not None else [], dtype=float)
     return WellTrace(
         status=status,
         b=float(b),
@@ -141,6 +152,8 @@ def _failed_trace(
         extrema_zeta_unwrapped=zeta,
         extrema_B=values,
         extrema_kind=kinds,
+        tangent_zeta_unwrapped=tangent_positions,
+        tangent_B=tangent_values,
         n_internal_maxima=int(np.count_nonzero(kinds == -1)),
         itinerary_hash=np.uint64(0),
         B_residual_in=float(B_residual_in),
@@ -213,9 +226,20 @@ def _regularized_integrands(
             if radicand < -root_tolerance / abs(b):
                 raise _QuadratureDomainError("trace left the B < b well")
             if x < 0.5:
-                radicand = (-slope_in / b) * u
+                endpoint_distance = u
+                slope = -slope_in
             else:
-                radicand = (slope_out / b) * (u_out - u)
+                endpoint_distance = u_out - u
+                slope = slope_out
+            endpoint_tolerance = max(
+                100.0 * np.finfo(float).eps * u_out,
+                root_tolerance / slope,
+            )
+            if endpoint_distance > endpoint_tolerance:
+                raise _QuadratureDomainError(
+                    "nonpositive radicand away from an endpoint"
+                )
+            radicand = (slope / b) * endpoint_distance
         if radicand <= 0.0 or not np.isfinite(radicand):
             raise _QuadratureDomainError("invalid endpoint radicand")
         root = np.sqrt(radicand)
@@ -306,6 +330,8 @@ def trace_regular_well(
             b=b,
             q_in=q_reduced,
             B_residual_in=residual_in,
+            tangent_zeta=[zeta_in],
+            tangent_B=[B_in],
         )
     if slope_in > 0.0:
         return _failed_trace(
@@ -418,7 +444,7 @@ def trace_regular_well(
                     theta_ext, zeta_ext = coordinates(extremum)
                     B_ext = _scalar(field.B(s, theta_ext, zeta_ext))
                     second = _scalar(field.D2_B(s, theta_ext, zeta_ext))
-                    if abs(second) <= cfg.extrema_tolerance:
+                    if abs(second) <= cfg.second_derivative_tolerance:
                         return _failed_trace(
                             TraceStatus.DEGENERATE,
                             b=b,
@@ -440,6 +466,8 @@ def trace_regular_well(
                             extrema_zeta=extrema_zeta + [float(zeta_ext)],
                             extrema_B=extrema_values + [B_ext],
                             extrema_kind=extrema_kinds + [kind],
+                            tangent_zeta=[float(zeta_ext)],
+                            tangent_B=[B_ext],
                         )
                     if B_ext > b + cfg.root_atol_B:
                         return _failed_trace(
@@ -468,6 +496,8 @@ def trace_regular_well(
                         extrema_zeta=extrema_zeta,
                         extrema_B=extrema_values,
                         extrema_kind=extrema_kinds,
+                        tangent_zeta=[float(coordinates(crossing)[1])],
+                        tangent_B=[b + F(crossing)],
                     )
                 u_out = float(crossing)
                 slope_out = float(slope_candidate)
@@ -595,6 +625,8 @@ def trace_regular_well(
         extrema_zeta_unwrapped=extrema_zeta_array,
         extrema_B=extrema_B_array,
         extrema_kind=extrema_kind_array,
+        tangent_zeta_unwrapped=np.empty(0, dtype=float),
+        tangent_B=np.empty(0, dtype=float),
         n_internal_maxima=int(np.count_nonzero(extrema_kind_array == -1)),
         itinerary_hash=itinerary,
         B_residual_in=float(residual_in),
