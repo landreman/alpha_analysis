@@ -14,10 +14,11 @@ failures remain explicit and receive ``NaN`` actions (DESIGN.md §21.2).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 import numpy as np
+from scipy.integrate import quad
 from scipy.optimize import brentq
 
 from .critical_curves import CriticalCurveStatus, CriticalCurves, CriticalKind
@@ -32,15 +33,17 @@ class TransitionMappingConfig:
 
     Field and derivative tolerances use the field's units and radians.
     ``action_quadrature_order`` is the Gauss--Legendre order for each of the
-    direct ``A_W``, ``A_1``, and ``A_3`` evaluations. Increasing it is the
-    transition-action refinement dimension required by §§21.3 and 23.
+    fixed-order child-action evaluations. ``A_W`` is independently evaluated
+    by adaptive quadrature over ``[a,d]`` with the tangent point supplied as
+    an interior breakpoint. Increasing the fixed order is the transition-
+    action refinement dimension required by §§21.3 and 23.
     ``additivity_atol`` has action-length units and ``additivity_rtol`` is
     dimensionless.
     """
 
     samples_per_field_period: int = 64
     samples_per_wavelength: int = 24
-    max_field_periods: int = 16
+    max_field_periods: int = 128
     root_atol_B: float = 1.0e-10
     root_atol_zeta: float = 1.0e-12
     root_rtol: float = 1.0e-12
@@ -48,8 +51,11 @@ class TransitionMappingConfig:
     tangent_slope_tolerance: float = 1.0e-8
     D2_tolerance: float = 1.0e-10
     action_quadrature_order: int = 32
+    action_quadrature_atol: float = 1.0e-11
+    action_quadrature_rtol: float = 1.0e-11
     additivity_atol: float = 1.0e-8
     additivity_rtol: float = 1.0e-7
+    field_identity_tolerance: float = 1.0e-8
 
     def __post_init__(self) -> None:
         for name in (
@@ -67,8 +73,11 @@ class TransitionMappingConfig:
             "tangent_atol_B",
             "tangent_slope_tolerance",
             "D2_tolerance",
+            "action_quadrature_atol",
+            "action_quadrature_rtol",
             "additivity_atol",
             "additivity_rtol",
+            "field_identity_tolerance",
         ):
             value = getattr(self, name)
             if not np.isfinite(value) or value <= 0.0:
@@ -90,6 +99,7 @@ class TransitionPort:
     points: FloatArray
     zeta_unwrapped: FloatArray
     action_values: FloatArray
+    quadrature_error: FloatArray
     source_vertex_ids: IntArray
     sheet_id: int = -1
 
@@ -97,13 +107,16 @@ class TransitionPort:
         points = np.asarray(self.points, dtype=np.float64)
         zeta = np.asarray(self.zeta_unwrapped, dtype=np.float64)
         action = np.asarray(self.action_values, dtype=np.float64)
+        error = np.asarray(self.quadrature_error, dtype=np.float64)
         vertex_ids = np.asarray(self.source_vertex_ids, dtype=np.int64)
         if self.role not in {"parent", "child_1", "child_3", "generic"}:
             raise ValueError("unknown transition port role")
         if points.ndim != 2 or points.shape[1:] != (3,):
             raise ValueError("transition port points must have shape (n, 3)")
         n_samples = len(points)
-        if any(values.shape != (n_samples,) for values in (zeta, action, vertex_ids)):
+        if any(
+            values.shape != (n_samples,) for values in (zeta, action, error, vertex_ids)
+        ):
             raise ValueError("transition port arrays must share one sample axis")
         finite_rows = np.all(np.isfinite(points), axis=1)
         nan_rows = np.all(np.isnan(points), axis=1)
@@ -113,6 +126,7 @@ class TransitionPort:
             ("points", points),
             ("zeta_unwrapped", zeta),
             ("action_values", action),
+            ("quadrature_error", error),
             ("source_vertex_ids", vertex_ids),
         ):
             object.__setattr__(self, name, values)
@@ -139,6 +153,8 @@ class TransitionCurve:
     event_zeta_unwrapped: FloatArray
     additivity_residual: FloatArray
     status: TransitionStatus
+    source_critical_status: CriticalCurveStatus
+    controls: TransitionMappingConfig
 
     def __post_init__(self) -> None:
         u = np.asarray(self.u, dtype=np.float64)
@@ -167,6 +183,10 @@ class TransitionCurve:
             raise ValueError("transition curve coordinates must be finite")
         if not np.isfinite(self.total_u_length) or self.total_u_length < 0.0:
             raise ValueError("total_u_length must be finite and nonnegative")
+        if not isinstance(self.source_critical_status, CriticalCurveStatus):
+            raise ValueError("source_critical_status must be a CriticalCurveStatus")
+        if not isinstance(self.controls, TransitionMappingConfig):
+            raise ValueError("controls must be a TransitionMappingConfig")
         for name, values in (
             ("u", u),
             ("marginal_points", marginal),
@@ -190,6 +210,9 @@ class TransitionCurve:
                 view.lines = np.concatenate(([len(ids)], ids))
             view.point_data["u [logical arc length]"] = self.u[finite]
             view.point_data["action A [length]"] = port.action_values[finite]
+            view.point_data["action quadrature error [length]"] = port.quadrature_error[
+                finite
+            ]
             view.point_data["lifted zeta [rad]"] = port.zeta_unwrapped[finite]
             view.point_data["source vertex id [integer]"] = port.source_vertex_ids[
                 finite
@@ -266,6 +289,10 @@ def _directional_crossing(
     step = _scan_step(field, iota, period, config)
     cell_count = int(np.ceil(config.max_field_periods * period / step))
     left = 0.0
+    for candidate in step * np.geomspace(1.0e-10, 1.0, 33):
+        if value(float(candidate)) < -config.root_atol_B:
+            left = float(candidate)
+            break
     f_left = value(left)
     d_left = derivative(left)
     for cell_index in range(cell_count):
@@ -339,7 +366,7 @@ def _directional_crossing(
                 _, zeta = coordinates(root)
                 return _DirectionalTrace(TransitionStatus.REGULAR, root, zeta)
         left, f_left, d_left = right, f_right, d_right
-    return _DirectionalTrace(TransitionStatus.MATCH_FAILURE, np.nan, np.nan)
+    return _DirectionalTrace(TransitionStatus.MAX_PERIODS, np.nan, np.nan)
 
 
 def _action(
@@ -376,6 +403,54 @@ def _action(
     return float(np.dot(weights, integrand))
 
 
+def _adaptive_parent_action(
+    field: BoozerFieldLike,
+    *,
+    b: float,
+    s: float,
+    alpha: float,
+    sigma: float,
+    start_zeta: float,
+    distance: float,
+    tangent_distance: float,
+    config: TransitionMappingConfig,
+) -> tuple[float, float]:
+    """Independently evaluate ``A_W=A[a,d]`` (DESIGN.md §10.2 step 4)."""
+    if not 0.0 < tangent_distance < distance:
+        raise ValueError("the marginal point must be interior to the parent well")
+    iota = _scalar(field.iota(s))
+    C = abs(_scalar(field.G(s)) + iota * _scalar(field.I(s)))
+
+    def integrand(path_distance: float) -> float:
+        zeta = start_zeta + sigma * path_distance
+        theta = alpha + iota * zeta
+        B = _scalar(field.B(s, theta, zeta))
+        if not np.isfinite(B) or B <= 0.0 or not np.isfinite(C) or C == 0.0:
+            raise ValueError("field values on the parent action interval are invalid")
+        difference = b - B
+        if difference < -config.root_atol_B:
+            raise ValueError("parent action interval left the B<=b well")
+        difference = max(difference, 0.0)
+        return C / B * np.sqrt(difference / b)
+
+    result = quad(
+        integrand,
+        0.0,
+        distance,
+        points=[tangent_distance],
+        epsabs=config.action_quadrature_atol,
+        epsrel=config.action_quadrature_rtol,
+        limit=200,
+        full_output=1,
+    )
+    if len(result) > 3:
+        raise ValueError("parent action quadrature tolerance was not achieved")
+    value, error = result[:2]
+    if not np.all(np.isfinite([value, error])):
+        raise ValueError("parent action quadrature returned nonfinite data")
+    return float(value), float(error)
+
+
 def _failed_ports(
     marginal: FloatArray,
     source_ids: IntArray,
@@ -385,9 +460,9 @@ def _failed_ports(
     unknown = np.full(n_samples, -1, dtype=np.int64)
     unavailable = np.full_like(marginal, np.nan)
     return (
-        TransitionPort("parent", unavailable, nan, nan, unknown),
-        TransitionPort("child_1", unavailable, nan, nan, unknown),
-        TransitionPort("child_3", marginal, nan, nan, source_ids),
+        TransitionPort("parent", unavailable, nan, nan, nan, unknown),
+        TransitionPort("child_1", unavailable, nan, nan, nan, unknown),
+        TransitionPort("child_3", marginal, nan, nan, nan, source_ids),
     )
 
 
@@ -411,7 +486,12 @@ def _map_polyline(
     identity = np.column_stack((s_values, theta_m - iota_values * zeta_m))
     event_zeta = np.full((n_samples, 3), np.nan)
 
-    if critical.status is not CriticalCurveStatus.REGULAR:
+    point_kinds = critical.point_kind[source_ids]
+    segment_kinds = critical.segment_kind[np.asarray(polyline.segment_ids, dtype=int)]
+    polyline_is_regular = np.all(
+        point_kinds == CriticalKind.GAMMA_MAX.value
+    ) and np.all(segment_kinds == CriticalKind.GAMMA_MAX.value)
+    if not polyline_is_regular:
         return TransitionCurve(
             transition_id,
             critical.b,
@@ -423,12 +503,17 @@ def _map_polyline(
             event_zeta,
             np.full(n_samples, np.nan),
             TransitionStatus.UNRESOLVED,
+            critical.status,
+            config,
         )
 
     a_points = np.empty_like(marginal)
     parent_action = np.full(n_samples, np.nan)
     child_1_action = np.full(n_samples, np.nan)
     child_3_action = np.full(n_samples, np.nan)
+    parent_error = np.full(n_samples, np.nan)
+    child_1_error = np.full(n_samples, np.nan)
+    child_3_error = np.full(n_samples, np.nan)
     status = TransitionStatus.REGULAR
     for index in range(n_samples):
         s = float(s_values[index])
@@ -510,7 +595,7 @@ def _map_polyline(
                 order=config.action_quadrature_order,
                 root_tolerance=config.root_atol_B,
             )
-            parent_action[index] = _action(
+            child_1_refined = _action(
                 field,
                 b=critical.b,
                 s=s,
@@ -521,7 +606,7 @@ def _map_polyline(
                 order=2 * config.action_quadrature_order,
                 root_tolerance=config.root_atol_B,
             )
-            parent_action[index] += _action(
+            child_3_refined = _action(
                 field,
                 b=critical.b,
                 s=s,
@@ -531,6 +616,19 @@ def _map_polyline(
                 distance=forward.distance,
                 order=2 * config.action_quadrature_order,
                 root_tolerance=config.root_atol_B,
+            )
+            child_1_error[index] = abs(child_1_refined - child_1_action[index])
+            child_3_error[index] = abs(child_3_refined - child_3_action[index])
+            parent_action[index], parent_error[index] = _adaptive_parent_action(
+                field,
+                b=critical.b,
+                s=s,
+                alpha=alpha,
+                sigma=sigma,
+                start_zeta=zeta_a,
+                distance=backward.distance + forward.distance,
+                tangent_distance=backward.distance,
+                config=config,
             )
         except (ValueError, FloatingPointError):
             status = TransitionStatus.UNRESOLVED
@@ -548,6 +646,8 @@ def _map_polyline(
             event_zeta,
             np.full(n_samples, np.nan),
             status,
+            critical.status,
+            config,
         )
 
     residual = parent_action - child_1_action - child_3_action
@@ -556,10 +656,29 @@ def _map_polyline(
         status = TransitionStatus.UNRESOLVED
     unknown = np.full(n_samples, -1, dtype=np.int64)
     ports = (
-        TransitionPort("parent", a_points, event_zeta[:, 0], parent_action, unknown),
-        TransitionPort("child_1", a_points, event_zeta[:, 0], child_1_action, unknown),
         TransitionPort(
-            "child_3", marginal, event_zeta[:, 1], child_3_action, source_ids
+            "parent",
+            a_points,
+            event_zeta[:, 0],
+            parent_action,
+            parent_error,
+            unknown,
+        ),
+        TransitionPort(
+            "child_1",
+            a_points,
+            event_zeta[:, 0],
+            child_1_action,
+            child_1_error,
+            unknown,
+        ),
+        TransitionPort(
+            "child_3",
+            marginal,
+            event_zeta[:, 1],
+            child_3_action,
+            child_3_error,
+            source_ids,
         ),
     )
     return TransitionCurve(
@@ -573,6 +692,8 @@ def _map_polyline(
         event_zeta,
         residual,
         status,
+        critical.status,
+        config,
     )
 
 
@@ -595,7 +716,53 @@ def map_transitions(
         for polyline in critical.polylines
         if polyline.kind is CriticalKind.GAMMA_MAX
     ]
-    return tuple(
+    transitions = [
         _map_polyline(field, critical, polyline, index, cfg)
         for index, polyline in enumerate(maxima)
-    )
+    ]
+    duplicate_components: set[int] = set()
+    for first_index, first in enumerate(transitions):
+        if first.status is not TransitionStatus.REGULAR:
+            continue
+        first_T = next(port for port in first.ports if port.role == "parent")
+        for second_index in range(first_index + 1, len(transitions)):
+            second = transitions[second_index]
+            if second.status is not TransitionStatus.REGULAR:
+                continue
+            second_T = next(port for port in second.ports if port.role == "parent")
+            ds = np.abs(
+                first.field_line_identity[:, np.newaxis, 0]
+                - second.field_line_identity[np.newaxis, :, 0]
+            )
+            dalpha = (
+                first.field_line_identity[:, np.newaxis, 1]
+                - second.field_line_identity[np.newaxis, :, 1]
+            )
+            dalpha -= 2.0 * np.pi * np.round(dalpha / (2.0 * np.pi))
+            dzeta = (
+                first_T.zeta_unwrapped[:, np.newaxis]
+                - second_T.zeta_unwrapped[np.newaxis, :]
+            )
+            matches = (
+                (ds <= cfg.field_identity_tolerance)
+                & (np.abs(dalpha) <= cfg.field_identity_tolerance)
+                & (np.abs(dzeta) <= cfg.root_atol_zeta)
+            )
+            if np.count_nonzero(np.any(matches, axis=1)) >= 2:
+                duplicate_components.update((first_index, second_index))
+    for index in duplicate_components:
+        transition = transitions[index]
+        source_ids = next(
+            port.source_vertex_ids
+            for port in transition.ports
+            if port.role == "child_3"
+        )
+        transitions[index] = replace(
+            transition,
+            ports=_failed_ports(
+                transition.marginal_points, source_ids, len(transition.u)
+            ),
+            additivity_residual=np.full(len(transition.u), np.nan),
+            status=TransitionStatus.MULTIWAY,
+        )
+    return tuple(transitions)

@@ -502,8 +502,10 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
     axes = (geometry_axis, action_axis, residual_axis, profile_axis)
 
     by_role = {port.role: port for port in transition.ports}
-    companion = by_role["parent"].points
-    marginal = transition.marginal_points
+    companion = by_role["parent"].points.copy()
+    marginal = transition.marginal_points.copy()
+    companion[:, 2] = by_role["parent"].zeta_unwrapped
+    marginal[:, 2] = transition.event_zeta_unwrapped[:, 1]
     geometry_axis.plot(*companion.T, color="tab:blue", label=r"$T$")
     geometry_axis.plot(*marginal.T, color="tab:red", label=r"$\Gamma_{\max}$")
     for first, second in zip(companion, marginal):

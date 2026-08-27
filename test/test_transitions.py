@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
+from dataclasses import replace
 from scipy.integrate import quad
 from scipy.optimize import brentq
 
 from alpha_analysis.j_connectivity import (
     CriticalKind,
+    CriticalCurveStatus,
     SurfaceCurveMesh,
     SurfaceMesh,
     TransitionMappingConfig,
@@ -112,6 +114,7 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
     )[0]
 
     assert fine.status is TransitionStatus.REGULAR
+    assert fine.source_critical_status is CriticalCurveStatus.REGULAR
     assert len(fine.ports) == 3
     parent = _port(fine, "parent")
     child_1 = _port(fine, "child_1")
@@ -168,10 +171,20 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
     np.testing.assert_allclose(child_1.action_values, expected_child, rtol=2.0e-10)
     np.testing.assert_allclose(child_3.action_values, expected_child, rtol=2.0e-10)
     np.testing.assert_allclose(parent.action_values, 2.0 * expected_child, rtol=2.0e-8)
+    assert np.all(parent.quadrature_error < 1.0e-10)
+    assert np.all(child_1.quadrature_error >= 0.0)
+    assert np.all(child_3.quadrature_error >= 0.0)
     assert np.max(np.abs(fine.additivity_residual)) < 2.0e-8
     assert np.max(np.abs(fine.additivity_residual)) < 0.15 * np.max(
         np.abs(coarse.additivity_residual)
     )
+    underresolved = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(action_quadrature_order=2),
+    )[0]
+    assert underresolved.status is TransitionStatus.UNRESOLVED
+    assert np.max(np.abs(underresolved.additivity_residual)) > 0.1
 
     # The common PL arc-length parameter has an independently known circle
     # limit, and its error decreases when transition-curve sampling doubles.
@@ -260,7 +273,19 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
     assert output.exists()
     assert len(axes) == 4
     assert any(line.get_label() == r"$T$" for line in axes[0].lines)
+    connector_zeta = axes[0].lines[2].get_data_3d()[2]
+    assert np.ptp(connector_zeta) < np.pi
     plt.close(figure)
+
+    # A degenerate curve elsewhere does not erase a locally regular maximum
+    # polyline; the slice-global status remains attached as report metadata.
+    source_unresolved = map_transitions(
+        field,
+        replace(critical, status=CriticalCurveStatus.UNRESOLVED),
+        TransitionMappingConfig(action_quadrature_order=48),
+    )[0]
+    assert source_unresolved.status is TransitionStatus.REGULAR
+    assert source_unresolved.source_critical_status is CriticalCurveStatus.UNRESOLVED
 
 
 def test_equal_height_multiway_event_is_explicit_and_never_gets_actions():
@@ -276,3 +301,57 @@ def test_equal_height_multiway_event_is_explicit_and_never_gets_actions():
         for item in transitions
         for port in item.ports
     )
+
+    duplicate_components = map_transitions(
+        _field(),
+        _critical_circles(_field(), s=0.5, zeta_values=(0.0, 0.0)),
+    )
+    assert len(duplicate_components) == 2
+    assert all(
+        item.status is TransitionStatus.MULTIWAY for item in duplicate_components
+    )
+
+
+def test_transition_trace_cap_has_a_distinct_explicit_status():
+    # Along each lifted line B=2-cos(theta), theta=alpha+0.2*zeta. Starting
+    # from the global maximum B=b=3, the next equal-height contact is five
+    # field periods away, beyond this deliberately one-period cap.
+    field = SyntheticFourierField(
+        nfp=1,
+        m=np.array([0, 1]),
+        n=np.array([0, 0]),
+        cosine_coefficients=np.array([[2.0], [-1.0]]),
+        sine_coefficients=np.zeros((2, 1)),
+        iota_coefficients=np.array([0.2]),
+        G_coefficients=np.array([3.0]),
+        I_coefficients=np.array([0.0]),
+    )
+    zeta = np.linspace(0.0, 2.0 * np.pi, 8, endpoint=False)
+    points = np.column_stack(
+        (
+            np.full(len(zeta), -np.sqrt(0.5)),
+            np.zeros(len(zeta)),
+            zeta,
+        )
+    )
+    ids = np.arange(len(points))
+    curve = SurfaceCurveMesh(
+        period=2.0 * np.pi,
+        points=points,
+        segments=np.column_stack((ids, np.roll(ids, -1))),
+        B=np.full(len(points), 3.0),
+        g=np.zeros(len(points)),
+        boundary_tags=np.full(len(points), SurfaceMesh.G_ZERO, dtype=np.int64),
+    )
+    critical = extract_critical_curves(curve, field, b=3.0)
+
+    transitions = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(max_field_periods=1),
+    )
+
+    assert len(transitions) == 1
+    assert transitions[0].status is TransitionStatus.MAX_PERIODS
+    assert transitions[0].controls.max_field_periods == 1
+    assert all(np.isnan(port.action_values).all() for port in transitions[0].ports)
