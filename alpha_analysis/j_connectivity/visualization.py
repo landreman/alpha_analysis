@@ -7,6 +7,65 @@ import numpy as np
 from .denominator import DenominatorConvergence, GlobalBBounds
 
 
+def plot_critical_curves(curves, *, output_path=None):
+    """Plot classified marginal polylines from DESIGN.md §§17.3 and 23.
+
+    Gamma-min, gamma-max, and degenerate portions are visually distinct, and
+    an unresolved result is called out in the title rather than hidden.
+    """
+    import matplotlib.pyplot as plt
+
+    from .critical_curves import CriticalKind
+
+    figure = plt.figure(figsize=(7, 6), constrained_layout=True)
+    axis = figure.add_subplot(111, projection="3d")
+    styles = {
+        CriticalKind.GAMMA_MIN: ("tab:blue", r"$\Gamma_{\min}$"),
+        CriticalKind.GAMMA_MAX: ("tab:red", r"$\Gamma_{\max}$"),
+        CriticalKind.DEGENERATE: ("tab:orange", "degenerate / unresolved"),
+    }
+    used_labels: set[CriticalKind] = set()
+    for polyline in curves.polylines:
+        points = curves.points[polyline.vertex_ids]
+        if polyline.closed:
+            closing = points[:1].copy()
+            closing[0, 2] += curves.period * np.round(
+                (points[-1, 2] - closing[0, 2]) / curves.period
+            )
+            points = np.vstack((points, closing))
+        color, label = styles[polyline.kind]
+        axis.plot(
+            points[:, 0],
+            points[:, 1],
+            points[:, 2],
+            color=color,
+            linewidth=2.0,
+            label=label if polyline.kind not in used_labels else None,
+        )
+        used_labels.add(polyline.kind)
+    degenerate = curves.point_kind == CriticalKind.DEGENERATE
+    if np.any(degenerate):
+        points = curves.points[degenerate]
+        axis.scatter(
+            points[:, 0],
+            points[:, 1],
+            points[:, 2],
+            color="black",
+            marker="x",
+            s=36,
+            label="degenerate point",
+        )
+    axis.set_xlabel("x")
+    axis.set_ylabel("y")
+    axis.set_zlabel(r"$\zeta$ [rad]")
+    axis.set_title(f"Critical curves: {curves.status.name}")
+    if curves.polylines or np.any(degenerate):
+        axis.legend(fontsize="small")
+    if output_path is not None:
+        figure.savefig(output_path, dpi=160)
+    return figure, axis
+
+
 def plot_well_profile(field, trace, *, output_path=None, n_samples=513):
     """Plot and optionally save the selected-well diagnostic from §17.4.
 

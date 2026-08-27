@@ -18,6 +18,16 @@ from .background_mesh import (
     tetrahedron_quality,
 )
 from .config import ConnectivityConfig
+from .critical_curves import (
+    CriticalCurveConfig,
+    CriticalCurveError,
+    CriticalCurveReport,
+    CriticalCurveStatus,
+    CriticalCurves,
+    CriticalKind,
+    CriticalPolyline,
+    extract_critical_curves,
+)
 from .denominator import (
     BoundsConfig,
     DenominatorConfig,
@@ -81,6 +91,13 @@ __all__ = [
     "BackgroundMesh",
     "BackgroundMeshConfig",
     "ConnectivityConfig",
+    "CriticalCurveConfig",
+    "CriticalCurveError",
+    "CriticalCurveReport",
+    "CriticalCurveStatus",
+    "CriticalCurves",
+    "CriticalKind",
+    "CriticalPolyline",
     "BoundsConfig",
     "BoozerFieldLike",
     "DenominatorConfig",
@@ -122,6 +139,7 @@ __all__ = [
     "compute_denominator",
     "downsample_surface",
     "evaluate_surface_data",
+    "extract_critical_curves",
     "denominator_convergence",
     "find_global_B_bounds",
     "itineraries_are_continuous",
