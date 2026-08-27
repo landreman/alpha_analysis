@@ -121,6 +121,21 @@ def _mode_frequency(field: BoozerFieldLike, iota: float) -> float:
     return float(np.max(np.abs(m_array * iota - n_array)))
 
 
+def _scan_step(
+    field: BoozerFieldLike,
+    iota: float,
+    period: float,
+    samples_per_field_period: int,
+    samples_per_wavelength: int,
+) -> float:
+    """Return the Fourier-aware §9.2 scan spacing in radians."""
+    step = period / samples_per_field_period
+    maximum_frequency = _mode_frequency(field, iota)
+    if maximum_frequency > 0.0:
+        step = min(step, 2.0 * np.pi / (samples_per_wavelength * maximum_frequency))
+    return float(step)
+
+
 def _failed_trace(
     status: TraceStatus,
     *,
@@ -202,6 +217,9 @@ def _regularized_integrands(
     u_out: float,
     slope_in: float,
     slope_out: float,
+    residual_in: float,
+    residual_out: float,
+    endpoint_window: float,
     root_tolerance: float,
 ):
     """Build the sine-squared endpoint map for the §4.2 ``A`` and ``K``."""
@@ -210,14 +228,14 @@ def _regularized_integrands(
     limit_out = np.pi * C_abs * np.sqrt(u_out / (b * slope_out))
 
     def endpoint_field_difference(x: float, u: float) -> float:
-        """Evaluate ``b-B`` near an endpoint without subtracting close fields."""
+        """Evaluate ``b-B`` within one resolved scan cell of an endpoint."""
         if x < 0.5:
-            lo, hi, orientation = 0.0, u, -1.0
+            lo, hi, orientation, residual = 0.0, u, -1.0, residual_in
         else:
-            lo, hi, orientation = u, u_out, 1.0
+            lo, hi, orientation, residual = u, u_out, 1.0, residual_out
         half_width = 0.5 * (hi - lo)
         if half_width <= 0.0:
-            return 0.0
+            return float(-residual)
         points = half_width * _ENDPOINT_GAUSS_NODES + 0.5 * (hi + lo)
         zeta = zeta_in + sigma * points
         theta = theta_in + iota * (zeta - zeta_in)
@@ -229,7 +247,8 @@ def _regularized_integrands(
                 "D_B must remain finite and preserve coordinate shape"
             )
         return float(
-            orientation
+            -residual
+            + orientation
             * half_width
             * np.dot(_ENDPOINT_GAUSS_WEIGHTS, derivative_values)
         )
@@ -255,7 +274,11 @@ def _regularized_integrands(
         cancellation_scale = np.cbrt(np.finfo(float).eps) * max(
             abs(b), abs(B_value), 1.0
         )
-        if abs(field_difference) <= cancellation_scale:
+        endpoint_distance = u if x < 0.5 else u_out - u
+        if (
+            endpoint_distance <= endpoint_window
+            and abs(field_difference) <= cancellation_scale
+        ):
             field_difference = endpoint_field_difference(x, u)
         radicand = field_difference / b
         if radicand <= 0.0:
@@ -381,13 +404,13 @@ def trace_regular_well(
             B_residual_in=residual_in,
         )
 
-    maximum_frequency = _mode_frequency(field, iota)
-    step = period / cfg.samples_per_field_period
-    if maximum_frequency > 0.0:
-        step = min(
-            step,
-            2.0 * np.pi / (cfg.samples_per_wavelength * maximum_frequency),
-        )
+    step = _scan_step(
+        field,
+        iota,
+        period,
+        cfg.samples_per_field_period,
+        cfg.samples_per_wavelength,
+    )
     steps_per_period = int(np.ceil(period / step))
 
     extrema_zeta: list[float] = []
@@ -616,6 +639,9 @@ def trace_regular_well(
         u_out=u_out,
         slope_in=slope_in,
         slope_out=slope_out,
+        residual_in=residual_in,
+        residual_out=residual_out,
+        endpoint_window=step,
         root_tolerance=cfg.root_atol_B,
     )
     try:
@@ -637,6 +663,10 @@ def trace_regular_well(
             limit=200,
             full_output=1,
         )
+        if len(action_result) > 3 or len(bounce_time_result) > 3:
+            raise _QuadratureDomainError(
+                "requested quadrature tolerance was not achieved"
+            )
         action, error_A = action_result[:2]
         bounce_time, error_K = bounce_time_result[:2]
     except (_QuadratureDomainError, ValueError, FloatingPointError):
@@ -755,6 +785,9 @@ def sample_well_profile(
         u_out=u_out,
         slope_in=slope_in,
         slope_out=slope_out,
+        residual_in=trace.B_residual_in,
+        residual_out=trace.B_residual_out,
+        endpoint_window=_scan_step(field, iota, period, 64, 24),
         root_tolerance=max(abs(trace.B_residual_in), abs(trace.B_residual_out), 1e-12),
     )
     x = np.linspace(0.0, 1.0, n_samples)

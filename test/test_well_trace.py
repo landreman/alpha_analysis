@@ -279,6 +279,50 @@ def test_shallow_wells_narrower_than_one_scan_cell_remain_regular():
         )
 
 
+def test_underresolved_scan_cannot_walk_past_a_hidden_first_exit():
+    mode = 32
+    phase = 0.125 * np.pi
+    amplitude = 0.5
+    cosine_phase = np.cos(phase)
+    sine_phase = np.sin(phase)
+    field = _fourier_field(
+        nfp=1,
+        m=[0, 0, 0, 0, 0],
+        n=[0, 1, mode, mode - 1, mode + 1],
+        cosine=[
+            2.0,
+            0.0,
+            amplitude * cosine_phase,
+            -0.5 * amplitude * cosine_phase,
+            -0.5 * amplitude * cosine_phase,
+        ],
+        sine=[
+            0.0,
+            0.2,
+            amplitude * sine_phase,
+            -0.5 * amplitude * sine_phase,
+            -0.5 * amplitude * sine_phase,
+        ],
+    )
+
+    class ModeBlindField:
+        nfp = field.nfp
+
+        def __getattr__(self, name):
+            if name in {"m", "n", "xm", "xn"}:
+                raise AttributeError(name)
+            return getattr(field, name)
+
+    q_in = np.array([0.4, 0.7, 0.0])
+    resolved = trace_regular_well(field, 2.0, q_in)
+    under_resolved = trace_regular_well(ModeBlindField(), 2.0, q_in)
+
+    assert resolved.status is TraceStatus.REGULAR
+    assert under_resolved.status is TraceStatus.ROOT_FAILURE
+    assert np.isnan(under_resolved.action_length)
+    assert np.isnan(under_resolved.bounce_time_length)
+
+
 def test_entry_and_in_trace_tangent_contacts_are_not_regular_wells():
     entry = trace_regular_well(_simple_well(), b=3.0, q_in=np.array([0.4, 0.7, np.pi]))
 
@@ -349,6 +393,91 @@ def test_selected_W7X_well_agrees_with_legacy_compute_J_invariant():
         [legacy["theta_right"] % (2.0 * np.pi), legacy["phi_right"]],
         atol=2e-9,
     )
+
+
+def test_W7X_near_threshold_internal_maximum_has_honest_quadrature():
+    path = os.path.join(
+        DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
+    )
+    field = BoozerField.from_boozmn(path)
+    b = 2.743049654230
+    q_in = np.array([0.5, 5.457232542581316, 0.3071391502993066])
+    trace = trace_regular_well(field, b, q_in)
+
+    assert trace.status is TraceStatus.REGULAR
+    assert trace.n_internal_maxima == 1
+    assert 0.0 < b - trace.extrema_B[1] < 2.0e-7
+
+    s, theta_in, zeta_in = q_in
+    iota = float(field.iota(s))
+    C = abs(float(field.G(s)) + iota * float(field.I(s)))
+    sigma = np.sign(float(field.G(s)) + iota * float(field.I(s)))
+    u_out = sigma * (trace.zeta_out_unwrapped - zeta_in)
+    theta_out = theta_in + iota * (trace.zeta_out_unwrapped - zeta_in)
+    slope_in = sigma * float(field.D_B(s, theta_in, zeta_in))
+    slope_out = sigma * float(field.D_B(s, theta_out, trace.zeta_out_unwrapped))
+    curvature_in = float(field.D2_B(s, theta_in, zeta_in))
+    curvature_out = float(field.D2_B(s, theta_out, trace.zeta_out_unwrapped))
+
+    def independent_pair(x):
+        u = u_out * np.sin(0.5 * np.pi * x) ** 2
+        jacobian = 0.5 * np.pi * u_out * np.sin(np.pi * x)
+        zeta = zeta_in + sigma * u
+        theta = theta_in + iota * (zeta - zeta_in)
+        B_value = float(field.B(s, theta, zeta))
+        field_difference = b - B_value
+        if x < 1.0e-4:
+            field_difference = (
+                -trace.B_residual_in - slope_in * u - 0.5 * curvature_in * u**2
+            )
+        elif x > 1.0 - 1.0e-4:
+            distance = u_out - u
+            field_difference = (
+                -trace.B_residual_out
+                + slope_out * distance
+                - 0.5 * curvature_out * distance**2
+            )
+        root = np.sqrt(field_difference / b)
+        common = C * jacobian / B_value
+        return common * root, common / root
+
+    relative_extrema = sigma * (trace.extrema_zeta_unwrapped - zeta_in) / u_out
+    extrema_x = 2.0 / np.pi * np.arcsin(np.sqrt(relative_extrema))
+    expected_A = quad(
+        lambda x: independent_pair(x)[0],
+        0.0,
+        1.0,
+        points=extrema_x,
+        epsabs=1.0e-8,
+        epsrel=1.0e-8,
+        limit=500,
+    )[0]
+    expected_K = quad(
+        lambda x: independent_pair(x)[1],
+        0.0,
+        1.0,
+        points=extrema_x,
+        epsabs=1.0e-8,
+        epsrel=1.0e-8,
+        limit=500,
+    )[0]
+
+    np.testing.assert_allclose(trace.action_length, expected_A, rtol=2.0e-7)
+    np.testing.assert_allclose(trace.bounce_time_length, expected_K, rtol=2.0e-8)
+
+
+def test_unattainable_quadrature_tolerance_is_an_explicit_failure():
+    root = 2.0 * np.pi / 3.0
+    trace = trace_regular_well(
+        _simple_well(),
+        2.5,
+        np.array([0.4, 0.7, -root]),
+        config=WellTraceConfig(quadrature_atol=1.0e-18, quadrature_rtol=1.0e-18),
+    )
+
+    assert trace.status is TraceStatus.QUADRATURE_FAILURE
+    assert np.isnan(trace.action_length)
+    assert np.isnan(trace.bounce_time_length)
 
 
 def test_well_profile_plot_writes_the_required_static_diagnostic(tmp_path):
