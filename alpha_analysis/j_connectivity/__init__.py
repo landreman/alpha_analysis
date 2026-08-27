@@ -49,6 +49,13 @@ from .types import (
     SurfaceStatus,
     TraceStatus,
     TransitionStatus,
+    WellTrace,
+)
+from .well_trace import (
+    WellProfile,
+    WellTraceConfig,
+    sample_well_profile,
+    trace_regular_well,
 )
 
 __all__ = [
@@ -78,6 +85,9 @@ __all__ = [
     "SurfaceStatus",
     "TraceStatus",
     "TransitionStatus",
+    "WellTrace",
+    "WellTraceConfig",
+    "WellProfile",
     "UniformSourceProfile",
     "compute_denominator",
     "denominator_convergence",
@@ -86,6 +96,8 @@ __all__ = [
     "signed_tetrahedron_volumes",
     "surface_flux",
     "tetrahedron_quality",
+    "sample_well_profile",
+    "trace_regular_well",
 ]
 
 

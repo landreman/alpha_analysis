@@ -7,6 +7,141 @@ import numpy as np
 from .denominator import DenominatorConvergence, GlobalBBounds
 
 
+def plot_well_profile(field, trace, *, output_path=None, n_samples=513):
+    """Plot and optionally save the selected-well diagnostic from §17.4.
+
+    Coordinates are in radians; ``A`` and ``K`` use the length units of the
+    field's Boozer current profiles. Entry, exit, classified extrema, both
+    integrands and cumulative quadratures, reduced and unwrapped paths, root
+    residuals, period count, error estimates, and explicit status are shown.
+    """
+    import matplotlib.pyplot as plt
+
+    from .well_trace import sample_well_profile
+
+    figure, axes = plt.subplots(2, 3, figsize=(14, 8), constrained_layout=True)
+    if trace.status.name != "REGULAR":
+        for axis in axes.ravel():
+            axis.axis("off")
+        axes[0, 1].set_facecolor("mistyrose")
+        axes[0, 1].text(
+            0.5,
+            0.5,
+            "\n".join(
+                (
+                    f"UNRESOLVED WELL TRACE: {trace.status.name}",
+                    f"b: {trace.b:.10g}",
+                    f"field periods scanned: {trace.field_period_count}",
+                    f"B residual in: {trace.B_residual_in:.3e}",
+                )
+            ),
+            color="darkred",
+            ha="center",
+            va="center",
+            weight="bold",
+        )
+        figure.suptitle("Well first-return diagnostic: unresolved")
+        if output_path is not None:
+            figure.savefig(output_path, dpi=160)
+        return figure, axes
+
+    profile = sample_well_profile(field, trace, n_samples=n_samples)
+    period = 2.0 * np.pi / field.nfp
+
+    field_axis = axes[0, 0]
+    field_axis.plot(profile.zeta_unwrapped, profile.B, label=r"$B(\zeta)$")
+    field_axis.axhline(trace.b, color="black", linestyle="--", label=r"$b$")
+    field_axis.plot(
+        profile.zeta_unwrapped[[0, -1]],
+        profile.B[[0, -1]],
+        "o",
+        color="tab:red",
+        label="entry / exit",
+    )
+    for kind, marker, label in ((1, "v", "minimum"), (-1, "^", "maximum")):
+        mask = trace.extrema_kind == kind
+        if np.any(mask):
+            field_axis.plot(
+                trace.extrema_zeta_unwrapped[mask],
+                trace.extrema_B[mask],
+                marker,
+                linestyle="none",
+                label=label,
+            )
+    field_axis.set_xlabel(r"unwrapped $\zeta$ [rad]")
+    field_axis.set_ylabel(r"$B$")
+    field_axis.legend(fontsize="small")
+    field_axis.grid(True)
+
+    integrand_axis = axes[0, 1]
+    integrand_axis.plot(
+        profile.zeta_unwrapped,
+        profile.action_integrand,
+        label=r"$dA/d|\zeta|$",
+    )
+    finite_K = np.where(
+        np.isfinite(profile.bounce_time_integrand),
+        profile.bounce_time_integrand,
+        np.nan,
+    )
+    integrand_axis.plot(profile.zeta_unwrapped, finite_K, label=r"$dK/d|\zeta|$")
+    integrand_axis.set_xlabel(r"unwrapped $\zeta$ [rad]")
+    integrand_axis.set_ylabel("integrand")
+    integrand_axis.legend(fontsize="small")
+    integrand_axis.grid(True)
+
+    cumulative_axis = axes[0, 2]
+    cumulative_axis.plot(profile.zeta_unwrapped, profile.cumulative_A, label=r"$A$")
+    cumulative_axis.plot(profile.zeta_unwrapped, profile.cumulative_K, label=r"$K$")
+    cumulative_axis.set_xlabel(r"unwrapped $\zeta$ [rad]")
+    cumulative_axis.set_ylabel("cumulative length")
+    cumulative_axis.legend(fontsize="small")
+    cumulative_axis.grid(True)
+
+    reduced_axis = axes[1, 0]
+    reduced_axis.plot(
+        np.mod(profile.zeta_unwrapped, period),
+        np.mod(profile.theta_unwrapped, 2.0 * np.pi),
+    )
+    reduced_axis.set_xlabel(r"$\zeta\ \mathrm{mod}\ L_\zeta$ [rad]")
+    reduced_axis.set_ylabel(r"$\theta\ \mathrm{mod}\ 2\pi$ [rad]")
+    reduced_axis.grid(True)
+
+    unwrapped_axis = axes[1, 1]
+    unwrapped_axis.plot(profile.zeta_unwrapped, profile.theta_unwrapped)
+    unwrapped_axis.set_xlabel(r"unwrapped $\zeta$ [rad]")
+    unwrapped_axis.set_ylabel(r"unwrapped $\theta$ [rad]")
+    unwrapped_axis.grid(True)
+
+    status_axis = axes[1, 2]
+    status_axis.axis("off")
+    status_axis.text(
+        0.0,
+        1.0,
+        "\n".join(
+            (
+                f"status: {trace.status.name}",
+                f"b: {trace.b:.10g}",
+                f"field periods: {trace.field_period_count}",
+                f"B residual in: {trace.B_residual_in:.3e}",
+                f"B residual out: {trace.B_residual_out:.3e}",
+                f"A: {trace.action_length:.10g}",
+                f"K: {trace.bounce_time_length:.10g}",
+                f"A error estimate: {trace.quadrature_error_A:.3e}",
+                f"K error estimate: {trace.quadrature_error_K:.3e}",
+                f"internal maxima: {trace.n_internal_maxima}",
+                f"itinerary: {int(trace.itinerary_hash):016x}",
+            )
+        ),
+        va="top",
+        family="monospace",
+    )
+    figure.suptitle("Regular well first-return diagnostic")
+    if output_path is not None:
+        figure.savefig(output_path, dpi=160)
+    return figure, axes
+
+
 def plot_background_mesh(mesh):
     """Plot wireframe, periodic seam pairs, and quality (DESIGN.md §17.2)."""
     import matplotlib.pyplot as plt

@@ -1,0 +1,237 @@
+"""Physics tests for the regular first-return well tracer (DESIGN.md §§9, 20.2)."""
+
+from __future__ import annotations
+
+import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.integrate import quad
+
+from alpha_analysis import (
+    DATA_DIR,
+    BoozerField,
+    BoozerSurface,
+    compute_J_invariant,
+)
+from alpha_analysis.j_connectivity import (
+    TraceStatus,
+    WellTraceConfig,
+    sample_well_profile,
+    trace_regular_well,
+)
+from alpha_analysis.j_connectivity.synthetic_fields import SyntheticFourierField
+from alpha_analysis.j_connectivity.visualization import plot_well_profile
+
+
+def _fourier_field(
+    *,
+    nfp: int,
+    m: list[int],
+    n: list[int],
+    cosine: list[float],
+    iota: float = 0.0,
+    C: float = 3.0,
+) -> SyntheticFourierField:
+    """Return a radially constant analytic field with signed ``G+iota I=C``."""
+    return SyntheticFourierField(
+        nfp=nfp,
+        m=np.asarray(m),
+        n=np.asarray(n),
+        cosine_coefficients=np.asarray(cosine)[:, np.newaxis],
+        sine_coefficients=np.zeros((len(m), 1)),
+        iota_coefficients=np.array([iota]),
+        G_coefficients=np.array([C]),
+        I_coefficients=np.array([0.0]),
+    )
+
+
+def _simple_well(C: float = 3.0) -> SyntheticFourierField:
+    # B(zeta) = 2 - cos(zeta), with b=2.5 roots at +/- 2*pi/3.
+    return _fourier_field(nfp=1, m=[0, 0], n=[0, 1], cosine=[2.0, -1.0], C=C)
+
+
+def test_regular_trace_obeys_first_return_invariants_and_independent_A_K():
+    field = _simple_well()
+    b = 2.5
+    root = 2.0 * np.pi / 3.0
+    trace = trace_regular_well(field, b, np.array([0.4, 0.7, -root]))
+
+    assert trace.status is TraceStatus.REGULAR
+    np.testing.assert_allclose(trace.zeta_out_unwrapped, root, atol=2e-11)
+    np.testing.assert_allclose(trace.q_out_reduced, [0.4, 0.7, root], atol=2e-11)
+    assert abs(trace.B_residual_in) < 1e-12
+    assert abs(trace.B_residual_out) < 1e-10
+    np.testing.assert_array_equal(trace.extrema_kind, [1])
+    np.testing.assert_allclose(trace.extrema_zeta_unwrapped, [0.0], atol=2e-11)
+    np.testing.assert_allclose(trace.extrema_B, [1.0], atol=2e-11)
+    assert trace.n_internal_maxima == 0
+
+    def B(zeta):
+        return 2.0 - np.cos(zeta)
+
+    expected_A = quad(
+        lambda zeta: 3.0 / B(zeta) * np.sqrt(1.0 - B(zeta) / b),
+        -root,
+        root,
+        epsabs=2e-12,
+        epsrel=2e-12,
+    )[0]
+    expected_K = quad(
+        lambda zeta: 3.0 / (B(zeta) * np.sqrt(1.0 - B(zeta) / b)),
+        -root,
+        root,
+        epsabs=2e-11,
+        epsrel=2e-11,
+    )[0]
+    np.testing.assert_allclose(trace.action_length, expected_A, rtol=2e-10)
+    np.testing.assert_allclose(trace.bounce_time_length, expected_K, rtol=2e-10)
+    assert trace.quadrature_error_A < 1e-9
+    assert trace.quadrature_error_K < 1e-8
+
+    profile = sample_well_profile(field, trace, n_samples=513)
+    assert np.all(profile.B[1:-1] < b)
+    np.testing.assert_allclose(profile.zeta_unwrapped[[0, -1]], [-root, root])
+    np.testing.assert_allclose(
+        [profile.cumulative_A[-1], profile.cumulative_K[-1]],
+        [trace.action_length, trace.bounce_time_length],
+        rtol=2e-4,
+    )
+
+
+def test_physical_field_direction_uses_sign_of_G_plus_iota_I():
+    b = 2.5
+    root = 2.0 * np.pi / 3.0
+    positive = trace_regular_well(_simple_well(C=3.0), b, np.array([0.4, 0.7, -root]))
+    negative = trace_regular_well(_simple_well(C=-3.0), b, np.array([0.4, 0.7, root]))
+
+    assert negative.status is TraceStatus.REGULAR
+    np.testing.assert_allclose(negative.zeta_out_unwrapped, -root, atol=2e-11)
+    np.testing.assert_allclose(
+        [negative.action_length, negative.bounce_time_length],
+        [positive.action_length, positive.bounce_time_length],
+        rtol=2e-11,
+    )
+
+
+def test_internal_extrema_and_itinerary_survive_a_periodic_shift():
+    # B = 2 - cos(zeta) + 0.4 cos(2 zeta).  The b=2 well has two
+    # minima separated by one sub-threshold internal maximum.
+    field = _fourier_field(
+        nfp=1,
+        m=[0, 0, 0],
+        n=[0, 1, 2],
+        cosine=[2.0, -1.0, 0.4],
+    )
+    crossing_cosine = (1.0 - np.sqrt(2.28)) / 1.6
+    root = np.arccos(crossing_cosine)
+    q_in = np.array([0.6, 1.2, -root])
+    trace = trace_regular_well(field, 2.0, q_in)
+    shifted = trace_regular_well(field, 2.0, q_in + [0.0, 0.0, 4.0 * np.pi])
+
+    critical = np.arccos(0.625)
+    assert trace.status is shifted.status is TraceStatus.REGULAR
+    np.testing.assert_array_equal(trace.extrema_kind, [1, -1, 1])
+    np.testing.assert_allclose(
+        trace.extrema_zeta_unwrapped, [-critical, 0.0, critical], atol=2e-11
+    )
+    np.testing.assert_allclose(trace.extrema_B, [1.2875, 1.4, 1.2875], atol=2e-11)
+    assert trace.n_internal_maxima == 1
+    assert shifted.itinerary_hash == trace.itinerary_hash
+    np.testing.assert_allclose(
+        [shifted.action_length, shifted.bounce_time_length],
+        [trace.action_length, trace.bounce_time_length],
+        rtol=2e-11,
+    )
+    np.testing.assert_allclose(shifted.q_out_reduced, trace.q_out_reduced, atol=2e-11)
+    shifted_profile = sample_well_profile(field, shifted, n_samples=129)
+    np.testing.assert_allclose(
+        shifted_profile.zeta_unwrapped[[0, -1]],
+        [-root + 4.0 * np.pi, root + 4.0 * np.pi],
+        atol=2e-11,
+    )
+
+
+def test_long_well_preserves_period_count_and_cap_is_unresolved():
+    # Along the line, B = 2 - cos(theta), theta = -pi/2 + 0.2 zeta.
+    # The first exit is 5*pi away: ten nfp=4 field periods.
+    field = _fourier_field(
+        nfp=4, m=[0, 1], n=[0, 0], cosine=[2.0, -1.0], iota=0.2, C=1.0
+    )
+    q_in = np.array([0.5, -0.5 * np.pi, 0.0])
+    trace = trace_regular_well(field, 2.0, q_in)
+
+    assert trace.status is TraceStatus.REGULAR
+    assert trace.field_period_count == 10
+    np.testing.assert_allclose(trace.zeta_out_unwrapped, 5.0 * np.pi, atol=2e-10)
+    np.testing.assert_allclose(trace.q_out_reduced, [0.5, 0.5 * np.pi, 0.0], atol=2e-10)
+
+    capped = trace_regular_well(
+        field, b=2.0, q_in=q_in, config=WellTraceConfig(max_field_periods=4)
+    )
+    assert capped.status is TraceStatus.MAX_PERIODS
+    assert capped.field_period_count == 4
+    assert np.isnan(capped.action_length)
+    assert np.isnan(capped.bounce_time_length)
+    assert np.isnan(capped.B_residual_out)
+
+
+def test_tangent_input_is_not_misreported_as_a_regular_well():
+    trace = trace_regular_well(_simple_well(), b=3.0, q_in=np.array([0.4, 0.7, np.pi]))
+
+    assert trace.status is TraceStatus.TANGENT_OR_TRANSITION
+    assert np.isnan(trace.action_length)
+    assert np.isnan(trace.bounce_time_length)
+
+
+def test_selected_W7X_well_agrees_with_legacy_compute_J_invariant():
+    path = os.path.join(
+        DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
+    )
+    field = BoozerField.from_boozmn(path)
+    s = 0.5
+    surface = BoozerSurface(field, s)
+    b_min, b_max = field.get_min_max()
+    b = b_min + 0.3 * (b_max - b_min)
+    zeta_center = np.pi / field.nfp
+    theta_center = 0.5 * np.pi + surface.iota * zeta_center
+    legacy = compute_J_invariant(
+        surface,
+        b,
+        theta_center,
+        zeta_center,
+        n_phi=1001,
+        phi_margin=5.0,
+        refine=True,
+    )
+    trace = trace_regular_well(
+        field,
+        b,
+        np.array([s, legacy["theta_left"], legacy["phi_left"]]),
+    )
+
+    assert trace.status is TraceStatus.REGULAR
+    legacy_length_scale = field.R00 * 2.0 * np.pi / field.nfp
+    np.testing.assert_allclose(
+        trace.action_length / legacy_length_scale, legacy["J"], rtol=2e-8
+    )
+    np.testing.assert_allclose(
+        trace.q_out_reduced[1:],
+        [legacy["theta_right"] % (2.0 * np.pi), legacy["phi_right"]],
+        atol=2e-9,
+    )
+
+
+def test_well_profile_plot_writes_the_required_static_diagnostic(tmp_path):
+    root = 2.0 * np.pi / 3.0
+    field = _simple_well()
+    trace = trace_regular_well(field, 2.5, np.array([0.4, 0.7, -root]))
+    output = tmp_path / "well-profile.png"
+
+    figure, axes = plot_well_profile(field, trace, output_path=output, n_samples=257)
+
+    assert output.exists()
+    assert output.stat().st_size > 0
+    assert np.asarray(axes).size == 6
+    assert "REGULAR" in axes[1, 2].texts[0].get_text()
+    plt.close(figure)
