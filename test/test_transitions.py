@@ -5,6 +5,7 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import quad
+from scipy.optimize import brentq
 
 from alpha_analysis.j_connectivity import (
     CriticalKind,
@@ -14,6 +15,7 @@ from alpha_analysis.j_connectivity import (
     TransitionStatus,
     extract_critical_curves,
     map_transitions,
+    trace_regular_well,
 )
 from alpha_analysis.j_connectivity.synthetic_fields import SyntheticFourierField
 from alpha_analysis.j_connectivity.visualization import plot_transition_diagnostics
@@ -200,6 +202,58 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
         parent.action_values,
         rtol=2.0e-10,
     )
+
+    # Approach the transition from the merged and split sides. The local
+    # extremum gap is exactly |b-B_max|=0.2|s-0.5| for this field, and all
+    # ordinary first-return actions must approach their mapped limiting port.
+    def nearby_actions(delta: float):
+        result = []
+        for s in (0.5 - delta, 0.5 + delta):
+            grid = np.linspace(-np.pi, np.pi, 513)
+            values = np.asarray(field.B(s, iota * grid, grid)) - 1.4
+            roots = [
+                brentq(
+                    lambda zeta: float(field.B(s, iota * zeta, zeta)) - 1.4,
+                    left,
+                    right,
+                )
+                for left, right, left_value, right_value in zip(
+                    grid[:-1], grid[1:], values[:-1], values[1:]
+                )
+                if left_value * right_value < 0.0
+            ]
+            incoming = [
+                root for root in roots if float(field.D_B(s, iota * root, root)) < 0.0
+            ]
+            result.append(
+                np.array(
+                    [
+                        trace_regular_well(
+                            field,
+                            1.4,
+                            np.array([s, iota * root, root]),
+                        ).action_length
+                        for root in incoming
+                    ]
+                )
+            )
+        return result
+
+    coarse_nearby = nearby_actions(0.02)
+    fine_nearby = nearby_actions(0.005)
+    limiting = np.array(
+        [
+            parent.action_values[0],
+            child_1.action_values[0],
+            child_3.action_values[0],
+        ]
+    )
+    coarse_error = np.abs(
+        np.concatenate((coarse_nearby[0], coarse_nearby[1])) - limiting
+    )
+    fine_error = np.abs(np.concatenate((fine_nearby[0], fine_nearby[1])) - limiting)
+    assert np.all(fine_error < coarse_error)
+    assert np.max(fine_error) < 0.35 * np.max(coarse_error)
 
     output = tmp_path / "transition.png"
     figure, axes = plot_transition_diagnostics(field, fine, output_path=output)
