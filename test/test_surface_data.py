@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import quad
@@ -12,11 +14,15 @@ from alpha_analysis.j_connectivity import (
     SurfaceRefinementConfig,
     TraceStatus,
     evaluate_surface_data,
+    itineraries_are_continuous,
     refine_surface_data,
 )
 from alpha_analysis.j_connectivity.synthetic_fields import SyntheticFourierField
 from alpha_analysis.j_connectivity.visualization import plot_surface_data
-from alpha_analysis.j_connectivity.well_trace import WellTraceConfig
+from alpha_analysis.j_connectivity.well_trace import (
+    WellTraceConfig,
+    trace_regular_well,
+)
 
 _TRACE_CONFIG = WellTraceConfig(
     samples_per_field_period=32,
@@ -110,9 +116,20 @@ def test_smooth_manufactured_action_converges_under_projected_refinement(tmp_pat
     field = _field(split=False)
     b = 2.5
     original = _surface(field, b)
+    assert np.all(
+        (original.points[:, 2] >= 0.0) & (original.points[:, 2] < original.period)
+    )
 
     initial_data = evaluate_surface_data(original, field, _TRACE_CONFIG)
     assert all(trace.status is TraceStatus.REGULAR for trace in initial_data.traces)
+    trace = initial_data.traces[0]
+    shifted = trace_regular_well(
+        field,
+        b,
+        trace.q_in + np.array([0.0, 0.0, original.period]),
+        _TRACE_CONFIG,
+    )
+    assert itineraries_are_continuous(trace, shifted, original.period, tolerance=1.0e-8)
     for trace in initial_data.traces:
         s = trace.q_in[0]
         root = np.arccos(2.0 + 0.2 * s - b)
@@ -153,6 +170,8 @@ def test_smooth_manufactured_action_converges_under_projected_refinement(tmp_pat
     assert bounce_time_errors[-1] < 0.35 * bounce_time_errors[0]
     assert np.all(np.isfinite(result.edge_indicators.action_interpolation_error))
     assert np.all(np.isfinite(result.edge_indicators.bounce_time_interpolation_error))
+    assert all(level.candidate_edge_count == 0 for level in result.report.levels)
+    assert not np.any(result.edge_indicators.itinerary_candidate)
     s, theta, zeta = _coordinates(result.surface.points)
     np.testing.assert_allclose(field.B(s, theta, zeta), b, atol=1.0e-10)
     physical_g = (
@@ -190,13 +209,24 @@ def test_return_map_discontinuity_candidates_sharpen_with_refinement():
     candidate_levels = [
         level for level in result.report.levels if level.candidate_edge_count
     ]
-    widths = np.array([level.max_candidate_s_width for level in candidate_levels])
+    widths = np.array([level.max_candidate_edge_length for level in candidate_levels])
     assert len(candidate_levels) == 4
     assert np.all(np.diff(widths) < 0.0)
     assert widths[-1] <= 0.3 * widths[0]
     assert candidate_levels[-1].candidate_edge_count >= 1
     assert np.count_nonzero(result.edge_indicators.itinerary_candidate) == (
         candidate_levels[-1].candidate_edge_count
+    )
+    candidate_edges = result.edge_indicators.edges[
+        result.edge_indicators.itinerary_candidate
+    ]
+    s = np.sum(result.surface.points[:, :2] ** 2, axis=1)
+    nonregular = ~result.data.regular
+    assert all(
+        (s[first] - 0.5) * (s[second] - 0.5) <= 1.0e-12
+        or nonregular[first]
+        or nonregular[second]
+        for first, second in candidate_edges
     )
     assert {
         trace.n_internal_maxima
@@ -209,3 +239,37 @@ def test_return_map_discontinuity_candidates_sharpen_with_refinement():
     )
     s, theta, zeta = _coordinates(result.surface.points)
     np.testing.assert_allclose(field.B(s, theta, zeta), 1.4, atol=1.0e-10)
+
+
+def test_shared_boundary_edge_is_reported_without_false_midpoint_provenance():
+    field = _field(split=False)
+    surface = _surface(field, b=2.5, s_values=(0.8, 1.0))
+    tags = np.zeros(len(surface.points), dtype=np.int64)
+    tags[2:] = SurfaceMesh.EDGE
+    surface = replace(surface, boundary_tags=tags)
+
+    result = refine_surface_data(
+        surface,
+        field,
+        SurfaceRefinementConfig(
+            max_levels=1,
+            action_interpolation_rtol=10.0,
+            action_interpolation_atol=10.0,
+            bounce_time_interpolation_rtol=10.0,
+            bounce_time_interpolation_atol=10.0,
+        ),
+        _TRACE_CONFIG,
+    )
+
+    np.testing.assert_array_equal(result.surface.triangles, surface.triangles)
+    blocked_edges = result.edge_indicators.edges[
+        result.edge_indicators.refinement_blocked
+    ]
+    np.testing.assert_array_equal(blocked_edges, [[2, 3]])
+    assert np.isnan(
+        result.edge_indicators.action_interpolation_error[
+            result.edge_indicators.refinement_blocked
+        ]
+    ).all()
+    assert result.report.levels[0].boundary_protected_edge_count == 1
+    assert result.report.levels[0].unresolved_edge_count == 1

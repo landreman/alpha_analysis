@@ -148,9 +148,11 @@ class SurfaceRefinementLevel:
     failed_trace_count: int
     refined_edge_count: int
     candidate_edge_count: int
+    unresolved_edge_count: int
+    boundary_protected_edge_count: int
     max_action_interpolation_error: float
     max_bounce_time_interpolation_error: float
-    max_candidate_s_width: float
+    max_candidate_edge_length: float
     max_B_residual: float
 
 
@@ -169,30 +171,38 @@ class SurfaceEdgeIndicators:
     the length units of ``A`` and ``K``; they are ``NaN`` when any of the two
     endpoint traces or the projected midpoint trace is non-regular. In that
     case ``itinerary_candidate`` remains true, so failure cannot erase a
-    possible sheet boundary (DESIGN.md §21.2).
+    possible sheet boundary. ``refinement_blocked`` marks edges that share a
+    provenance boundary: inserting a merely ``B=b``-projected midpoint would
+    falsely claim ``EDGE``, ``G_ZERO``, ``AXIS``, or seam provenance, so those
+    edges remain explicit work for the curve-aware Milestone 8 refinement
+    rather than being silently corrupted (DESIGN.md §§8.4 and 21.2).
     """
 
     edges: IntArray
     action_interpolation_error: FloatArray
     bounce_time_interpolation_error: FloatArray
     itinerary_candidate: np.ndarray
+    refinement_blocked: np.ndarray
 
     def __post_init__(self) -> None:
         edges = np.asarray(self.edges, dtype=np.int64)
         action = np.asarray(self.action_interpolation_error, dtype=np.float64)
         bounce_time = np.asarray(self.bounce_time_interpolation_error, dtype=np.float64)
         candidates = np.asarray(self.itinerary_candidate, dtype=bool)
+        blocked = np.asarray(self.refinement_blocked, dtype=bool)
         if edges.ndim != 2 or edges.shape[1:] != (2,):
             raise ValueError("edge indicators require edges with shape (n_edges, 2)")
         n_edges = len(edges)
         if any(
-            values.shape != (n_edges,) for values in (action, bounce_time, candidates)
+            values.shape != (n_edges,)
+            for values in (action, bounce_time, candidates, blocked)
         ):
             raise ValueError("edge indicator arrays must have one value per edge")
         object.__setattr__(self, "edges", edges)
         object.__setattr__(self, "action_interpolation_error", action)
         object.__setattr__(self, "bounce_time_interpolation_error", bounce_time)
         object.__setattr__(self, "itinerary_candidate", candidates)
+        object.__setattr__(self, "refinement_blocked", blocked)
 
 
 @dataclass(frozen=True)
@@ -207,13 +217,14 @@ class SurfaceRefinementResult:
 
 @dataclass(frozen=True)
 class _EdgeSample:
-    point: FloatArray
+    point: FloatArray | None
     B: float
     g: float
-    trace: WellTrace
+    trace: WellTrace | None
     action_error: float
     bounce_time_error: float
     candidate: bool
+    refinement_blocked: bool
 
 
 def _logical_coordinates(
@@ -300,14 +311,10 @@ def itineraries_are_continuous(
         _periodic_difference(first.q_out_reduced[2], second.q_out_reduced[2], period)
         / period
     )
-    lifted_exit_difference = (
-        abs(
-            (first.zeta_out_unwrapped - first.q_in[2])
-            - (second.zeta_out_unwrapped - second.q_in[2])
-        )
-        / period
-    )
-    if max(theta_difference, zeta_difference, lifted_exit_difference) > tolerance:
+    # The pair (field_period_count, reduced exit) is the shift-invariant lifted
+    # exit. Never subtract reduced q_in from raw zeta_out_unwrapped: the latter
+    # retains any integer-period lift supplied by the caller.
+    if max(theta_difference, zeta_difference) > tolerance:
         return False
     first_positions = (first.extrema_zeta_unwrapped - first.zeta_out_unwrapped) / period
     second_positions = (
@@ -418,9 +425,29 @@ def _edge_samples(
     result = {}
     for edge in _surface_edges(data.surface.triangles):
         first, second = edge
+        endpoint_traces = (data.traces[first], data.traces[second])
+        shared_boundary = int(
+            data.surface.boundary_tags[first] & data.surface.boundary_tags[second]
+        )
+        if shared_boundary:
+            result[edge] = _EdgeSample(
+                point=None,
+                B=np.nan,
+                g=np.nan,
+                trace=None,
+                action_error=np.nan,
+                bounce_time_error=np.nan,
+                candidate=not itineraries_are_continuous(
+                    endpoint_traces[0],
+                    endpoint_traces[1],
+                    data.surface.period,
+                    config.itinerary_tolerance,
+                ),
+                refinement_blocked=True,
+            )
+            continue
         point, B_value, g_value = _projected_midpoint(data.surface, field, edge, config)
         midpoint_trace = _trace_point(field, data.surface.level, point, trace_config)
-        endpoint_traces = (data.traces[first], data.traces[second])
         regular_triplet = all(
             trace.status is TraceStatus.REGULAR
             for trace in endpoint_traces + (midpoint_trace,)
@@ -470,6 +497,7 @@ def _edge_samples(
             action_error=float(action_error),
             bounce_time_error=float(bounce_time_error),
             candidate=bool(candidate),
+            refinement_blocked=False,
         )
     return result
 
@@ -496,6 +524,10 @@ def _selected_edges(
 ) -> set[tuple[int, int]]:
     selected = set()
     for edge, sample in samples.items():
+        if sample.refinement_blocked:
+            continue
+        if sample.trace is None:
+            raise SurfaceRefinementError("an unblocked edge has no midpoint trace")
         first, second = edge
         if (
             sample.candidate
@@ -533,8 +565,22 @@ def _make_level(
     selected: set[tuple[int, int]],
 ) -> SurfaceRefinementLevel:
     candidates = [edge for edge, sample in samples.items() if sample.candidate]
-    s = np.sum(data.surface.points[:, :2] ** 2, axis=1)
-    candidate_widths = [abs(s[first] - s[second]) for first, second in candidates]
+    candidate_lengths = [
+        _periodic_edge_length(
+            data.surface.points[first],
+            data.surface.points[second],
+            data.surface.period,
+        )
+        for first, second in candidates
+    ]
+    unresolved_edges = sum(
+        not np.isfinite(sample.action_error)
+        or not np.isfinite(sample.bounce_time_error)
+        for sample in samples.values()
+    )
+    boundary_protected_edges = sum(
+        sample.refinement_blocked for sample in samples.values()
+    )
     residuals = [
         abs(trace.B_residual_in)
         for trace in data.traces
@@ -548,13 +594,15 @@ def _make_level(
         failed_trace_count=int(np.count_nonzero(~data.regular)),
         refined_edge_count=len(selected),
         candidate_edge_count=len(candidates),
+        unresolved_edge_count=unresolved_edges,
+        boundary_protected_edge_count=boundary_protected_edges,
         max_action_interpolation_error=_maximum_finite(
             [sample.action_error for sample in samples.values()]
         ),
         max_bounce_time_interpolation_error=_maximum_finite(
             [sample.bounce_time_error for sample in samples.values()]
         ),
-        max_candidate_s_width=float(max(candidate_widths, default=0.0)),
+        max_candidate_edge_length=float(max(candidate_lengths, default=np.nan)),
         max_B_residual=float(max(residuals, default=0.0)),
     )
 
@@ -573,6 +621,9 @@ def _make_edge_indicators(
         ),
         itinerary_candidate=np.asarray(
             [samples[edge].candidate for edge in edges], dtype=bool
+        ),
+        refinement_blocked=np.asarray(
+            [samples[edge].refinement_blocked for edge in edges], dtype=bool
         ),
     )
 
@@ -631,6 +682,8 @@ def _refine_edges(
     midpoint_ids = {}
     for edge in sorted(selected):
         sample = samples[edge]
+        if sample.point is None or not np.all(np.isfinite([sample.B, sample.g])):
+            raise SurfaceRefinementError("selected edge lacks a projected midpoint")
         midpoint_ids[edge] = len(points)
         points.append(sample.point)
         B_values.append(sample.B)
@@ -695,13 +748,15 @@ def refine_surface_data(
 ) -> SurfaceRefinementResult:
     """Refine nonlinear action data and return-sheet candidates (§§6, 8.4).
 
-    Every unique edge is sampled at a locally projected ``B=b`` midpoint.
+    Every untagged edge is sampled at a locally projected ``B=b`` midpoint.
     Midpoint deviations from linear interpolation estimate errors in ``A``
-    and ``K``. Unquantized lifted return data identify candidate sheet
-    discontinuities. Marked edges are bisected conformingly, all changed
-    provenance is invalidated, and every new vertex is checked to remain on
-    the incoming half. The report includes the final unrefined indicator level,
-    so convergence and the remaining candidate width are machine-readable.
+    and ``K``. Edges shared by a provenance boundary remain explicitly blocked
+    until curve-aware refinement can preserve that constraint. Unquantized
+    lifted return data identify candidate sheet discontinuities. Marked edges
+    are bisected conformingly, all changed provenance is invalidated, and every
+    new vertex is checked to remain on the incoming half. The report includes
+    the final unrefined indicator level, unresolved and protected edge counts,
+    and periodic geometric candidate length.
     """
     cfg = SurfaceRefinementConfig() if config is None else config
     trace_cfg = WellTraceConfig() if trace_config is None else trace_config
