@@ -300,23 +300,15 @@ class PyVistaSurfaceExtractor:
             period,
             self.config.merge_tolerance,
         )
-        points = np.asarray(
-            [
-                _project_point_to_level(
-                    point,
-                    field,
-                    float(b),
-                    period,
-                    self.config,
-                    boundary_tag=int(boundary_tag),
-                    seam_side=int(seam_side),
-                )
-                for point, boundary_tag, seam_side in zip(
-                    points, source_boundary_tags, seam_sides
-                )
-            ],
-            dtype=np.float64,
-        ).reshape(-1, 3)
+        points = _project_points_to_level(
+            points,
+            field,
+            float(b),
+            period,
+            self.config,
+            source_boundary_tags,
+            seam_sides,
+        )
         points = _match_pyvista_periodic_seam(
             points, seam_sides, self.config.merge_tolerance
         )
@@ -380,15 +372,18 @@ def _march_tetrahedra(
     for lower, upper in background.periodic_node_pairs:
         representative[upper] = lower
 
-    points: list[np.ndarray] = []
     parent_edges: list[tuple[int, int]] = []
     point_tags: list[int] = []
+    raw_edges: list[tuple[int, int]] = []
+    duplicate_checks: list[tuple[int, tuple[int, int]]] = []
+    duplicate_seen: set[tuple[int, int]] = set()
     triangles: list[tuple[int, int, int]] = []
     parent_tetrahedra: list[int] = []
     edge_cache: dict[tuple[int, int], int] = {}
     edge_sources: dict[tuple[int, int], tuple[int, int]] = {}
 
     def edge_vertex(first: int, second: int) -> int:
+        """Register the root-carrying edge; polishing happens batched below."""
         raw_edge = tuple(sorted((int(first), int(second))))
         canonical_edge = tuple(
             sorted((int(representative[first]), int(representative[second])))
@@ -398,38 +393,21 @@ def _march_tetrahedra(
                 SurfaceStatus.DEGENERATE,
                 "a level root lies on an edge collapsed by the periodic quotient",
             )
-        if canonical_edge in edge_cache and edge_sources[canonical_edge] == raw_edge:
-            return edge_cache[canonical_edge]
-
-        point = _polish_background_edge(
-            background.points[first],
-            background.points[second],
-            field,
-            b,
-            period,
-            config,
-        )
-        point = _canonicalize_point(point, period, config.merge_tolerance)
-        tag = _edge_boundary_tag(background, first, second)
         if canonical_edge in edge_cache:
             point_id = edge_cache[canonical_edge]
-            if (
-                _periodic_distance(points[point_id], point, period)
-                > config.merge_tolerance
-            ):
-                raise SurfaceExtractionError(
-                    SurfaceStatus.PERIODIC_MISMATCH,
-                    "periodic seam roots do not coincide within merge_tolerance",
-                )
-            point_tags[point_id] |= tag
+            if edge_sources[canonical_edge] != raw_edge:
+                point_tags[point_id] |= _edge_boundary_tag(background, first, second)
+                if raw_edge not in duplicate_seen:
+                    duplicate_seen.add(raw_edge)
+                    duplicate_checks.append((point_id, raw_edge))
             return point_id
 
-        point_id = len(points)
+        point_id = len(raw_edges)
         edge_cache[canonical_edge] = point_id
         edge_sources[canonical_edge] = raw_edge
-        points.append(point)
+        raw_edges.append(raw_edge)
         parent_edges.append(canonical_edge)
-        point_tags.append(tag)
+        point_tags.append(_edge_boundary_tag(background, first, second))
         return point_id
 
     for tetrahedron_id, tetrahedron in enumerate(background.tetrahedra):
@@ -470,7 +448,29 @@ def _march_tetrahedra(
         else:  # pragma: no cover
             raise AssertionError("invalid marching-tetrahedra sign partition")
 
-    point_array = np.asarray(points, dtype=np.float64).reshape(-1, 3)
+    point_array = _polish_background_edges(
+        background, raw_edges, field, b, period, config
+    )
+    if duplicate_checks:
+        # Seam partner copies of already-polished edges must land on the
+        # same canonical point.
+        duplicate_points = _polish_background_edges(
+            background,
+            [raw_edge for _, raw_edge in duplicate_checks],
+            field,
+            b,
+            period,
+            config,
+        )
+        for (point_id, _), duplicate in zip(duplicate_checks, duplicate_points):
+            if (
+                _periodic_distance(point_array[point_id], duplicate, period)
+                > config.merge_tolerance
+            ):
+                raise SurfaceExtractionError(
+                    SurfaceStatus.PERIODIC_MISMATCH,
+                    "periodic seam roots do not coincide within merge_tolerance",
+                )
     triangle_array = np.asarray(triangles, dtype=np.int64).reshape(-1, 3)
     if len(triangle_array):
         keys = [tuple(sorted(map(int, triangle))) for triangle in triangle_array]
@@ -503,48 +503,117 @@ def _march_tetrahedra(
     )
 
 
-def _polish_background_edge(
-    first: np.ndarray,
-    second: np.ndarray,
+def _polish_background_edges(
+    background: BackgroundMesh,
+    edges: list[tuple[int, int]],
     field: BoozerFieldLike,
     b: float,
     period: float,
     config: SurfaceExtractionConfig,
 ) -> np.ndarray:
-    second_local = _unwrap_point_relative(second, first, period)
-    direction = second_local - first
+    """Polish the bracketed ``B=b`` root on every background edge at once.
 
-    def residual(parameter: float) -> float:
-        point = first + parameter * direction
-        return float(_evaluate_B(field, point[np.newaxis, :])[0] - b)
+    Each edge is solved on its own chord by the vectorized Chandrupatla
+    iteration, to the same parameter tolerance as the previous per-edge
+    ``brentq`` calls, so one batched field evaluation per iteration serves
+    all still-unconverged edges. Returns canonicalized points, one per edge.
+    """
+    if not len(edges):
+        return np.empty((0, 3), dtype=np.float64)
+    edge_array = np.asarray(edges, dtype=np.int64)
+    firsts = np.asarray(background.points[edge_array[:, 0]], dtype=np.float64)
+    seconds = np.asarray(background.points[edge_array[:, 1]], dtype=np.float64).copy()
+    difference = seconds[:, 2] - firsts[:, 2]
+    seconds[:, 2] -= period * np.round(difference / period)
+    directions = seconds - firsts
 
-    lower_residual = residual(0.0)
-    upper_residual = residual(1.0)
-    if lower_residual * upper_residual >= 0.0:
+    def residuals(parameters: np.ndarray, active: np.ndarray) -> np.ndarray:
+        points = firsts[active] + parameters[:, np.newaxis] * directions[active]
+        return _evaluate_B(field, points) - b
+
+    endpoint_values = _evaluate_B(field, np.vstack((firsts, seconds))) - b
+    lower_values = endpoint_values[: len(edge_array)]
+    upper_values = endpoint_values[len(edge_array) :]
+    if np.any(lower_values * upper_values >= 0.0):
         raise SurfaceExtractionError(
             SurfaceStatus.ROOT_FAILURE,
             "background samples bracket a root that the analytic field does not",
         )
-    try:
-        parameter = brentq(
-            residual,
-            0.0,
-            1.0,
-            xtol=config.parameter_tolerance,
-            rtol=4.0 * np.finfo(float).eps,
-            maxiter=100,
-        )
-    except ValueError as error:
+    parameters, unconverged = _chandrupatla_roots(
+        residuals, lower_values, upper_values, config
+    )
+    if np.any(unconverged):
         raise SurfaceExtractionError(
             SurfaceStatus.ROOT_FAILURE, "bracketed edge-root polishing failed"
-        ) from error
-    point = first + parameter * direction
-    if abs(residual(parameter)) > config.B_tolerance:
+        )
+    points = firsts + parameters[:, np.newaxis] * directions
+    if np.max(np.abs(_evaluate_B(field, points) - b)) > config.B_tolerance:
         raise SurfaceExtractionError(
             SurfaceStatus.ROOT_FAILURE,
             "edge-root residual exceeds B_tolerance after polishing",
         )
-    return point
+    return _canonicalize_points(points, period, config.merge_tolerance)
+
+
+def _chandrupatla_roots(
+    residuals,
+    lower_values: np.ndarray,
+    upper_values: np.ndarray,
+    config: SurfaceExtractionConfig,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Vectorized bracketed root find on the unit parameter interval.
+
+    Chandrupatla's algorithm (inverse quadratic interpolation inside a
+    guaranteed bracket, bisection otherwise) with elementwise state, so one
+    call of ``residuals(parameters, active_mask)`` per iteration serves every
+    still-active bracket. Every ``(lower, upper)`` pair must already straddle
+    a sign change. Returns ``(roots, unconverged_mask)``; the caller decides
+    what an unconverged bracket means.
+    """
+    n = len(lower_values)
+    x1 = np.zeros(n)
+    f1 = np.asarray(lower_values, dtype=np.float64).copy()
+    x2 = np.ones(n)
+    f2 = np.asarray(upper_values, dtype=np.float64).copy()
+    x3 = np.zeros(n)
+    f3 = np.zeros(n)
+    roots = np.where(np.abs(f1) <= np.abs(f2), x1, x2)
+    t = np.full(n, 0.5)
+    active = np.ones(n, dtype=bool)
+    rtol = 4.0 * np.finfo(float).eps
+    for _ in range(100):
+        x = x1 + t * (x2 - x1)
+        f = np.zeros(n)
+        f[active] = residuals(x[active], active)
+        same = np.sign(f) == np.sign(f1)
+        move = active & same
+        x3[move] = x1[move]
+        f3[move] = f1[move]
+        swap = active & ~same
+        x3[swap] = x2[swap]
+        f3[swap] = f2[swap]
+        x2[swap] = x1[swap]
+        f2[swap] = f1[swap]
+        x1[active] = x[active]
+        f1[active] = f[active]
+        best = np.where(np.abs(f1) <= np.abs(f2), x1, x2)
+        roots[active] = best[active]
+        spread = np.abs(x2 - x1)
+        tolerance = config.parameter_tolerance + rtol * np.abs(best)
+        active &= ~((f == 0.0) | (spread <= 2.0 * tolerance))
+        if not active.any():
+            break
+        with np.errstate(divide="ignore", invalid="ignore"):
+            xi = (x1 - x2) / (x3 - x2)
+            phi = (f1 - f2) / (f3 - f2)
+            interpolate = (phi**2 < xi) & ((1.0 - phi) ** 2 < 1.0 - xi)
+            candidate = f1 / (f1 - f2) * (f3 / (f3 - f2)) - (x3 - x1) / (x2 - x1) * (
+                f1 / (f3 - f1)
+            ) * (f2 / (f2 - f3))
+        t = np.where(interpolate & np.isfinite(candidate), candidate, 0.5)
+        limit = tolerance / np.maximum(spread, np.finfo(float).tiny)
+        t = np.clip(t, limit, 1.0 - limit)
+    return roots, active
 
 
 def _split_by_physical_g(
@@ -1091,12 +1160,10 @@ def _polish_g_zero_on_outer_boundary(
         return float(field.B(1.0, theta, zeta)) - b
 
     def cylinder_gradient(theta: float, zeta: float) -> np.ndarray:
-        return np.array(
-            [
-                float(field.dB_dtheta(1.0, theta, zeta)),
-                float(field.dB_dzeta(1.0, theta, zeta)),
-            ]
+        dB_dtheta, dB_dzeta = _field_quantities(
+            field, 1.0, theta, zeta, ("dB_dtheta", "dB_dzeta")
         )
+        return np.array([float(dB_dtheta), float(dB_dzeta)])
 
     def correct(theta: float, zeta: float, cap: float) -> tuple[float, float] | None:
         position = np.array([theta, zeta])
@@ -1588,59 +1655,109 @@ def _project_to_level_near(
     return None
 
 
-def _project_point_to_level(
-    point: np.ndarray,
+def _project_points_to_level(
+    points: np.ndarray,
     field: BoozerFieldLike,
     b: float,
     period: float,
     config: SurfaceExtractionConfig,
-    *,
-    boundary_tag: int = 0,
-    seam_side: int = 0,
+    boundary_tags: np.ndarray,
+    seam_sides: np.ndarray,
 ) -> np.ndarray:
-    """Project a VTK contour point to ``B=b`` within the §8.2 disk domain."""
-    projected = np.asarray(point, dtype=np.float64).copy()
-    on_axis = bool(boundary_tag & SurfaceMesh.AXIS)
-    on_seam = bool(boundary_tag & SurfaceMesh.PERIODIC_SEAM)
-    if on_axis:
-        projected[:2] = 0.0
-    if on_seam:
-        projected[2] = period if seam_side > 0 else 0.0
-    active_domain_boundary = False
+    """Project VTK contour points to ``B=b`` within the §8.2 disk domain.
+
+    Vectorized constrained Newton: each iteration serves every
+    still-unconverged point from one batched field evaluation, with the
+    axis, periodic-seam, and outer-boundary constraints applied per point
+    exactly as the previous per-point loop did. Any point that fails to
+    converge fails the whole projection (§21.2 — no silent substitutes).
+    """
+    projected = np.array(points, dtype=np.float64).reshape(-1, 3)
+    n_points = len(projected)
+    if not n_points:
+        return projected
+    on_axis = (np.asarray(boundary_tags) & SurfaceMesh.AXIS) != 0
+    on_seam = (np.asarray(boundary_tags) & SurfaceMesh.PERIODIC_SEAM) != 0
+    seam_targets = np.where(np.asarray(seam_sides) > 0, period, 0.0)
+    projected[on_axis, :2] = 0.0
+    projected[on_seam, 2] = seam_targets[on_seam]
     guarded_unit_radius = 1.0 - 8.0 * np.finfo(float).eps
-    initial_radius = np.linalg.norm(projected[:2])
-    if initial_radius > 1.0:
-        projected[:2] *= guarded_unit_radius / initial_radius
-        active_domain_boundary = True
+    radius = np.linalg.norm(projected[:, :2], axis=1)
+    active_boundary = radius > 1.0
+    projected[active_boundary, :2] *= (guarded_unit_radius / radius[active_boundary])[
+        :, np.newaxis
+    ]
+    converged = np.zeros(n_points, dtype=bool)
+    hopeless = np.zeros(n_points, dtype=bool)
     for _ in range(20):
-        residual = float(_evaluate_B(field, projected[np.newaxis, :])[0] - b)
-        if abs(residual) <= config.B_tolerance:
-            if np.linalg.norm(projected[:2]) > 1.0 + config.merge_tolerance:
-                break
-            return _canonicalize_point(projected, period, config.merge_tolerance)
-        gradient = _logical_B_gradient(field, projected)
-        if active_domain_boundary:
-            radial = np.array([projected[0], projected[1], 0.0])
-            gradient -= np.dot(gradient, radial) * radial
-        if on_axis:
-            gradient[:2] = 0.0
-        if on_seam:
-            gradient[2] = 0.0
-        norm_squared = float(np.dot(gradient, gradient))
-        if norm_squared <= np.finfo(float).eps:
+        todo = ~converged & ~hopeless
+        if not todo.any():
             break
-        candidate = projected - residual * gradient / norm_squared
-        radius = np.linalg.norm(candidate[:2])
-        if on_axis:
-            candidate[:2] = 0.0
-        elif active_domain_boundary or radius > 1.0:
-            candidate[:2] *= guarded_unit_radius / radius
-            active_domain_boundary = True
-        if on_seam:
-            candidate[2] = period if seam_side > 0 else 0.0
-        projected = candidate
-    raise SurfaceExtractionError(
-        SurfaceStatus.ROOT_FAILURE, "PyVista contour-point projection failed"
+        residual = np.zeros(n_points)
+        residual[todo] = _evaluate_B(field, projected[todo]) - b
+        done = todo & (np.abs(residual) <= config.B_tolerance)
+        out_of_domain = done & (
+            np.linalg.norm(projected[:, :2], axis=1) > 1.0 + config.merge_tolerance
+        )
+        converged |= done & ~out_of_domain
+        hopeless |= out_of_domain
+        stepping = todo & ~done
+        if not stepping.any():
+            continue
+        gradient = np.zeros((n_points, 3))
+        gradient[stepping] = _logical_B_gradients(field, projected[stepping])
+        constrained = stepping & active_boundary
+        if constrained.any():
+            radial = projected[constrained].copy()
+            radial[:, 2] = 0.0
+            overlap = np.einsum("ij,ij->i", gradient[constrained], radial)
+            gradient[constrained] -= overlap[:, np.newaxis] * radial
+        gradient[stepping & on_axis, :2] = 0.0
+        gradient[stepping & on_seam, 2] = 0.0
+        norm_squared = np.einsum("ij,ij->i", gradient, gradient)
+        dead = stepping & (norm_squared <= np.finfo(float).eps)
+        hopeless |= dead
+        stepping &= ~dead
+        if not stepping.any():
+            continue
+        candidate = (
+            projected[stepping]
+            - (residual[stepping] / norm_squared[stepping])[:, np.newaxis]
+            * gradient[stepping]
+        )
+        axis_lane = on_axis[stepping]
+        candidate[axis_lane, :2] = 0.0
+        lane_radius = np.linalg.norm(candidate[:, :2], axis=1)
+        clamp = ~axis_lane & (active_boundary[stepping] | (lane_radius > 1.0))
+        candidate[clamp, :2] *= (guarded_unit_radius / lane_radius[clamp])[
+            :, np.newaxis
+        ]
+        seam_lane = on_seam[stepping]
+        candidate[seam_lane, 2] = seam_targets[stepping][seam_lane]
+        projected[stepping] = candidate
+        active_boundary[np.flatnonzero(stepping)[clamp]] = True
+    if not np.all(converged):
+        raise SurfaceExtractionError(
+            SurfaceStatus.ROOT_FAILURE, "PyVista contour-point projection failed"
+        )
+    return _canonicalize_points(projected, period, config.merge_tolerance)
+
+
+def _field_quantities(field: BoozerFieldLike, s, theta, zeta, quantities):
+    """Evaluate several field quantities, fused into one Fourier pass when the
+    backend offers ``fourier_quantities`` (one shared phase/trig table), and
+    through the individual §7.2 protocol methods otherwise. ``quantities``
+    are protocol method names; results come back as float64 arrays in
+    matching order."""
+    fused = getattr(field, "fourier_quantities", None)
+    if fused is not None:
+        return tuple(
+            np.asarray(value, dtype=np.float64)
+            for value in fused(s, theta, zeta, quantities)
+        )
+    return tuple(
+        np.asarray(getattr(field, name)(s, theta, zeta), dtype=np.float64)
+        for name in quantities
     )
 
 
@@ -1656,8 +1773,7 @@ def _physical_g(field: BoozerFieldLike, points: np.ndarray) -> np.ndarray:
     if not len(points):
         return np.empty(0, dtype=np.float64)
     s, theta, zeta = _logical_coordinates(points)
-    B = np.asarray(field.B(s, theta, zeta), dtype=np.float64)
-    derivative = np.asarray(field.D_B(s, theta, zeta), dtype=np.float64)
+    B, derivative = _field_quantities(field, s, theta, zeta, ("B", "D_B"))
     current = np.asarray(field.G(s), dtype=np.float64) + np.asarray(
         field.iota(s), dtype=np.float64
     ) * np.asarray(field.I(s), dtype=np.float64)
@@ -1678,29 +1794,47 @@ def _logical_coordinates(points: np.ndarray):
 
 
 def _logical_B_gradient(field: BoozerFieldLike, point: np.ndarray) -> np.ndarray:
-    x, y, zeta = point
-    s = x * x + y * y
-    if s == 0.0:
+    return _logical_B_gradients(field, np.asarray(point)[np.newaxis, :])[0]
+
+
+def _logical_B_gradients(field: BoozerFieldLike, points: np.ndarray) -> np.ndarray:
+    """Return the logical ``(x, y, zeta)`` gradient of ``B`` at each point.
+
+    One fused Fourier pass serves all regular points; the (rare) exact-axis
+    points use the centered Cartesian differences of the §7.3 regular limit.
+    """
+    points = np.asarray(points, dtype=np.float64)
+    s, theta, zeta = _logical_coordinates(points)
+    result = np.empty((len(points), 3), dtype=np.float64)
+    regular = s != 0.0
+    if np.any(regular):
+        dB_ds, dB_dtheta, dB_dzeta = _field_quantities(
+            field,
+            s[regular],
+            theta[regular],
+            zeta[regular],
+            ("dB_ds", "dB_dtheta", "dB_dzeta"),
+        )
+        x = points[regular, 0]
+        y = points[regular, 1]
+        s_regular = s[regular]
+        result[regular, 0] = 2.0 * x * dB_ds - y * dB_dtheta / s_regular
+        result[regular, 1] = 2.0 * y * dB_ds + x * dB_dtheta / s_regular
+        result[regular, 2] = dB_dzeta
+    for index in np.flatnonzero(~regular):
         epsilon = 1.0e-6
         epsilon_s = epsilon**2
-        dB_dx = (
-            float(field.B(epsilon_s, 0.0, zeta))
-            - float(field.B(epsilon_s, np.pi, zeta))
+        zeta_axis = zeta[index]
+        result[index, 0] = (
+            float(field.B(epsilon_s, 0.0, zeta_axis))
+            - float(field.B(epsilon_s, np.pi, zeta_axis))
         ) / (2.0 * epsilon)
-        dB_dy = (
-            float(field.B(epsilon_s, 0.5 * np.pi, zeta))
-            - float(field.B(epsilon_s, -0.5 * np.pi, zeta))
+        result[index, 1] = (
+            float(field.B(epsilon_s, 0.5 * np.pi, zeta_axis))
+            - float(field.B(epsilon_s, -0.5 * np.pi, zeta_axis))
         ) / (2.0 * epsilon)
-        theta = 0.0
-    else:
-        theta = float(np.arctan2(y, x))
-        dB_ds = float(field.dB_ds(s, theta, zeta))
-        dB_dtheta = float(field.dB_dtheta(s, theta, zeta))
-        dB_dx = 2.0 * x * dB_ds - y * dB_dtheta / s
-        dB_dy = 2.0 * y * dB_ds + x * dB_dtheta / s
-    return np.array(
-        [dB_dx, dB_dy, float(field.dB_dzeta(s, theta, zeta))], dtype=np.float64
-    )
+        result[index, 2] = float(field.dB_dzeta(0.0, 0.0, zeta_axis))
+    return result
 
 
 def _edge_boundary_tag(background: BackgroundMesh, first: int, second: int) -> int:
@@ -1762,16 +1896,20 @@ def _orient_triangles(
     period: float,
 ) -> np.ndarray:
     result = np.asarray(triangles, dtype=np.int64).copy()
-    for index, triangle in enumerate(result):
-        vertices = _unwrap_triangle(points[triangle], period)
-        normal = np.cross(vertices[1] - vertices[0], vertices[2] - vertices[0])
-        if np.linalg.norm(normal) <= 32.0 * np.finfo(float).eps:
-            raise SurfaceExtractionError(
-                SurfaceStatus.DEGENERATE, "marching produced a zero-area triangle"
-            )
-        gradient = _logical_B_gradient(field, np.mean(vertices, axis=0))
-        if np.dot(normal, gradient) < 0.0:
-            result[index, 1], result[index, 2] = result[index, 2], result[index, 1]
+    if not len(result):
+        return result
+    vertices = points[result].copy()
+    for index in (1, 2):
+        difference = vertices[:, index, 2] - vertices[:, 0, 2]
+        vertices[:, index, 2] -= period * np.round(difference / period)
+    normals = np.cross(vertices[:, 1] - vertices[:, 0], vertices[:, 2] - vertices[:, 0])
+    if np.any(np.linalg.norm(normals, axis=1) <= 32.0 * np.finfo(float).eps):
+        raise SurfaceExtractionError(
+            SurfaceStatus.DEGENERATE, "marching produced a zero-area triangle"
+        )
+    gradients = _logical_B_gradients(field, np.mean(vertices, axis=1))
+    flip = np.einsum("ij,ij->i", normals, gradients) < 0.0
+    result[flip] = result[flip][:, [0, 2, 1]]
     return result
 
 
@@ -1799,6 +1937,17 @@ def _canonicalize_point(
     result[2] %= period
     if result[2] <= tolerance or period - result[2] <= tolerance:
         result[2] = 0.0
+    return result
+
+
+def _canonicalize_points(
+    points: np.ndarray, period: float, tolerance: float
+) -> np.ndarray:
+    """Vectorized :func:`_canonicalize_point` over an ``(n, 3)`` array."""
+    result = np.asarray(points, dtype=np.float64).copy()
+    result[:, 2] %= period
+    snap = (result[:, 2] <= tolerance) | (period - result[:, 2] <= tolerance)
+    result[snap, 2] = 0.0
     return result
 
 

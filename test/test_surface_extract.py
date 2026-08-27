@@ -818,3 +818,27 @@ def test_pitch_surface_diagnostic_is_headless_and_saveable(tmp_path):
     assert "component" in axes[0].get_title().lower()
     assert "incoming" in axes[1].get_title().lower()
     plt.close(figure)
+
+
+def test_chandrupatla_roots_match_the_scalar_brentq_contract():
+    # The batched bracketed solver replacing the per-edge brentq calls must
+    # land on the same roots at the same parameter tolerance, across a
+    # family of brackets of very different stiffness solved simultaneously.
+    import alpha_analysis.j_connectivity.surface_extract as module
+
+    rng = np.random.default_rng(3)
+    n = 50
+    true_roots = rng.uniform(0.02, 0.98, n)
+    stiffness = 10.0 ** rng.uniform(-2.0, 2.0, n)
+
+    def residuals(parameters, active):
+        return np.sinh(stiffness[active] * (parameters - true_roots[active]))
+
+    everywhere = np.ones(n, dtype=bool)
+    lower = residuals(np.zeros(n), everywhere)
+    upper = residuals(np.ones(n), everywhere)
+    config = module.SurfaceExtractionConfig()
+    roots, unconverged = module._chandrupatla_roots(residuals, lower, upper, config)
+
+    assert not unconverged.any()
+    np.testing.assert_allclose(roots, true_roots, rtol=0.0, atol=1.0e-11)

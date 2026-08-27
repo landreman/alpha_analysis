@@ -220,3 +220,25 @@ def test_wout_adapter_transposes_and_loads_booz_xform_sine_modes(monkeypatch, tm
     np.testing.assert_allclose(field.B(0.5, np.pi / 2, 0.0), 2.2)
     assert field.nfp == 2
     assert field.R00 == 5.5
+
+
+def test_fourier_quantities_include_sine_modes_in_both_trig_branches(tmp_path):
+    # Asymmetric data exercises the sine series of the fused evaluation; the
+    # tiny mode table keeps the angle-difference factorization off by
+    # default, so force it on to check that branch's algebra as well.
+    path = tmp_path / "asymmetric_boozmn.nc"
+    _write_asymmetric_boozmn(path)
+    field = BoozerField.from_boozmn(path)
+    assert field._has_sine
+    assert not field._trig_factorized
+    s = np.array([0.31, 0.57, 0.76])
+    theta = np.array([0.2, 1.4, 5.1])
+    zeta = np.array([0.1, 0.8, 2.2])
+    names = ("B", "dB_ds", "dB_dtheta", "dB_dzeta", "D_B", "D2_B")
+    reference = tuple(getattr(field, name)(s, theta, zeta) for name in names)
+    field._trig_factorized = True
+    bundle = field.fourier_quantities(s, theta, zeta, names)
+    for name, expected, values in zip(names, reference, bundle):
+        np.testing.assert_allclose(
+            values, expected, rtol=1e-13, atol=1e-13, err_msg=name
+        )

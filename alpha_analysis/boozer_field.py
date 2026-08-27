@@ -1,11 +1,29 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 from scipy.io import netcdf_file
 from scipy.interpolate import CubicSpline
+
+
+@lru_cache(maxsize=64)
+def _fourier_plan(quantities: tuple[str, ...]):
+    """Cache which tables a fourier_quantities request needs.
+
+    Returns ``(needed, need_base, need_first, need_value, need_ds, need_k)``
+    where ``needed`` is the deduplicated quantity tuple; the flags select the
+    trigonometric tables, coefficient splines, and ``k = m iota - n`` array.
+    """
+    needed = tuple(dict.fromkeys(quantities))
+    need_base = any(name in ("B", "dB_ds", "D2_B") for name in needed)
+    need_first = any(name in ("dB_dtheta", "dB_dzeta", "D_B") for name in needed)
+    need_value = any(name != "dB_ds" for name in needed)
+    need_ds = "dB_ds" in needed
+    need_k = any(name in ("D_B", "D2_B") for name in needed)
+    return needed, need_base, need_first, need_value, need_ds, need_k
 
 
 class BoozerField:
@@ -54,6 +72,14 @@ class BoozerField:
         self._bmnc_spline: CubicSpline | None = None
         self._bmns_spline: CubicSpline | None = None
         self._coefficient_s0: float | None = None
+        self._has_sine: bool = False
+        self._xm_float: np.ndarray | None = None
+        self._xn_float: np.ndarray | None = None
+        self._m_unique: np.ndarray | None = None
+        self._m_index: np.ndarray | None = None
+        self._n_unique: np.ndarray | None = None
+        self._n_index: np.ndarray | None = None
+        self._trig_factorized: bool = False
 
     @classmethod
     def from_boozmn(cls, boozmn_file: str | Path) -> "BoozerField":
@@ -216,36 +242,167 @@ class BoozerField:
         """Return signed ``G + iota I`` in the loaded Boozer current units (§5.1)."""
         return self.G(s) + self.iota(s) * self.I(s)
 
+    # Quantity names accepted by fourier_quantities, mapped from the legacy
+    # _evaluate_fourier derivative keywords.
+    _FOURIER_QUANTITIES = ("B", "dB_ds", "dB_dtheta", "dB_dzeta", "D_B", "D2_B")
+    _QUANTITY_BY_DERIVATIVE = {
+        "B": "B",
+        "s": "dB_ds",
+        "theta": "dB_dtheta",
+        "zeta": "dB_dzeta",
+        "parallel": "D_B",
+        "parallel2": "D2_B",
+    }
+    # Caps each (points, modes) temporary array at ~8 MB of doubles so that
+    # arbitrarily large point batches cannot exhaust memory.
+    _FOURIER_CHUNK_ELEMENTS = 2**20
+
     def _evaluate_fourier(self, s, theta, zeta, *, derivative: str) -> np.ndarray:
+        quantity = self._QUANTITY_BY_DERIVATIVE.get(derivative)
+        if quantity is None:
+            raise ValueError(f"unknown Fourier derivative {derivative!r}")
+        return self.fourier_quantities(s, theta, zeta, (quantity,))[0]
+
+    def fourier_quantities(
+        self, s, theta, zeta, quantities: tuple[str, ...]
+    ) -> tuple[np.ndarray, ...]:
+        """Evaluate several §7.1 Fourier quantities from one shared phase table.
+
+        ``quantities`` names protocol methods among ``("B", "dB_ds",
+        "dB_dtheta", "dB_dzeta", "D_B", "D2_B")``; the matching arrays are
+        returned in order, in the broadcast shape of ``s``, ``theta``,
+        ``zeta`` (angles in radians, ``s`` normalized toroidal flux). One
+        set of trigonometric tables serves every requested quantity, the
+        sine series is skipped entirely for stellarator-symmetric data, and
+        points are processed in bounded chunks so large batches cannot
+        exhaust memory. Each result equals the corresponding individual
+        method's up to floating-point rounding of the trigonometric factors
+        and summation order.
+        """
+        unknown = [name for name in quantities if name not in self._FOURIER_QUANTITIES]
+        if unknown:
+            raise ValueError(f"unknown Fourier quantities {unknown!r}")
         s_arr, theta_arr, zeta_arr = np.broadcast_arrays(
             np.asarray(s, dtype=float),
             np.asarray(theta, dtype=float),
             np.asarray(zeta, dtype=float),
         )
-        phase = (
-            theta_arr[..., np.newaxis] * self.xm - zeta_arr[..., np.newaxis] * self.xn
+        shape = s_arr.shape
+        s_flat = s_arr.ravel()
+        theta_flat = theta_arr.ravel()
+        zeta_flat = zeta_arr.ravel()
+        n_points = s_flat.size
+        n_modes = self.xm.size
+        chunk = max(1, self._FOURIER_CHUNK_ELEMENTS // max(1, n_modes))
+        if n_points <= chunk:
+            computed = self._fourier_chunk(s_flat, theta_flat, zeta_flat, quantities)
+            return tuple(computed[name].reshape(shape) for name in quantities)
+        results = {name: np.empty(n_points) for name in set(quantities)}
+        for start in range(0, n_points, chunk):
+            stop = min(n_points, start + chunk)
+            computed = self._fourier_chunk(
+                s_flat[start:stop],
+                theta_flat[start:stop],
+                zeta_flat[start:stop],
+                quantities,
+            )
+            for name, value in computed.items():
+                results[name][start:stop] = value
+        return tuple(results[name].reshape(shape) for name in quantities)
+
+    def _fourier_chunk(
+        self,
+        s: np.ndarray,
+        theta: np.ndarray,
+        zeta: np.ndarray,
+        quantities: tuple[str, ...],
+    ) -> dict[str, np.ndarray]:
+        """Evaluate one bounded chunk of points; returns arrays by quantity."""
+        # "Base" quantities contract the coefficients against cos(phase)
+        # (plus sin(phase) for sine modes); "first"-derivative quantities
+        # swap the trigonometric tables and carry a mode-number weight.
+        needed, need_base, need_first, need_value, need_ds, need_k = _fourier_plan(
+            quantities
         )
-        spline_order = 1 if derivative == "s" else 0
-        cosine = np.asarray(
-            self._evaluate_coefficient_spline(self._bmnc_spline, s_arr, spline_order)
+        has_sine = self._has_sine
+        xm = self._xm_float
+        xn = self._xn_float
+        need_cos = need_base or (has_sine and need_first)
+        need_sin = need_first or (has_sine and need_base)
+        if self._trig_factorized:
+            # cos(m theta - n zeta) and its sine from the angle-difference
+            # identities over the unique m and unique n values: a few
+            # hundred transcendental evaluations instead of one (or two)
+            # per mode per point.
+            cos_m_theta = np.cos(theta[:, np.newaxis] * self._m_unique)
+            sin_m_theta = np.sin(theta[:, np.newaxis] * self._m_unique)
+            cos_n_zeta = np.cos(zeta[:, np.newaxis] * self._n_unique)
+            sin_n_zeta = np.sin(zeta[:, np.newaxis] * self._n_unique)
+            cos_m = cos_m_theta[:, self._m_index]
+            sin_m = sin_m_theta[:, self._m_index]
+            cos_n = cos_n_zeta[:, self._n_index]
+            sin_n = sin_n_zeta[:, self._n_index]
+            cos_phase = cos_m * cos_n + sin_m * sin_n if need_cos else None
+            sin_phase = sin_m * cos_n - cos_m * sin_n if need_sin else None
+        else:
+            phase = theta[:, np.newaxis] * xm - zeta[:, np.newaxis] * xn
+            cos_phase = np.cos(phase) if need_cos else None
+            sin_phase = np.sin(phase) if need_sin else None
+        cosine = (
+            self._evaluate_coefficient_spline(self._bmnc_spline, s)
+            if need_value
+            else None
         )
-        sine = np.asarray(
-            self._evaluate_coefficient_spline(self._bmns_spline, s_arr, spline_order)
+        sine = (
+            self._evaluate_coefficient_spline(self._bmns_spline, s)
+            if need_value and has_sine
+            else None
         )
-        base = cosine * np.cos(phase) + sine * np.sin(phase)
-        first = -cosine * np.sin(phase) + sine * np.cos(phase)
-        if derivative in ("B", "s"):
-            return np.sum(base, axis=-1)
-        if derivative == "theta":
-            return np.sum(self.xm * first, axis=-1)
-        if derivative == "zeta":
-            return np.sum(-self.xn * first, axis=-1)
-        k = self.xm * np.asarray(self.iota(s_arr))[..., np.newaxis] - self.xn
-        if derivative == "parallel":
-            return np.sum(k * first, axis=-1)
-        if derivative == "parallel2":
-            return -np.sum(k**2 * base, axis=-1)
-        raise ValueError(f"unknown Fourier derivative {derivative!r}")
+        if need_ds:
+            cosine_ds = self._evaluate_coefficient_spline(self._bmnc_spline, s, 1)
+            sine_ds = (
+                self._evaluate_coefficient_spline(self._bmns_spline, s, 1)
+                if has_sine
+                else None
+            )
+        if need_k:
+            k = np.atleast_1d(np.asarray(self.iota(s)))[:, np.newaxis] * xm - xn
+        table_shape = (len(s), xm.size)
+
+        def contracted(coefficients, table, weight=None):
+            if weight is None:
+                return np.einsum("ij,ij->i", coefficients, table)
+            weight = np.broadcast_to(weight, table_shape)
+            return np.einsum("ij,ij,ij->i", coefficients, table, weight)
+
+        computed: dict[str, np.ndarray] = {}
+        for name in needed:
+            if name == "B":
+                value = contracted(cosine, cos_phase)
+                if has_sine:
+                    value += contracted(sine, sin_phase)
+            elif name == "dB_ds":
+                value = contracted(cosine_ds, cos_phase)
+                if has_sine:
+                    value += contracted(sine_ds, sin_phase)
+            elif name == "dB_dtheta":
+                value = -contracted(cosine, sin_phase, xm)
+                if has_sine:
+                    value += contracted(sine, cos_phase, xm)
+            elif name == "dB_dzeta":
+                value = contracted(cosine, sin_phase, xn)
+                if has_sine:
+                    value -= contracted(sine, cos_phase, xn)
+            elif name == "D_B":
+                value = -contracted(cosine, sin_phase, k)
+                if has_sine:
+                    value += contracted(sine, cos_phase, k)
+            else:  # D2_B
+                value = -contracted(cosine, cos_phase, k * k)
+                if has_sine:
+                    value -= contracted(sine, sin_phase, k * k)
+            computed[name] = value
+        return computed
 
     def compute_B(
         self,
@@ -336,6 +493,18 @@ class BoozerField:
         )
         self._bmns_spline = CubicSpline(
             fourier_s, self.bmns_data, axis=0, extrapolate=True
+        )
+        # Identically-zero sine data lets fourier_quantities skip the sine
+        # series without changing any value.
+        self._has_sine = bool(np.any(self.bmns_data))
+        self._xm_float = np.asarray(self.xm, dtype=float)
+        self._xn_float = np.asarray(self.xn, dtype=float)
+        self._m_unique, self._m_index = np.unique(self._xm_float, return_inverse=True)
+        self._n_unique, self._n_index = np.unique(self._xn_float, return_inverse=True)
+        # The angle-difference factorization only pays off when the mode
+        # table reuses few distinct m and n values.
+        self._trig_factorized = (
+            self._m_unique.size + self._n_unique.size <= self._xm_float.size // 4
         )
         # Innermost coefficient surface: below it the axis-regular harmonic
         # continuation of DESIGN.md §7.3 replaces spline extrapolation.

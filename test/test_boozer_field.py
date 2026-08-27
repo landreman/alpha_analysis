@@ -226,3 +226,53 @@ def test_B_is_axis_regular():
     np.testing.assert_allclose(
         float(booz.dB_ds(s_probe, 0.7, zeta)), finite_difference, rtol=1.0e-5
     )
+
+
+def test_fourier_quantities_match_direct_mode_sums():
+    # The fused evaluation (shared phase table, skipped sine series,
+    # factorized trigonometry, chunking) must reproduce the plain §7.1 mode
+    # sums written out directly from the interpolated coefficients, through
+    # both trigonometric branches, and chunked evaluation must equal
+    # unchunked exactly.
+    field = BoozerField.from_boozmn(boozmn_file_name)
+    rng = np.random.default_rng(7)
+    n = 23
+    s = rng.uniform(0.05, 0.95, n)
+    theta = rng.uniform(-np.pi, np.pi, n)
+    zeta = rng.uniform(0.0, 2.0 * np.pi / field.nfp, n)
+
+    phase = theta[:, np.newaxis] * field.xm - zeta[:, np.newaxis] * field.xn
+    cosine = field.bmnc(s)
+    sine = field.bmns(s)
+    first = -cosine * np.sin(phase) + sine * np.cos(phase)
+    k = np.asarray(field.iota(s))[:, np.newaxis] * field.xm - field.xn
+    names = ("B", "dB_dtheta", "dB_dzeta", "D_B", "D2_B")
+    expected = (
+        np.sum(cosine * np.cos(phase) + sine * np.sin(phase), axis=-1),
+        np.sum(field.xm * first, axis=-1),
+        np.sum(-field.xn * first, axis=-1),
+        np.sum(k * first, axis=-1),
+        -np.sum(k**2 * (cosine * np.cos(phase) + sine * np.sin(phase)), axis=-1),
+    )
+
+    assert field._trig_factorized  # the W7-X mode table reuses few m and n
+    for factorized in (True, False):
+        field._trig_factorized = factorized
+        bundle = field.fourier_quantities(s, theta, zeta, names)
+        for name, reference, values in zip(names, expected, bundle):
+            np.testing.assert_allclose(
+                values, reference, rtol=1e-12, atol=1e-12, err_msg=name
+            )
+    field._trig_factorized = True
+
+    # Forcing many small chunks must not change any value.
+    whole = field.fourier_quantities(s, theta, zeta, names)
+    field._FOURIER_CHUNK_ELEMENTS = 5 * field.xm.size
+    chunked = field.fourier_quantities(s, theta, zeta, names)
+    del field._FOURIER_CHUNK_ELEMENTS
+    for name, big, small in zip(names, whole, chunked):
+        np.testing.assert_array_equal(big, small, err_msg=name)
+
+    # The protocol methods route through the same fused path; spot-check the
+    # scalar shape contract they rely on.
+    assert np.shape(field.B(0.3, 0.2, 0.1)) == ()
