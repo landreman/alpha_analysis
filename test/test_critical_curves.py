@@ -255,3 +255,94 @@ def test_failed_degenerate_solve_returns_explicit_unresolved_segments():
     assert result.status is CriticalCurveStatus.UNRESOLVED
     assert result.report.unresolved_segment_count == 2
     assert result.report.degenerate_solve_failure_count == 2
+
+
+def _generic_junction_field() -> SyntheticFourierField:
+    # Along a field line with iota=0.4, alpha=5 theta-2 zeta is constant and
+    # B=2+0.1s-cos(u)+(0.3+0.1s^3 cos(alpha))cos(2u), u=zeta-0.23.
+    # Its generic extrema births satisfy B=b, D_B=D2_B=0 at isolated points.
+    phase = 0.23
+    cosine = np.zeros((5, 4))
+    sine = np.zeros((5, 4))
+    cosine[0, :2] = [2.0, 0.1]
+    cosine[1, 0] = -np.cos(phase)
+    sine[1, 0] = np.sin(phase)
+    cosine[2, 0] = 0.3 * np.cos(2.0 * phase)
+    sine[2, 0] = -0.3 * np.sin(2.0 * phase)
+    cosine[3, 3] = 0.05 * np.cos(2.0 * phase)
+    sine[3, 3] = -0.05 * np.sin(2.0 * phase)
+    cosine[4, 3] = 0.05 * np.cos(2.0 * phase)
+    sine[4, 3] = 0.05 * np.sin(2.0 * phase)
+    return SyntheticFourierField(
+        nfp=1,
+        m=np.array([0, 0, 0, 5, 5]),
+        n=np.array([0, 1, 2, 4, 0]),
+        cosine_coefficients=cosine,
+        sine_coefficients=sine,
+        iota_coefficients=np.array([0.4]),
+        G_coefficients=np.array([1.0]),
+        I_coefficients=np.array([0.0]),
+    )
+
+
+def test_generic_production_junctions_pass_physical_residual_gates():
+    field = _generic_junction_field()
+    b = 1.34
+    background = StructuredPrismMeshBackend(
+        BackgroundMeshConfig(n_radial=8, n_poloidal=24, n_zeta=25)
+    ).build(field)
+    extraction = MarchingTetrahedraExtractor().extract(background, field, b)
+
+    result = extract_critical_curves(extraction, field, b)
+
+    assert result.report.refined_segment_count == 10
+    assert result.report.degenerate_solve_failure_count == 0
+    assert result.report.unresolved_segment_count == 0
+    degenerate_points = result.points[result.point_kind == CriticalKind.DEGENERATE]
+    s = np.sum(degenerate_points[:, :2] ** 2, axis=1)
+    theta = np.arctan2(degenerate_points[:, 1], degenerate_points[:, 0])
+    B = np.asarray(field.B(s, theta, degenerate_points[:, 2]))
+    g = B * np.asarray(field.D_B(s, theta, degenerate_points[:, 2]))
+    D2_B = np.asarray(field.D2_B(s, theta, degenerate_points[:, 2]))
+    np.testing.assert_allclose(B, b, atol=1.0e-9)
+    np.testing.assert_allclose(g, 0.0, atol=1.0e-9)
+    np.testing.assert_allclose(D2_B, 0.0, atol=1.0e-8)
+
+
+def test_midpoint_sampling_finds_two_type_changes_inside_each_coarse_segment():
+    # B=1.5+s+0.25 cos(3 theta)cos(zeta) has D2_B=-0.25 cos(3 theta)
+    # on zeta=0. Each 2pi/3 coarse segment has maximum-class endpoints but a
+    # minimum-class midpoint, with two analytic degenerate points inside.
+    field = SyntheticFourierField(
+        nfp=1,
+        m=np.array([0, 3, 3]),
+        n=np.array([0, 1, -1]),
+        cosine_coefficients=np.array([[1.5, 1.0], [0.125, 0.0], [0.125, 0.0]]),
+        sine_coefficients=np.zeros((3, 2)),
+        iota_coefficients=np.array([0.0]),
+        G_coefficients=np.array([1.0]),
+        I_coefficients=np.array([0.0]),
+    )
+    theta = np.array([0.0, 2.0 * np.pi / 3.0, 4.0 * np.pi / 3.0])
+    s = 0.5 - 0.25 * np.cos(3.0 * theta)
+    points = np.column_stack(
+        (np.sqrt(s) * np.cos(theta), np.sqrt(s) * np.sin(theta), np.zeros(3))
+    )
+    curve = SurfaceCurveMesh(
+        period=2.0 * np.pi,
+        points=points,
+        segments=np.column_stack((np.arange(3), np.roll(np.arange(3), -1))),
+        B=np.full(3, 2.0),
+        g=np.zeros(3),
+        boundary_tags=np.full(3, SurfaceMesh.G_ZERO, dtype=np.int64),
+    )
+
+    result = extract_critical_curves(curve, field, b=2.0)
+
+    assert result.report.unresolved_segment_count == 0
+    assert result.report.degenerate_solve_failure_count == 0
+    assert np.count_nonzero(result.point_kind == CriticalKind.DEGENERATE) == 6
+    assert {polyline.kind for polyline in result.polylines} == {
+        CriticalKind.GAMMA_MIN,
+        CriticalKind.GAMMA_MAX,
+    }

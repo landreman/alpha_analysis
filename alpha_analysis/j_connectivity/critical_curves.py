@@ -315,11 +315,7 @@ def _degenerate_point(
     ):
         solution = seed
     else:
-        solved = root(residual, seed)
-        if not solved.success:
-            raise CriticalCurveError(
-                "degenerate-point solve on an ambiguous segment did not converge"
-            )
+        solved = root(residual, seed, options={"xtol": 1.0e-12})
         solution = np.asarray(solved.x, dtype=np.float64)
     point = _point_from_coordinates(solution, period)
     B, g, D2_B = _field_values(field, point[np.newaxis, :])
@@ -339,16 +335,76 @@ def _degenerate_point(
     return point
 
 
-def _ambiguous_segments(segments: IntArray, point_kind: np.ndarray) -> np.ndarray:
+def _segment_midpoint_data(
+    points: FloatArray,
+    segments: IntArray,
+    field: BoozerFieldLike,
+    period: float,
+    tolerance: float,
+) -> tuple[FloatArray, np.ndarray]:
+    midpoints = np.array(
+        [
+            _point_from_coordinates(
+                _midpoint_coordinates(points[first], points[second], period), period
+            )
+            for first, second in segments
+        ],
+        dtype=np.float64,
+    ).reshape(-1, 3)
+    if not len(midpoints):
+        return midpoints, np.empty(0, dtype=np.int64)
+    _, _, midpoint_D2 = _field_values(field, midpoints)
+    return midpoints, _point_kinds(midpoint_D2, tolerance)
+
+
+def _refinement_bracket(
+    first: FloatArray,
+    second: FloatArray,
+    first_kind: int,
+    second_kind: int,
+    midpoint: FloatArray,
+    midpoint_kind: int,
+) -> tuple[FloatArray, FloatArray]:
+    """Choose a half-segment that brackets one unresolved type change."""
+    degenerate = CriticalKind.DEGENERATE.value
+    if (
+        first_kind != degenerate
+        and midpoint_kind != degenerate
+        and first_kind != midpoint_kind
+    ):
+        return first, midpoint
+    if (
+        midpoint_kind != degenerate
+        and second_kind != degenerate
+        and midpoint_kind != second_kind
+    ):
+        return midpoint, second
+    return first, second
+
+
+def _ambiguous_segments(
+    segments: IntArray, point_kind: np.ndarray, midpoint_kind: np.ndarray
+) -> np.ndarray:
     first = point_kind[segments[:, 0]]
     second = point_kind[segments[:, 1]]
-    regular_first = first != CriticalKind.DEGENERATE.value
-    regular_second = second != CriticalKind.DEGENERATE.value
-    return regular_first & regular_second & (first != second)
+    degenerate = CriticalKind.DEGENERATE.value
+    regular_first = first != degenerate
+    regular_second = second != degenerate
+    regular_midpoint = midpoint_kind != degenerate
+    sign_change = (
+        (regular_first & regular_second & (first != second))
+        | (regular_first & regular_midpoint & (first != midpoint_kind))
+        | (regular_second & regular_midpoint & (second != midpoint_kind))
+    )
+    near_zero_inside = (midpoint_kind == degenerate) & (regular_first | regular_second)
+    return sign_change | near_zero_inside
 
 
 def _classify_segments(
-    segments: IntArray, point_kind: np.ndarray, unresolved: np.ndarray
+    segments: IntArray,
+    point_kind: np.ndarray,
+    midpoint_kind: np.ndarray,
+    unresolved: np.ndarray,
 ) -> np.ndarray:
     result = np.full(len(segments), CriticalKind.DEGENERATE.value, dtype=np.int64)
     for segment_id, (first, second) in enumerate(segments):
@@ -357,6 +413,7 @@ def _classify_segments(
         endpoint_kinds = {
             int(point_kind[first]),
             int(point_kind[second]),
+            int(midpoint_kind[segment_id]),
         } - {CriticalKind.DEGENERATE.value}
         if len(endpoint_kinds) == 1:
             result[segment_id] = endpoint_kinds.pop()
@@ -512,28 +569,44 @@ def extract_critical_curves(
     refined_count = 0
     solve_failure_count = 0
     history: list[float] = []
+    failed_segment_keys: set[tuple[int, int]] = set()
 
     for level in range(cfg.max_refinement_levels + 1):
         segment_array = np.asarray(segments_list, dtype=np.int64).reshape(-1, 2)
         kind_array = np.asarray(kind_list, dtype=np.int64)
-        ambiguous = _ambiguous_segments(segment_array, kind_array)
+        point_array = np.asarray(points_list, dtype=np.float64)
+        midpoint_points, midpoint_kind = _segment_midpoint_data(
+            point_array, segment_array, field, curve.period, cfg.D2_tolerance
+        )
+        ambiguous = _ambiguous_segments(segment_array, kind_array, midpoint_kind)
+        retry = ambiguous.copy()
+        for segment_id, segment in enumerate(segment_array):
+            if tuple(sorted(map(int, segment))) in failed_segment_keys:
+                retry[segment_id] = False
         lengths = [
-            _segment_length(np.asarray(points_list), segment, curve.period)
+            _segment_length(point_array, segment, curve.period)
             for segment in segment_array[ambiguous]
         ]
         history.append(max(lengths, default=0.0))
-        if not np.any(ambiguous) or level == cfg.max_refinement_levels:
+        if not np.any(retry) or level == cfg.max_refinement_levels:
             break
         replacement: list[tuple[int, int]] = []
-        solve_failed = False
         for segment_id, (first, second) in enumerate(segments_list):
-            if not ambiguous[segment_id]:
+            if not retry[segment_id]:
                 replacement.append((first, second))
                 continue
+            bracket_first, bracket_second = _refinement_bracket(
+                point_array[first],
+                point_array[second],
+                int(kind_array[first]),
+                int(kind_array[second]),
+                midpoint_points[segment_id],
+                int(midpoint_kind[segment_id]),
+            )
             try:
                 midpoint = _degenerate_point(
-                    np.asarray(points_list[first]),
-                    np.asarray(points_list[second]),
+                    bracket_first,
+                    bracket_second,
                     field,
                     b,
                     curve.period,
@@ -542,7 +615,7 @@ def extract_critical_curves(
             except CriticalCurveError:
                 replacement.append((first, second))
                 solve_failure_count += 1
-                solve_failed = True
+                failed_segment_keys.add(tuple(sorted((first, second))))
                 continue
             _, _, midpoint_D2 = _field_values(field, midpoint[np.newaxis, :])
             midpoint_id = len(points_list)
@@ -553,15 +626,16 @@ def extract_critical_curves(
             replacement.extend(((first, midpoint_id), (midpoint_id, second)))
             refined_count += 1
         segments_list = replacement
-        if solve_failed:
-            break
 
     points = np.asarray(points_list, dtype=np.float64).reshape(-1, 3)
     segments = np.asarray(segments_list, dtype=np.int64).reshape(-1, 2)
     D2_B = np.asarray(D2_list, dtype=np.float64)
     point_kind = np.asarray(kind_list, dtype=np.int64)
-    unresolved = _ambiguous_segments(segments, point_kind)
-    segment_kind = _classify_segments(segments, point_kind, unresolved)
+    _, midpoint_kind = _segment_midpoint_data(
+        points, segments, field, curve.period, cfg.D2_tolerance
+    )
+    unresolved = _ambiguous_segments(segments, point_kind, midpoint_kind)
+    segment_kind = _classify_segments(segments, point_kind, midpoint_kind, unresolved)
     polylines = _walk_polylines(points, segments, segment_kind, curve.period)
     unresolved_count = int(np.count_nonzero(unresolved))
     degree = np.bincount(segments.ravel(), minlength=len(points))
