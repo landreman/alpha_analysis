@@ -185,3 +185,94 @@ def test_get_min_max():
     B_min, B_max = booz.get_min_max(n_s=20, n_theta=32, n_phi=33)
     np.testing.assert_allclose(B_min, B_min_ref, rtol=2e-4)
     np.testing.assert_allclose(B_max, B_max_ref, rtol=1e-13, atol=1e-13)
+
+
+def test_B_is_axis_regular():
+    """The Fourier interpolation must be single-valued and continuous at the
+    axis, with the physical rho^|m| harmonic scaling (DESIGN.md section 7.3,
+    option 1).  Unconstrained spline extrapolation below the innermost
+    coefficient surface leaves m != 0 harmonics finite at s=0 and makes |B|
+    multivalued there by about 1e-3 for this file."""
+    booz = BoozerField.from_boozmn(boozmn_file_name)
+    s0 = float(booz.s_bmnc[0])
+    zeta = 0.3
+
+    # Single-valued at the axis: the poloidal spread of B at s -> 0 must
+    # vanish like sqrt(s), so at s = 1e-14 it is far below the ~1e-3 spread
+    # the unconstrained extrapolation produces.
+    theta = np.linspace(0.0, 2.0 * np.pi, 17)
+    spread = np.ptp(booz.B(1.0e-14, theta, zeta))
+    assert spread < 1.0e-6
+
+    # Continuous across the innermost coefficient surface where the
+    # continuation hands over to the spline.
+    below = float(booz.B(s0 * (1.0 - 1.0e-9), 0.7, zeta))
+    above = float(booz.B(s0 * (1.0 + 1.0e-9), 0.7, zeta))
+    np.testing.assert_allclose(below, above, rtol=0.0, atol=1.0e-6)
+
+    # Harmonic scaling: the m-odd part of B scales as sqrt(s) in the
+    # continuation region, so quartering s halves the poloidal asymmetry.
+    def odd_part(s):
+        return 0.5 * float(booz.B(s, 0.0, zeta) - booz.B(s, np.pi, zeta))
+
+    ratio = odd_part(s0 / 4.0) / odd_part(s0 / 16.0)
+    np.testing.assert_allclose(ratio, 2.0, rtol=0.05)
+
+    # The continued radial derivative must be consistent with B itself.
+    s_probe, step = s0 / 2.0, s0 * 1.0e-5
+    finite_difference = (
+        float(booz.B(s_probe + step, 0.7, zeta) - booz.B(s_probe - step, 0.7, zeta))
+    ) / (2.0 * step)
+    np.testing.assert_allclose(
+        float(booz.dB_ds(s_probe, 0.7, zeta)), finite_difference, rtol=1.0e-5
+    )
+
+
+def test_fourier_quantities_match_direct_mode_sums():
+    # The fused evaluation (shared phase table, skipped sine series,
+    # factorized trigonometry, chunking) must reproduce the plain §7.1 mode
+    # sums written out directly from the interpolated coefficients, through
+    # both trigonometric branches, and chunked evaluation must equal
+    # unchunked exactly.
+    field = BoozerField.from_boozmn(boozmn_file_name)
+    rng = np.random.default_rng(7)
+    n = 23
+    s = rng.uniform(0.05, 0.95, n)
+    theta = rng.uniform(-np.pi, np.pi, n)
+    zeta = rng.uniform(0.0, 2.0 * np.pi / field.nfp, n)
+
+    phase = theta[:, np.newaxis] * field.xm - zeta[:, np.newaxis] * field.xn
+    cosine = field.bmnc(s)
+    sine = field.bmns(s)
+    first = -cosine * np.sin(phase) + sine * np.cos(phase)
+    k = np.asarray(field.iota(s))[:, np.newaxis] * field.xm - field.xn
+    names = ("B", "dB_dtheta", "dB_dzeta", "D_B", "D2_B")
+    expected = (
+        np.sum(cosine * np.cos(phase) + sine * np.sin(phase), axis=-1),
+        np.sum(field.xm * first, axis=-1),
+        np.sum(-field.xn * first, axis=-1),
+        np.sum(k * first, axis=-1),
+        -np.sum(k**2 * (cosine * np.cos(phase) + sine * np.sin(phase)), axis=-1),
+    )
+
+    assert field._trig_factorized  # the W7-X mode table reuses few m and n
+    for factorized in (True, False):
+        field._trig_factorized = factorized
+        bundle = field.fourier_quantities(s, theta, zeta, names)
+        for name, reference, values in zip(names, expected, bundle):
+            np.testing.assert_allclose(
+                values, reference, rtol=1e-12, atol=1e-12, err_msg=name
+            )
+    field._trig_factorized = True
+
+    # Forcing many small chunks must not change any value.
+    whole = field.fourier_quantities(s, theta, zeta, names)
+    field._FOURIER_CHUNK_ELEMENTS = 5 * field.xm.size
+    chunked = field.fourier_quantities(s, theta, zeta, names)
+    del field._FOURIER_CHUNK_ELEMENTS
+    for name, big, small in zip(names, whole, chunked):
+        np.testing.assert_array_equal(big, small, err_msg=name)
+
+    # The protocol methods route through the same fused path; spot-check the
+    # scalar shape contract they rely on.
+    assert np.shape(field.B(0.3, 0.2, 0.1)) == ()

@@ -1,11 +1,12 @@
-"""Interactively render several fixed-``B`` pitch surfaces in real space.
+"""Interactively render several fixed-``B`` pitch surfaces in logical coordinates.
 
-This is the surface companion to ``plot_volume_mesh_pyvista_real_space.py``.
-The same ``BackgroundMesh`` is built for the same boozmn equilibrium, then
-``B = b`` level surfaces (DESIGN.md §8.3) are extracted at several pitch
-values and every vertex is mapped from the logical cylinder of DESIGN.md §3.2
-to Cartesian ``(X, Y, Z)`` in meters with the Boozer map implemented in
-``plot_volume_mesh_pyvista_real_space.BoozerGeometry``.
+This is the logical-coordinate twin of
+``plot_pitch_surfaces_pyvista_real_space.py``: the same ``BackgroundMesh`` is
+built for the same boozmn equilibrium and the same ``B = b`` level surfaces
+(DESIGN.md §8.3) are extracted, but the vertices are drawn as they are stored
+-- in the dimensionless logical cylinder ``(x, y, zeta)`` of DESIGN.md §3.2,
+in which ``SurfaceMesh`` is authoritative -- rather than mapped to real space.
+It is the surface companion to ``plot_volume_mesh_pyvista_logical.py``.
 
 The levels are ``numpy.linspace(min(B), max(B), n_surfaces + 2)[1:-1]``, taken
 over the background samples: the two endpoints are dropped because the extreme
@@ -18,17 +19,22 @@ the incoming half ``g < 0`` is drawn with black triangle edges, the outgoing
 half ``g > 0`` with red ones. The ``g = 0`` boundary curve is where the two
 meet.
 
-Triangles that straddle the periodic seam are unwrapped in zeta before being
-mapped, so the surface stays local instead of drawing a triangle across the
-whole device; the real-space map is smooth in zeta, so an unwrapped zeta
-outside ``[0, period)`` maps correctly.
+Triangles that straddle the periodic seam are unwrapped in zeta so the surface
+stays local instead of drawing a triangle across the whole period; the
+unwrapped vertices sit just outside ``[0, period)``, which is correct for the
+covering space of the quotient in DESIGN.md §8.1. Requesting more than one
+field period stacks rigid copies translated by ``period`` in zeta, the logical
+counterpart of the rigid rotation used in real space.
+
+``--zeta-scale`` stretches the zeta axis for legibility only; it is a viewing
+transformation and changes no stored quantity.
 
 PyVista renders and stays outside the numerical core (DESIGN.md §19.2): the
 NumPy arrays on ``SurfaceMesh`` remain authoritative.
 
 Example::
 
-    python examples/plot_pitch_surfaces_pyvista_real_space.py \
+    python examples/plot_pitch_surfaces_pyvista_logical.py \
         --n-surfaces 6 --extractor marching --n-periods 5
 """
 
@@ -43,10 +49,13 @@ import pyvista as pv
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from plot_volume_mesh_pyvista_real_space import (  # noqa: E402
+from plot_volume_mesh_pyvista_logical import (  # noqa: E402
     DEFAULT_BOOZMN,
-    BoozerGeometry,
+    B_LABEL,
     screen_size,
+)
+from plot_pitch_surfaces_pyvista_real_space import (  # noqa: E402
+    unwrapped_triangle_soup,
 )
 
 from alpha_analysis.boozer_field import BoozerField  # noqa: E402
@@ -62,38 +71,20 @@ from alpha_analysis.j_connectivity.surface_extract import (  # noqa: E402
     SurfaceExtractionError,
 )
 
-B_LABEL = "B [field units]"
 
+def to_logical_surface(surface, zeta_scale: float) -> pv.PolyData | None:
+    """Return one ``SurfaceMesh`` as a PyVista mesh in logical coordinates.
 
-def unwrapped_triangle_soup(surface) -> tuple[np.ndarray, np.ndarray]:
-    """Return per-triangle vertices and triangle indices, unwrapped in zeta.
-
-    Vertices are duplicated per triangle so that seam-crossing cells can be
-    unwrapped independently; this is a rendering-only transformation, exactly
-    as in ``visualization._periodic_plot_triangles``.
+    The points are the stored logical ``(x, y, zeta)`` with the seam unwrapped
+    and zeta scaled by ``zeta_scale`` for legibility only.
     """
-    triangles = np.asarray(surface.triangles, dtype=np.int64)
-    if not len(triangles):
-        return np.empty((0, 3), dtype=float), np.empty((0, 3), dtype=np.int64)
-    vertices = np.asarray(surface.points, dtype=float)[triangles].copy()
-    for index in (1, 2):
-        difference = vertices[:, index, 2] - vertices[:, 0, 2]
-        vertices[:, index, 2] -= surface.period * np.round(difference / surface.period)
-    points = vertices.reshape(-1, 3)
-    faces = np.arange(len(points), dtype=np.int64).reshape(-1, 3)
-    return points, faces
-
-
-def to_real_space_surface(surface, geometry: BoozerGeometry) -> pv.PolyData | None:
-    """Map one ``SurfaceMesh`` to a real-space PyVista triangle mesh."""
     points, faces = unwrapped_triangle_soup(surface)
     if not len(faces):
         return None
-    s = np.sum(points[:, :2] ** 2, axis=1)
-    theta = np.arctan2(points[:, 1], points[:, 0])
-    theta[s == 0.0] = 0.0
+    points = points.copy()
+    points[:, 2] *= zeta_scale
     cells = np.column_stack((np.full(len(faces), 3, dtype=np.int64), faces)).ravel()
-    mesh = pv.PolyData(geometry.cartesian(s, theta, points[:, 2]), cells)
+    mesh = pv.PolyData(points, cells)
     triangles = np.asarray(surface.triangles, dtype=np.int64)
     mesh.point_data[B_LABEL] = np.asarray(surface.B, dtype=float)[triangles].ravel()
     return mesh
@@ -127,7 +118,13 @@ def main() -> None:
         "--n-periods",
         type=int,
         default=1,
-        help="field periods to draw; copies are rigid rotations of the surfaces",
+        help="field periods to draw; copies are translations in logical zeta",
+    )
+    parser.add_argument(
+        "--zeta-scale",
+        type=float,
+        default=3.0,
+        help="stretch the logical zeta axis for legibility only",
     )
     parser.add_argument(
         "--opacity", type=float, default=0.55, help="surface face opacity"
@@ -166,14 +163,16 @@ def main() -> None:
     # The endpoints are excluded: B = min(B) and B = max(B) are attained at
     # isolated points, not on a surface.
     levels = np.linspace(B_min, B_max, args.n_surfaces + 2)[1:-1]
-    print(f"Bmin: {B_min:.6g}, Bmax: {B_max:.6g}, levels: {levels}, lowest B surface: {levels[0]:.6g}")
+    print(
+        f"Bmin: {B_min:.6g}, Bmax: {B_max:.6g}, levels: {levels}, "
+        f"lowest B surface: {levels[0]:.6g}"
+    )
     extractor = (
         PyVistaSurfaceExtractor()
         if args.extractor == "pyvista"
         else MarchingTetrahedraExtractor()
     )
 
-    geometry = BoozerGeometry(args.boozmn)
     extractions = []
     for level in levels:
         try:
@@ -191,14 +190,14 @@ def main() -> None:
             (extraction.incoming, "black"),
             (extraction.outgoing, "red"),
         ):
-            mesh = to_real_space_surface(half, geometry)
+            mesh = to_logical_surface(half, args.zeta_scale)
             if mesh is None:
                 continue
             for period in range(args.n_periods):
-                # The field is periodic, so period k is period 0 rotated about
-                # the z axis; |B| rides along unchanged.
-                angle = 360.0 * period / field.nfp
-                copy = mesh.rotate_z(angle, inplace=False)
+                # The field is periodic, so period k is period 0 translated by
+                # one period in logical zeta; |B| rides along unchanged.
+                shift = args.zeta_scale * half.period * period
+                copy = mesh.translate((0.0, 0.0, shift), inplace=False)
                 plotter.add_mesh(
                     copy,
                     scalars=B_LABEL,
@@ -212,18 +211,20 @@ def main() -> None:
                     scalar_bar_args={"title": "|B| [T]"} if first else None,
                 )
                 first = False
-    plotter.add_axes(xlabel="X", ylabel="Y", zlabel="Z")
+    plotter.add_axes(xlabel="x", ylabel="y", zlabel="zeta")
     plotter.add_text(
         f"{args.boozmn.name}\n{args.backend} background mesh, "
         f"{args.extractor} extraction: {len(extractions)} of "
         f"{len(levels)} pitch surfaces in "
         f"[{levels[0]:.4g}, {levels[-1]:.4g}], "
         f"{args.n_periods} of {field.nfp} field periods\n"
+        "logical coordinates, zeta stretched by "
+        f"{args.zeta_scale:g} for legibility\n"
         "black edges: incoming g < 0    red edges: outgoing g > 0",
         font_size=8,
     )
     plotter.show_bounds(
-        xtitle="X [m]", ytitle="Y [m]", ztitle="Z [m]", location="outer", grid="back"
+        xtitle="x", ytitle="y", ztitle="zeta [rad]", location="outer", grid="back"
     )
     if off_screen:
         plotter.show(screenshot=args.screenshot)

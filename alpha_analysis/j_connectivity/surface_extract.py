@@ -66,6 +66,12 @@ class SurfaceMesh:
     AXIS: ClassVar[int] = 2
     PERIODIC_SEAM: ClassVar[int] = 4
     G_ZERO: ClassVar[int] = 8
+    # A split vertex placed at the g sign discontinuity of a marching
+    # triangle that bridges two sheets of an under-resolved surface: no
+    # local g=0 point exists there, so the vertex satisfies B=b but not
+    # g=0, is excluded from the g=0 curve, and marks the extraction
+    # UNRESOLVED (ADR 0001).
+    G_JUMP: ClassVar[int] = 16
 
     level: float
     period: float
@@ -196,7 +202,13 @@ class SurfaceCurveMesh:
 
 @dataclass(frozen=True)
 class SurfaceExtraction:
-    """Full ``B=b`` surface, signed halves, and preserved ``g=0`` curves."""
+    """Full ``B=b`` surface, signed halves, and preserved ``g=0`` curves.
+
+    ``n_unresolved_splits`` counts split vertices placed at ``g`` sign
+    discontinuities of sheet-bridging marching triangles (``G_JUMP``); when
+    it is nonzero the status is ``UNRESOLVED`` and the ``g=0`` curve omits
+    those vertices rather than pretending they satisfy ``g=0``.
+    """
 
     b: float
     full: SurfaceMesh
@@ -204,6 +216,7 @@ class SurfaceExtraction:
     outgoing: SurfaceMesh
     g_zero: SurfaceCurveMesh
     status: SurfaceStatus = SurfaceStatus.REGULAR
+    n_unresolved_splits: int = 0
 
 
 class MarchingTetrahedraExtractor:
@@ -287,23 +300,15 @@ class PyVistaSurfaceExtractor:
             period,
             self.config.merge_tolerance,
         )
-        points = np.asarray(
-            [
-                _project_point_to_level(
-                    point,
-                    field,
-                    float(b),
-                    period,
-                    self.config,
-                    boundary_tag=int(boundary_tag),
-                    seam_side=int(seam_side),
-                )
-                for point, boundary_tag, seam_side in zip(
-                    points, source_boundary_tags, seam_sides
-                )
-            ],
-            dtype=np.float64,
-        ).reshape(-1, 3)
+        points = _project_points_to_level(
+            points,
+            field,
+            float(b),
+            period,
+            self.config,
+            source_boundary_tags,
+            seam_sides,
+        )
         points = _match_pyvista_periodic_seam(
             points, seam_sides, self.config.merge_tolerance
         )
@@ -367,15 +372,18 @@ def _march_tetrahedra(
     for lower, upper in background.periodic_node_pairs:
         representative[upper] = lower
 
-    points: list[np.ndarray] = []
     parent_edges: list[tuple[int, int]] = []
     point_tags: list[int] = []
+    raw_edges: list[tuple[int, int]] = []
+    duplicate_checks: list[tuple[int, tuple[int, int]]] = []
+    duplicate_seen: set[tuple[int, int]] = set()
     triangles: list[tuple[int, int, int]] = []
     parent_tetrahedra: list[int] = []
     edge_cache: dict[tuple[int, int], int] = {}
     edge_sources: dict[tuple[int, int], tuple[int, int]] = {}
 
     def edge_vertex(first: int, second: int) -> int:
+        """Register the root-carrying edge; polishing happens batched below."""
         raw_edge = tuple(sorted((int(first), int(second))))
         canonical_edge = tuple(
             sorted((int(representative[first]), int(representative[second])))
@@ -385,38 +393,21 @@ def _march_tetrahedra(
                 SurfaceStatus.DEGENERATE,
                 "a level root lies on an edge collapsed by the periodic quotient",
             )
-        if canonical_edge in edge_cache and edge_sources[canonical_edge] == raw_edge:
-            return edge_cache[canonical_edge]
-
-        point = _polish_background_edge(
-            background.points[first],
-            background.points[second],
-            field,
-            b,
-            period,
-            config,
-        )
-        point = _canonicalize_point(point, period, config.merge_tolerance)
-        tag = _edge_boundary_tag(background, first, second)
         if canonical_edge in edge_cache:
             point_id = edge_cache[canonical_edge]
-            if (
-                _periodic_distance(points[point_id], point, period)
-                > config.merge_tolerance
-            ):
-                raise SurfaceExtractionError(
-                    SurfaceStatus.PERIODIC_MISMATCH,
-                    "periodic seam roots do not coincide within merge_tolerance",
-                )
-            point_tags[point_id] |= tag
+            if edge_sources[canonical_edge] != raw_edge:
+                point_tags[point_id] |= _edge_boundary_tag(background, first, second)
+                if raw_edge not in duplicate_seen:
+                    duplicate_seen.add(raw_edge)
+                    duplicate_checks.append((point_id, raw_edge))
             return point_id
 
-        point_id = len(points)
+        point_id = len(raw_edges)
         edge_cache[canonical_edge] = point_id
         edge_sources[canonical_edge] = raw_edge
-        points.append(point)
+        raw_edges.append(raw_edge)
         parent_edges.append(canonical_edge)
-        point_tags.append(tag)
+        point_tags.append(_edge_boundary_tag(background, first, second))
         return point_id
 
     for tetrahedron_id, tetrahedron in enumerate(background.tetrahedra):
@@ -457,7 +448,29 @@ def _march_tetrahedra(
         else:  # pragma: no cover
             raise AssertionError("invalid marching-tetrahedra sign partition")
 
-    point_array = np.asarray(points, dtype=np.float64).reshape(-1, 3)
+    point_array = _polish_background_edges(
+        background, raw_edges, field, b, period, config
+    )
+    if duplicate_checks:
+        # Seam partner copies of already-polished edges must land on the
+        # same canonical point.
+        duplicate_points = _polish_background_edges(
+            background,
+            [raw_edge for _, raw_edge in duplicate_checks],
+            field,
+            b,
+            period,
+            config,
+        )
+        for (point_id, _), duplicate in zip(duplicate_checks, duplicate_points):
+            if (
+                _periodic_distance(point_array[point_id], duplicate, period)
+                > config.merge_tolerance
+            ):
+                raise SurfaceExtractionError(
+                    SurfaceStatus.PERIODIC_MISMATCH,
+                    "periodic seam roots do not coincide within merge_tolerance",
+                )
     triangle_array = np.asarray(triangles, dtype=np.int64).reshape(-1, 3)
     if len(triangle_array):
         keys = [tuple(sorted(map(int, triangle))) for triangle in triangle_array]
@@ -490,48 +503,117 @@ def _march_tetrahedra(
     )
 
 
-def _polish_background_edge(
-    first: np.ndarray,
-    second: np.ndarray,
+def _polish_background_edges(
+    background: BackgroundMesh,
+    edges: list[tuple[int, int]],
     field: BoozerFieldLike,
     b: float,
     period: float,
     config: SurfaceExtractionConfig,
 ) -> np.ndarray:
-    second_local = _unwrap_point_relative(second, first, period)
-    direction = second_local - first
+    """Polish the bracketed ``B=b`` root on every background edge at once.
 
-    def residual(parameter: float) -> float:
-        point = first + parameter * direction
-        return float(_evaluate_B(field, point[np.newaxis, :])[0] - b)
+    Each edge is solved on its own chord by the vectorized Chandrupatla
+    iteration, to the same parameter tolerance as the previous per-edge
+    ``brentq`` calls, so one batched field evaluation per iteration serves
+    all still-unconverged edges. Returns canonicalized points, one per edge.
+    """
+    if not len(edges):
+        return np.empty((0, 3), dtype=np.float64)
+    edge_array = np.asarray(edges, dtype=np.int64)
+    firsts = np.asarray(background.points[edge_array[:, 0]], dtype=np.float64)
+    seconds = np.asarray(background.points[edge_array[:, 1]], dtype=np.float64).copy()
+    difference = seconds[:, 2] - firsts[:, 2]
+    seconds[:, 2] -= period * np.round(difference / period)
+    directions = seconds - firsts
 
-    lower_residual = residual(0.0)
-    upper_residual = residual(1.0)
-    if lower_residual * upper_residual >= 0.0:
+    def residuals(parameters: np.ndarray, active: np.ndarray) -> np.ndarray:
+        points = firsts[active] + parameters[:, np.newaxis] * directions[active]
+        return _evaluate_B(field, points) - b
+
+    endpoint_values = _evaluate_B(field, np.vstack((firsts, seconds))) - b
+    lower_values = endpoint_values[: len(edge_array)]
+    upper_values = endpoint_values[len(edge_array) :]
+    if np.any(lower_values * upper_values >= 0.0):
         raise SurfaceExtractionError(
             SurfaceStatus.ROOT_FAILURE,
             "background samples bracket a root that the analytic field does not",
         )
-    try:
-        parameter = brentq(
-            residual,
-            0.0,
-            1.0,
-            xtol=config.parameter_tolerance,
-            rtol=4.0 * np.finfo(float).eps,
-            maxiter=100,
-        )
-    except ValueError as error:
+    parameters, unconverged = _chandrupatla_roots(
+        residuals, lower_values, upper_values, config
+    )
+    if np.any(unconverged):
         raise SurfaceExtractionError(
             SurfaceStatus.ROOT_FAILURE, "bracketed edge-root polishing failed"
-        ) from error
-    point = first + parameter * direction
-    if abs(residual(parameter)) > config.B_tolerance:
+        )
+    points = firsts + parameters[:, np.newaxis] * directions
+    if np.max(np.abs(_evaluate_B(field, points) - b)) > config.B_tolerance:
         raise SurfaceExtractionError(
             SurfaceStatus.ROOT_FAILURE,
             "edge-root residual exceeds B_tolerance after polishing",
         )
-    return point
+    return _canonicalize_points(points, period, config.merge_tolerance)
+
+
+def _chandrupatla_roots(
+    residuals,
+    lower_values: np.ndarray,
+    upper_values: np.ndarray,
+    config: SurfaceExtractionConfig,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Vectorized bracketed root find on the unit parameter interval.
+
+    Chandrupatla's algorithm (inverse quadratic interpolation inside a
+    guaranteed bracket, bisection otherwise) with elementwise state, so one
+    call of ``residuals(parameters, active_mask)`` per iteration serves every
+    still-active bracket. Every ``(lower, upper)`` pair must already straddle
+    a sign change. Returns ``(roots, unconverged_mask)``; the caller decides
+    what an unconverged bracket means.
+    """
+    n = len(lower_values)
+    x1 = np.zeros(n)
+    f1 = np.asarray(lower_values, dtype=np.float64).copy()
+    x2 = np.ones(n)
+    f2 = np.asarray(upper_values, dtype=np.float64).copy()
+    x3 = np.zeros(n)
+    f3 = np.zeros(n)
+    roots = np.where(np.abs(f1) <= np.abs(f2), x1, x2)
+    t = np.full(n, 0.5)
+    active = np.ones(n, dtype=bool)
+    rtol = 4.0 * np.finfo(float).eps
+    for _ in range(100):
+        x = x1 + t * (x2 - x1)
+        f = np.zeros(n)
+        f[active] = residuals(x[active], active)
+        same = np.sign(f) == np.sign(f1)
+        move = active & same
+        x3[move] = x1[move]
+        f3[move] = f1[move]
+        swap = active & ~same
+        x3[swap] = x2[swap]
+        f3[swap] = f2[swap]
+        x2[swap] = x1[swap]
+        f2[swap] = f1[swap]
+        x1[active] = x[active]
+        f1[active] = f[active]
+        best = np.where(np.abs(f1) <= np.abs(f2), x1, x2)
+        roots[active] = best[active]
+        spread = np.abs(x2 - x1)
+        tolerance = config.parameter_tolerance + rtol * np.abs(best)
+        active &= ~((f == 0.0) | (spread <= 2.0 * tolerance))
+        if not active.any():
+            break
+        with np.errstate(divide="ignore", invalid="ignore"):
+            xi = (x1 - x2) / (x3 - x2)
+            phi = (f1 - f2) / (f3 - f2)
+            interpolate = (phi**2 < xi) & ((1.0 - phi) ** 2 < 1.0 - xi)
+            candidate = f1 / (f1 - f2) * (f3 / (f3 - f2)) - (x3 - x1) / (x2 - x1) * (
+                f1 / (f3 - f1)
+            ) * (f2 / (f2 - f3))
+        t = np.where(interpolate & np.isfinite(candidate), candidate, 0.5)
+        limit = tolerance / np.maximum(spread, np.finfo(float).tiny)
+        t = np.clip(t, limit, 1.0 - limit)
+    return roots, active
 
 
 def _split_by_physical_g(
@@ -540,6 +622,11 @@ def _split_by_physical_g(
     config: SurfaceExtractionConfig,
 ) -> SurfaceExtraction:
     crossing_cache: dict[tuple[str, int, int], dict[str, object]] = {}
+    # The surface patch a marching triangle approximates lives inside one
+    # background tetrahedron, so the largest marching-triangle edge is the
+    # locality scale for split-point polishing on edges much shorter than a
+    # background cell.
+    patch_scale = _max_triangle_edge_length(full)
 
     def vertex_record(vertex: int) -> dict[str, object]:
         key = ("v", int(vertex), int(vertex))
@@ -562,7 +649,7 @@ def _split_by_physical_g(
         lower, upper = sorted((int(first), int(second)))
         key = ("e", lower, upper)
         if key not in crossing_cache:
-            point = _polish_g_crossing(
+            point, resolved = _polish_g_crossing(
                 full.points[first],
                 full.points[second],
                 float(full.g[first]),
@@ -571,10 +658,11 @@ def _split_by_physical_g(
                 full.level,
                 full.period,
                 config,
+                patch_scale=patch_scale,
             )
             B_value = float(_evaluate_B(field, point[np.newaxis, :])[0])
             g_value = float(_physical_g(field, point[np.newaxis, :])[0])
-            tag = SurfaceMesh.G_ZERO
+            tag = SurfaceMesh.G_ZERO if resolved else SurfaceMesh.G_JUMP
             for bit in (
                 SurfaceMesh.EDGE,
                 SurfaceMesh.AXIS,
@@ -584,6 +672,11 @@ def _split_by_physical_g(
                     full.boundary_tags[second] & bit
                 ):
                     tag |= bit
+            # A split point polished onto the outer boundary (where the g=0
+            # curve exits the domain) is an EDGE point regardless of its
+            # parent vertices' provenance.
+            if abs(float(np.linalg.norm(point[:2])) - 1.0) <= config.merge_tolerance:
+                tag |= SurfaceMesh.EDGE
             crossing_cache[key] = {
                 "key": key,
                 "point": point,
@@ -627,12 +720,19 @@ def _split_by_physical_g(
     incoming = _build_clipped_surface(full, True, clipped_polygon, config)
     outgoing = _build_clipped_surface(full, False, clipped_polygon, config)
     g_zero = _build_g_zero_curves(full, crossing_record, vertex_record, config)
+    n_unresolved = sum(
+        1
+        for record in crossing_cache.values()
+        if int(record["tag"]) & SurfaceMesh.G_JUMP
+    )
     return SurfaceExtraction(
         b=full.level,
         full=full,
         incoming=incoming,
         outgoing=outgoing,
         g_zero=g_zero,
+        status=(SurfaceStatus.UNRESOLVED if n_unresolved else SurfaceStatus.REGULAR),
+        n_unresolved_splits=n_unresolved,
     )
 
 
@@ -728,6 +828,11 @@ def _build_g_zero_curves(
                 SurfaceStatus.DEGENERATE,
                 "a surface triangle contains an unresolved multiway g=0 event",
             )
+        # A G_JUMP split vertex is not a g=0 point; the g=0 curve honestly
+        # omits it rather than drawing a curve segment that is not there.
+        records = [
+            record for record in records if int(record["tag"]) & SurfaceMesh.G_ZERO
+        ]
         if len(records) != 2:
             continue
         key = tuple(sorted((records[0]["key"], records[1]["key"])))
@@ -755,22 +860,177 @@ def _polish_g_crossing(
     b: float,
     period: float,
     config: SurfaceExtractionConfig,
-) -> np.ndarray:
+    patch_scale: float = 0.0,
+) -> tuple[np.ndarray, bool]:
+    """Locate the split point on one bracketed surface edge (§8.3).
+
+    Returns ``(point, resolved)``. When ``resolved`` is true the point
+    satisfies ``B=b`` and ``g=0`` to tolerance — found by the planar Newton
+    fast path, by the bracketed projected-chord solve, by a pencil of
+    plane-curve continuations returning the crossing nearest the edge, or,
+    when the ``g=0`` curve exits the domain near the outer boundary, on the
+    ``x^2+y^2=1`` cylinder (ADR 0001).
+
+    When every one of those bracketed searches proves that no local ``g=0``
+    point exists — a marching triangle bridging two sheets of an
+    under-resolved surface, whose genuine crossings are many cells away —
+    ``resolved`` is false and the point is the ``g`` sign discontinuity of
+    the projected chord path: on the surface (``B=b`` to tolerance), local
+    by construction, but with ``g != 0``. Callers must record such points
+    as ``G_JUMP``, not ``G_ZERO``.
+
+    ``patch_scale`` is the size of the surface patch one background cell
+    holds (the largest marching-triangle edge); it keeps the fallbacks'
+    search range and acceptance radius meaningful on marching edges much
+    shorter than a background cell.
+    """
     if first_g * second_g >= 0.0:
         raise SurfaceExtractionError(
             SurfaceStatus.ROOT_FAILURE, "g=0 surface edge is not bracketed"
         )
     second_local = _unwrap_point_relative(second, first, period)
     tangent = second_local - first
+    displacement_limit = config.merge_tolerance + float(np.linalg.norm(tangent))
+    point = _polish_g_crossing_planar(
+        first, tangent, first_g, second_g, field, b, config, displacement_limit
+    )
+    if point is None:
+        point = _polish_g_crossing_bracketed(
+            first,
+            tangent,
+            first_g,
+            second_g,
+            field,
+            b,
+            config,
+            displacement_limit,
+            patch_scale,
+        )
+    if point is not None:
+        return _canonicalize_point(point, period, config.merge_tolerance), True
+    point = _locate_g_jump_on_chord(
+        first, tangent, first_g, second_g, field, b, config, displacement_limit
+    )
+    if point is None:
+        raise SurfaceExtractionError(
+            SurfaceStatus.ROOT_FAILURE,
+            "simultaneous B=b and g=0 split-point polishing failed: the "
+            "planar Newton solve, the bracketed fallbacks, and the g-jump "
+            "locator were all rejected by the locality and residual checks "
+            f"(edge length={np.linalg.norm(tangent):.3g}, "
+            f"g bracket=({first_g:.3g}, {second_g:.3g}))",
+        )
+    return _canonicalize_point(point, period, config.merge_tolerance), False
+
+
+def _locate_g_jump_on_chord(
+    first: np.ndarray,
+    tangent: np.ndarray,
+    first_g: float,
+    second_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    displacement_limit: float,
+) -> np.ndarray | None:
+    """Bisect the chord to the ``g`` sign discontinuity of its projection.
+
+    Used only after the bracketed searches have established that no local
+    ``g=0`` point exists: the marching edge bridges two surface sheets of
+    opposite ``g`` sign, and the projection of the chord onto ``B=b`` jumps
+    between them at some chord parameter. Sign bisection converges to that
+    parameter regardless of the discontinuity, and the returned projected
+    point lies on one of the two sheets right at the gap — the honest
+    seam for partitioning a triangle whose true ``g=0`` curve is elsewhere.
+    """
+
+    def project(parameter: float) -> np.ndarray | None:
+        return _project_to_level_near(
+            first + parameter * tangent, field, b, config, displacement_limit
+        )
+
+    # Sample the projectable part of the chord; the projection can stall in
+    # the vanishing-gradient interior of the tube, so failed samples are
+    # simply skipped. The endpoints are already on the surface with known
+    # opposite signs, so an adjacent sign change always exists.
+    samples: list[tuple[float, np.ndarray, float]] = [
+        (0.0, np.asarray(first, dtype=np.float64), float(first_g))
+    ]
+    for parameter in np.linspace(0.0, 1.0, 65)[1:-1]:
+        candidate = project(float(parameter))
+        if candidate is not None:
+            samples.append(
+                (
+                    float(parameter),
+                    candidate,
+                    float(_physical_g(field, candidate[np.newaxis, :])[0]),
+                )
+            )
+    samples.append((1.0, first + tangent, float(second_g)))
+    flip = None
+    for left, right in zip(samples, samples[1:]):
+        if np.sign(left[2]) != np.sign(right[2]):
+            flip = (left, right)
+            break
+    if flip is None:
+        return None
+    (t_low, p_low, g_low), (t_high, p_high, g_high) = flip
+    for _ in range(40):
+        if t_high - t_low <= config.parameter_tolerance:
+            break
+        t_mid = 0.5 * (t_low + t_high)
+        candidate = project(t_mid)
+        if candidate is None:
+            break
+        g_mid = float(_physical_g(field, candidate[np.newaxis, :])[0])
+        if np.sign(g_mid) == np.sign(g_low):
+            t_low, p_low, g_low = t_mid, candidate, g_mid
+        else:
+            t_high, p_high, g_high = t_mid, candidate, g_mid
+    # Both bracket points sit at the gap on their own sheets. Prefer a
+    # genuine interior point over a pre-existing endpoint, but a sheet can
+    # bulge outside the unit disk near the outer boundary, so fall back
+    # through the remaining samples by proximity to the flip; the in-disk
+    # edge endpoints guarantee an acceptable candidate exists.
+    t_flip = 0.5 * (t_low + t_high)
+    preferred: list[np.ndarray] = []
+    if t_low <= 0.0:
+        preferred = [p_high, p_low]
+    elif t_high >= 1.0:
+        preferred = [p_low, p_high]
+    else:
+        preferred = [p_low, p_high] if abs(g_low) <= abs(g_high) else [p_high, p_low]
+    fallbacks = [
+        sample[1]
+        for sample in sorted(samples, key=lambda sample: abs(sample[0] - t_flip))
+    ]
+    for point in preferred + fallbacks:
+        if (
+            float(np.sum(point[:2] ** 2)) <= 1.0 + config.merge_tolerance
+            and abs(float(_evaluate_B(field, point[np.newaxis, :])[0] - b))
+            <= config.B_tolerance
+        ):
+            return point
+    return None
+
+
+def _polish_g_crossing_planar(
+    first: np.ndarray,
+    tangent: np.ndarray,
+    first_g: float,
+    second_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    displacement_limit: float,
+) -> np.ndarray | None:
+    """Fast planar Newton solve; ``None`` when its checks reject the root."""
     initial_parameter = first_g / (first_g - second_g)
     initial = first + initial_parameter * tangent
     gradient = _logical_B_gradient(field, initial)
     gradient_norm = np.linalg.norm(gradient)
     if gradient_norm <= np.finfo(float).eps:
-        raise SurfaceExtractionError(
-            SurfaceStatus.DEGENERATE,
-            "cannot project a g=0 split point where logical grad B vanishes",
-        )
+        return None
     normal = gradient / gradient_norm
 
     def equations(parameters: np.ndarray) -> np.ndarray:
@@ -791,78 +1051,713 @@ def _polish_g_crossing(
     parameter = initial_parameter + solution.x[0]
     point = initial + solution.x[0] * tangent + solution.x[1] * normal
     residual = equations(solution.x)
-    normal_displacement_limit = config.merge_tolerance + np.linalg.norm(tangent)
     if (
         not np.all(np.isfinite(solution.x))
         or not -config.merge_tolerance <= parameter <= 1.0 + config.merge_tolerance
-        or abs(solution.x[1]) > normal_displacement_limit
+        or abs(solution.x[1]) > displacement_limit
         or abs(residual[0]) > config.B_tolerance
         or abs(residual[1]) > config.g_tolerance
+        or float(np.sum(point[:2] ** 2)) > 1.0 + config.merge_tolerance
     ):
-        raise SurfaceExtractionError(
-            SurfaceStatus.ROOT_FAILURE,
-            "simultaneous B=b and g=0 split-point polishing failed "
-            f"(success={solution.success}, parameter={parameter:.6g}, "
-            f"normal_displacement={solution.x[1]:.3g}, "
-            f"normal_limit={normal_displacement_limit:.3g}, "
-            f"residual=({residual[0]:.3g}, {residual[1]:.3g}))",
+        return None
+    return point
+
+
+def _polish_g_crossing_bracketed(
+    first: np.ndarray,
+    tangent: np.ndarray,
+    first_g: float,
+    second_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    displacement_limit: float,
+    patch_scale: float,
+) -> np.ndarray | None:
+    """Bracketed fallback that cannot leave the edge neighborhood.
+
+    Both endpoints lie on ``B=b`` with ``g`` of opposite signs, so ``g``
+    after projecting a chord point back onto ``B=b`` is a bracketed scalar
+    function of the chord parameter — unless the surface curves so strongly
+    between the endpoints (a thin tube near ``min B``) that the projection
+    jumps sheets and the projected ``g`` is discontinuous. When the direct
+    chord solve is rejected for that reason, crossings are collected by
+    tracing the intersection curves of ``B=b`` with a pencil of planes
+    through the edge, and the crossing nearest the edge is returned.
+
+    The surface patch that the parent triangle approximates lies inside its
+    background tetrahedron and hence inside the unit disk; every accepted
+    candidate must stay inside the disk and within the locality scale — a
+    few edge lengths, or twice the background patch scale for marching
+    edges much shorter than their background cell. Near the outer boundary
+    the surface's ``g=0`` curve may leave the domain entirely, in which
+    case no interior crossing exists and the split point is where that
+    curve exits: the ``g`` flip along the surface's boundary curve on the
+    ``x^2+y^2=1`` cylinder. A distant or out-of-domain root is never
+    returned (§21.2).
+    """
+    second = first + tangent
+    edge_length = float(np.linalg.norm(tangent))
+    acceptance_radius = config.merge_tolerance + max(
+        4.0 * edge_length, 2.0 * patch_scale
+    )
+    point = _brentq_projected_chord(first, second, first_g, second_g, field, b, config)
+    if point is not None and (
+        _distance_to_segment(point, first, second) <= displacement_limit
+    ):
+        return point
+    point = _trace_plane_curve_to_g_zero(
+        first, second, first_g, second_g, field, b, config, patch_scale
+    )
+    if point is not None and (
+        _distance_to_segment(point, first, second) <= acceptance_radius
+    ):
+        return point
+    if (
+        max(np.linalg.norm(first[:2]), np.linalg.norm(second[:2])) + acceptance_radius
+        >= 1.0
+    ):
+        point = _polish_g_zero_on_outer_boundary(
+            first, second, first_g, second_g, field, b, config, patch_scale
         )
-    return _canonicalize_point(point, period, config.merge_tolerance)
+        if point is not None and (
+            _distance_to_segment(point, first, second) <= acceptance_radius
+        ):
+            return point
+    return None
 
 
-def _project_point_to_level(
+def _polish_g_zero_on_outer_boundary(
+    first: np.ndarray,
+    second: np.ndarray,
+    first_g: float,
+    second_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    patch_scale: float,
+) -> np.ndarray | None:
+    """Find where the surface's ``g=0`` curve exits through ``x^2+y^2=1``.
+
+    On the outer cylinder, parametrized by ``(theta, zeta)`` with
+    ``(x, y) = (cos theta, sin theta)``, the level set ``B(1, theta,
+    zeta) = b`` is a one-dimensional implicit curve — the boundary curve of
+    the domain-clipped surface. When the interior ``g=0`` curve leaves the
+    domain near the edge, ``g`` restricted to this boundary curve changes
+    sign at the exit point, so the same predictor-corrector continuation
+    used for the in-plane traces applies in the chart, seeded at an edge
+    endpoint that lies on the boundary (or at the projected mid-chord).
+    Every candidate lies on the boundary exactly, so it is in-domain by
+    construction.
+    """
+    length = float(np.linalg.norm(second - first))
+    scale = max(length, 0.5 * patch_scale)
+
+    def cylinder_point(theta: float, zeta: float) -> np.ndarray:
+        return np.array([np.cos(theta), np.sin(theta), zeta])
+
+    def cylinder_residual(theta: float, zeta: float) -> float:
+        return float(field.B(1.0, theta, zeta)) - b
+
+    def cylinder_gradient(theta: float, zeta: float) -> np.ndarray:
+        dB_dtheta, dB_dzeta = _field_quantities(
+            field, 1.0, theta, zeta, ("dB_dtheta", "dB_dzeta")
+        )
+        return np.array([float(dB_dtheta), float(dB_dzeta)])
+
+    def correct(theta: float, zeta: float, cap: float) -> tuple[float, float] | None:
+        position = np.array([theta, zeta])
+        start_position = position.copy()
+        residual = cylinder_residual(*position)
+        for _ in range(30):
+            if abs(residual) <= config.B_tolerance:
+                return float(position[0]), float(position[1])
+            gradient2 = cylinder_gradient(*position)
+            norm_squared = float(np.dot(gradient2, gradient2))
+            if norm_squared <= np.finfo(float).eps:
+                return None
+            step = (-residual / norm_squared) * gradient2
+            improved = None
+            for _halving in range(20):
+                trial = position + step
+                if np.linalg.norm(trial - start_position) > cap:
+                    step = 0.5 * step
+                    continue
+                trial_residual = cylinder_residual(*trial)
+                if abs(trial_residual) < abs(residual):
+                    improved = (trial, trial_residual)
+                    break
+                step = 0.5 * step
+            if improved is None:
+                return None
+            position, residual = improved
+        return None
+
+    def chart_g(theta: float, zeta: float) -> float:
+        return float(_physical_g(field, cylinder_point(theta, zeta)[np.newaxis, :])[0])
+
+    # Seed on the boundary curve: an edge endpoint already on the cylinder
+    # is exact; otherwise correct the projected mid-chord onto the curve.
+    seed: tuple[float, float] | None = None
+    seed_g = 0.0
+    for endpoint, endpoint_g in ((first, first_g), (second, second_g)):
+        if abs(float(np.linalg.norm(endpoint[:2])) - 1.0) <= config.merge_tolerance:
+            seed = (
+                float(np.arctan2(endpoint[1], endpoint[0])),
+                float(endpoint[2]),
+            )
+            seed_g = float(endpoint_g)
+            break
+    if seed is None:
+        middle = 0.5 * (first + second)
+        corrected = correct(
+            float(np.arctan2(middle[1], middle[0])),
+            float(middle[2]),
+            cap=2.0 * scale,
+        )
+        if corrected is None:
+            return None
+        seed = corrected
+        seed_g = chart_g(*seed)
+        if abs(seed_g) <= config.g_tolerance:
+            return cylinder_point(*seed)
+
+    def polish_between(
+        start: np.ndarray, start_g: float, end: np.ndarray, end_g: float
+    ) -> np.ndarray | None:
+        span = end - start
+        cap = float(np.linalg.norm(span)) + config.merge_tolerance
+
+        def bracketed_g(parameter: float) -> float:
+            if parameter <= 0.0:
+                return start_g
+            if parameter >= 1.0:
+                return end_g
+            sample = start + parameter * span
+            corrected = correct(sample[0], sample[1], cap)
+            if corrected is None:
+                raise _LocalProjectionFailure()
+            return chart_g(*corrected)
+
+        try:
+            parameter = brentq(
+                bracketed_g,
+                0.0,
+                1.0,
+                xtol=config.parameter_tolerance,
+                rtol=4.0 * np.finfo(float).eps,
+                maxiter=200,
+            )
+        except (_LocalProjectionFailure, ValueError):
+            return None
+        sample = start + float(np.clip(parameter, 0.0, 1.0)) * span
+        corrected = correct(sample[0], sample[1], cap)
+        if corrected is None:
+            return None
+        point = cylinder_point(*corrected)
+        if (
+            abs(float(_evaluate_B(field, point[np.newaxis, :])[0] - b))
+            > config.B_tolerance
+            or abs(chart_g(*corrected)) > config.g_tolerance
+        ):
+            return None
+        return point
+
+    nominal_step = scale / 16.0
+    arc_budget = 8.0 * scale
+    candidates: list[np.ndarray] = []
+    for orientation in (1.0, -1.0):
+        position = np.array(seed, dtype=np.float64)
+        position_g = seed_g
+        previous_direction: np.ndarray | None = None
+        traveled = 0.0
+        step_size = nominal_step
+        for _ in range(1024):
+            if traveled > arc_budget or len(candidates) >= 8:
+                break
+            gradient2 = cylinder_gradient(*position)
+            norm2 = float(np.linalg.norm(gradient2))
+            if norm2 <= np.finfo(float).eps:
+                break
+            tangent2 = np.array([-gradient2[1], gradient2[0]]) / norm2
+            if previous_direction is None:
+                tangent2 = orientation * tangent2
+            elif float(np.dot(tangent2, previous_direction)) < 0.0:
+                tangent2 = -tangent2
+            corrected = None
+            while step_size >= nominal_step * 2.0**-20:
+                trial = position + step_size * tangent2
+                corrected = correct(trial[0], trial[1], cap=step_size)
+                if corrected is not None:
+                    break
+                step_size *= 0.5
+            if corrected is None:
+                break
+            following = np.array(corrected, dtype=np.float64)
+            advance = float(np.linalg.norm(following - position))
+            if advance <= config.merge_tolerance:
+                break
+            following_g = chart_g(*following)
+            if abs(following_g) <= config.g_tolerance:
+                candidates.append(cylinder_point(*following))
+            elif position_g * following_g < 0.0:
+                candidate = polish_between(position, position_g, following, following_g)
+                if candidate is not None:
+                    candidates.append(candidate)
+            previous_direction = (following - position) / advance
+            traveled += advance
+            position, position_g = following, following_g
+            step_size = min(2.0 * step_size, nominal_step)
+    if not candidates:
+        return None
+    return min(
+        candidates,
+        key=lambda candidate: _distance_to_segment(candidate, first, second),
+    )
+
+
+def _trace_plane_curve_to_g_zero(
+    first: np.ndarray,
+    second: np.ndarray,
+    first_g: float,
+    second_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    patch_scale: float,
+) -> np.ndarray | None:
+    """Trace ``B=b`` within planes through the edge, return the nearest
+    ``g=0`` crossing.
+
+    A plane containing the chord cuts the level set in a one-dimensional
+    implicit curve; every point of the curve lies on the surface. When the
+    cut is transversal (the tube cross-section for ``b`` near ``min B``)
+    that curve passes through both endpoints, ``g`` restricted to it is
+    continuous with opposite signs at the endpoints, and the direct arc
+    carries a crossing near the edge. A near-axial plane instead cuts the
+    tube in two disconnected curves, one per endpoint, with no bracket on
+    either — so a pencil of planes rotated about the chord is tried, seeded
+    by the ``grad B`` direction. Predictor steps follow the in-plane curve
+    tangent with orientation continuity — no step-toward-the-target
+    heuristic, which stalls when the far endpoint sits on the opposite
+    sheet — and corrector steps are damped in-plane Newton back onto
+    ``B=b``. Every sign flip met in either direction of every plane is
+    polished on its short bracketing sub-chord, and the candidate closest
+    to the edge wins. A direction ends at the far endpoint, at the unit-disk
+    boundary (beyond it the field is unphysical extrapolation and no valid
+    crossing can live), or at the arc-length budget.
+    """
+    chord = second - first
+    length = float(np.linalg.norm(chord))
+    if length <= 0.0:
+        return None
+    u = chord / length
+    w0 = None
+    for probe in (0.5 * (first + second), first, second):
+        gradient = _logical_B_gradient(field, probe)
+        candidate = gradient - float(np.dot(gradient, u)) * u
+        candidate_norm = float(np.linalg.norm(candidate))
+        if candidate_norm > 1.0e-8 * max(1.0, float(np.linalg.norm(gradient))):
+            w0 = candidate / candidate_norm
+            break
+    if w0 is None:
+        return None
+    w_perpendicular = np.cross(u, w0)
+    # The search scale: the chord itself when the marching edge is a fair
+    # sample of the background cell, the patch scale when the edge is much
+    # shorter than the cell that holds the surface patch.
+    scale = max(length, 0.5 * patch_scale)
+
+    candidates: list[np.ndarray] = []
+    for angle in (0.0, 0.25 * np.pi, 0.5 * np.pi, 0.75 * np.pi):
+        w = np.cos(angle) * w0 + np.sin(angle) * w_perpendicular
+        candidates.extend(
+            _trace_one_plane_for_g_zero(
+                first, second, first_g, second_g, u, w, length, scale, field, b, config
+            )
+        )
+        near = [
+            candidate
+            for candidate in candidates
+            if _distance_to_segment(candidate, first, second) <= 1.5 * scale
+        ]
+        if near:
+            break
+    if not candidates:
+        return None
+    return min(
+        candidates,
+        key=lambda candidate: _distance_to_segment(candidate, first, second),
+    )
+
+
+def _trace_one_plane_for_g_zero(
+    first: np.ndarray,
+    second: np.ndarray,
+    first_g: float,
+    second_g: float,
+    u: np.ndarray,
+    w: np.ndarray,
+    length: float,
+    scale: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+) -> list[np.ndarray]:
+    """Collect polished ``g=0`` crossings on ``B=b`` in one cutting plane."""
+
+    def plane_point(a: float, c: float) -> np.ndarray:
+        return first + a * u + c * w
+
+    def plane_residual(a: float, c: float) -> float:
+        return float(_evaluate_B(field, plane_point(a, c)[np.newaxis, :])[0] - b)
+
+    def plane_gradient(a: float, c: float) -> np.ndarray:
+        gradient = _logical_B_gradient(field, plane_point(a, c))
+        return np.array([float(np.dot(gradient, u)), float(np.dot(gradient, w))])
+
+    def correct(a: float, c: float, cap: float) -> tuple[float, float] | None:
+        position = np.array([a, c])
+        start_position = position.copy()
+        residual = plane_residual(*position)
+        for _ in range(30):
+            if abs(residual) <= config.B_tolerance:
+                return float(position[0]), float(position[1])
+            gradient2 = plane_gradient(*position)
+            norm_squared = float(np.dot(gradient2, gradient2))
+            if norm_squared <= np.finfo(float).eps:
+                return None
+            step = (-residual / norm_squared) * gradient2
+            improved = None
+            for _halving in range(20):
+                trial = position + step
+                if np.linalg.norm(trial - start_position) > cap:
+                    step = 0.5 * step
+                    continue
+                trial_residual = plane_residual(*trial)
+                if abs(trial_residual) < abs(residual):
+                    improved = (trial, trial_residual)
+                    break
+                step = 0.5 * step
+            if improved is None:
+                return None
+            position, residual = improved
+        return None
+
+    def collect(candidates: list[np.ndarray], point: np.ndarray | None) -> None:
+        if point is not None and (
+            float(np.sum(point[:2] ** 2)) <= 1.0 + config.merge_tolerance
+        ):
+            candidates.append(point)
+
+    nominal_step = scale / 16.0
+    arc_budget = 8.0 * scale
+    candidates: list[np.ndarray] = []
+    for orientation in (1.0, -1.0):
+        a, c = 0.0, 0.0
+        current = np.asarray(first, dtype=np.float64)
+        current_g = float(first_g)
+        previous_direction: np.ndarray | None = None
+        traveled = 0.0
+        step_size = nominal_step
+        for _ in range(1024):
+            if traveled > arc_budget or len(candidates) >= 8:
+                break
+            gradient2 = plane_gradient(a, c)
+            norm2 = float(np.linalg.norm(gradient2))
+            if norm2 <= np.finfo(float).eps:
+                break
+            tangent2 = np.array([-gradient2[1], gradient2[0]]) / norm2
+            if previous_direction is None:
+                if orientation * tangent2[0] < 0.0:
+                    tangent2 = -tangent2
+            elif float(np.dot(tangent2, previous_direction)) < 0.0:
+                tangent2 = -tangent2
+            corrected = None
+            while step_size >= nominal_step * 2.0**-20:
+                trial = (a + step_size * tangent2[0], c + step_size * tangent2[1])
+                corrected = correct(*trial, cap=step_size)
+                if corrected is not None:
+                    break
+                step_size *= 0.5
+            if corrected is None:
+                break
+            a_next, c_next = corrected
+            advance = float(np.hypot(a_next - a, c_next - c))
+            if advance <= config.merge_tolerance:
+                break
+            point = plane_point(a_next, c_next)
+            if float(np.sum(point[:2] ** 2)) > 1.0:
+                # The trace left the plasma domain; the field beyond the unit
+                # disk is extrapolation, so no valid crossing lies this way.
+                break
+            point_g = float(_physical_g(field, point[np.newaxis, :])[0])
+            if abs(point_g) <= config.g_tolerance:
+                collect(candidates, point)
+            elif current_g * point_g < 0.0:
+                collect(
+                    candidates,
+                    _brentq_projected_chord(
+                        current, point, current_g, point_g, field, b, config
+                    ),
+                )
+            if np.hypot(a_next - length, c_next) <= step_size:
+                if point_g * second_g < 0.0:
+                    collect(
+                        candidates,
+                        _brentq_projected_chord(
+                            point, second, point_g, second_g, field, b, config
+                        ),
+                    )
+                break
+            previous_direction = (
+                np.array([a_next - a, c_next - c], dtype=np.float64) / advance
+            )
+            traveled += advance
+            a, c = a_next, c_next
+            current, current_g = point, point_g
+            step_size = min(2.0 * step_size, nominal_step)
+    return candidates
+
+
+def _brentq_projected_chord(
+    left: np.ndarray,
+    right: np.ndarray,
+    left_g: float,
+    right_g: float,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+) -> np.ndarray | None:
+    """Solve ``g=0`` along one surface chord via projection; ``None`` on any
+    projection failure or residual-check rejection."""
+    tangent = right - left
+    cap = float(np.linalg.norm(tangent)) + config.merge_tolerance
+
+    def projected(parameter: float) -> np.ndarray | None:
+        return _project_to_level_near(left + parameter * tangent, field, b, config, cap)
+
+    def projected_g(parameter: float) -> float:
+        if parameter <= 0.0:
+            return left_g
+        if parameter >= 1.0:
+            return right_g
+        point = projected(parameter)
+        if point is None:
+            raise _LocalProjectionFailure()
+        return float(_physical_g(field, point[np.newaxis, :])[0])
+
+    try:
+        parameter = brentq(
+            projected_g,
+            0.0,
+            1.0,
+            xtol=config.parameter_tolerance,
+            rtol=4.0 * np.finfo(float).eps,
+            maxiter=200,
+        )
+    except (_LocalProjectionFailure, ValueError):
+        return None
+    point = projected(float(np.clip(parameter, 0.0, 1.0)))
+    if point is None:
+        return None
+    residual_B = float(_evaluate_B(field, point[np.newaxis, :])[0] - b)
+    residual_g = float(_physical_g(field, point[np.newaxis, :])[0])
+    if (
+        abs(residual_B) > config.B_tolerance
+        or abs(residual_g) > config.g_tolerance
+        or float(np.sum(point[:2] ** 2)) > 1.0 + config.merge_tolerance
+    ):
+        return None
+    return point
+
+
+def _max_triangle_edge_length(surface: SurfaceMesh) -> float:
+    """Largest marching-triangle edge length, with seam triangles unwrapped.
+
+    Marching triangles live inside single background tetrahedra, so this is
+    a per-extraction proxy for the background cell size in logical units.
+    """
+    if not len(surface.triangles):
+        return 0.0
+    vertices = surface.points[surface.triangles].copy()
+    for index in (1, 2):
+        difference = vertices[:, index, 2] - vertices[:, 0, 2]
+        vertices[:, index, 2] -= surface.period * np.round(difference / surface.period)
+    edges = np.stack(
+        (
+            vertices[:, 1] - vertices[:, 0],
+            vertices[:, 2] - vertices[:, 1],
+            vertices[:, 0] - vertices[:, 2],
+        )
+    )
+    return float(np.max(np.linalg.norm(edges, axis=-1)))
+
+
+def _distance_to_segment(
+    point: np.ndarray, start: np.ndarray, end: np.ndarray
+) -> float:
+    """Euclidean distance from ``point`` to the segment ``start``–``end``,
+    all in the same locally unwrapped coordinates."""
+    direction = end - start
+    length_squared = float(np.dot(direction, direction))
+    if length_squared == 0.0:
+        return float(np.linalg.norm(point - start))
+    parameter = np.clip(
+        float(np.dot(point - start, direction)) / length_squared, 0.0, 1.0
+    )
+    return float(np.linalg.norm(point - (start + parameter * direction)))
+
+
+class _LocalProjectionFailure(Exception):
+    """The displacement-capped projection onto ``B=b`` did not converge."""
+
+
+def _project_to_level_near(
     point: np.ndarray,
+    field: BoozerFieldLike,
+    b: float,
+    config: SurfaceExtractionConfig,
+    max_displacement: float,
+) -> np.ndarray | None:
+    """Project ``point`` onto ``B=b`` along the local gradient, staying local.
+
+    Damped Newton with a monotone-residual line search; the iterate never
+    moves farther than ``max_displacement`` from the seed, which pins the
+    result to the ``B=b`` sheet nearest the seed. Returns ``None`` when no
+    such local projection is found — never a distant substitute (§21.2).
+    """
+    start = np.asarray(point, dtype=np.float64)
+    current = start.copy()
+    residual = float(_evaluate_B(field, current[np.newaxis, :])[0] - b)
+    for _ in range(60):
+        if abs(residual) <= config.B_tolerance:
+            return current
+        gradient = _logical_B_gradient(field, current)
+        norm_squared = float(np.dot(gradient, gradient))
+        if norm_squared <= np.finfo(float).eps:
+            return None
+        step = (-residual / norm_squared) * gradient
+        improved = None
+        for _halving in range(30):
+            trial = current + step
+            if np.linalg.norm(trial - start) > max_displacement:
+                step = 0.5 * step
+                continue
+            trial_residual = float(_evaluate_B(field, trial[np.newaxis, :])[0] - b)
+            if abs(trial_residual) < abs(residual):
+                improved = (trial, trial_residual)
+                break
+            step = 0.5 * step
+        if improved is None:
+            return None
+        current, residual = improved
+    return None
+
+
+def _project_points_to_level(
+    points: np.ndarray,
     field: BoozerFieldLike,
     b: float,
     period: float,
     config: SurfaceExtractionConfig,
-    *,
-    boundary_tag: int = 0,
-    seam_side: int = 0,
+    boundary_tags: np.ndarray,
+    seam_sides: np.ndarray,
 ) -> np.ndarray:
-    """Project a VTK contour point to ``B=b`` within the §8.2 disk domain."""
-    projected = np.asarray(point, dtype=np.float64).copy()
-    on_axis = bool(boundary_tag & SurfaceMesh.AXIS)
-    on_seam = bool(boundary_tag & SurfaceMesh.PERIODIC_SEAM)
-    if on_axis:
-        projected[:2] = 0.0
-    if on_seam:
-        projected[2] = period if seam_side > 0 else 0.0
-    active_domain_boundary = False
+    """Project VTK contour points to ``B=b`` within the §8.2 disk domain.
+
+    Vectorized constrained Newton: each iteration serves every
+    still-unconverged point from one batched field evaluation, with the
+    axis, periodic-seam, and outer-boundary constraints applied per point
+    exactly as the previous per-point loop did. Any point that fails to
+    converge fails the whole projection (§21.2 — no silent substitutes).
+    """
+    projected = np.array(points, dtype=np.float64).reshape(-1, 3)
+    n_points = len(projected)
+    if not n_points:
+        return projected
+    on_axis = (np.asarray(boundary_tags) & SurfaceMesh.AXIS) != 0
+    on_seam = (np.asarray(boundary_tags) & SurfaceMesh.PERIODIC_SEAM) != 0
+    seam_targets = np.where(np.asarray(seam_sides) > 0, period, 0.0)
+    projected[on_axis, :2] = 0.0
+    projected[on_seam, 2] = seam_targets[on_seam]
     guarded_unit_radius = 1.0 - 8.0 * np.finfo(float).eps
-    initial_radius = np.linalg.norm(projected[:2])
-    if initial_radius > 1.0:
-        projected[:2] *= guarded_unit_radius / initial_radius
-        active_domain_boundary = True
+    radius = np.linalg.norm(projected[:, :2], axis=1)
+    active_boundary = radius > 1.0
+    projected[active_boundary, :2] *= (guarded_unit_radius / radius[active_boundary])[
+        :, np.newaxis
+    ]
+    converged = np.zeros(n_points, dtype=bool)
+    hopeless = np.zeros(n_points, dtype=bool)
     for _ in range(20):
-        residual = float(_evaluate_B(field, projected[np.newaxis, :])[0] - b)
-        if abs(residual) <= config.B_tolerance:
-            if np.linalg.norm(projected[:2]) > 1.0 + config.merge_tolerance:
-                break
-            return _canonicalize_point(projected, period, config.merge_tolerance)
-        gradient = _logical_B_gradient(field, projected)
-        if active_domain_boundary:
-            radial = np.array([projected[0], projected[1], 0.0])
-            gradient -= np.dot(gradient, radial) * radial
-        if on_axis:
-            gradient[:2] = 0.0
-        if on_seam:
-            gradient[2] = 0.0
-        norm_squared = float(np.dot(gradient, gradient))
-        if norm_squared <= np.finfo(float).eps:
+        todo = ~converged & ~hopeless
+        if not todo.any():
             break
-        candidate = projected - residual * gradient / norm_squared
-        radius = np.linalg.norm(candidate[:2])
-        if on_axis:
-            candidate[:2] = 0.0
-        elif active_domain_boundary or radius > 1.0:
-            candidate[:2] *= guarded_unit_radius / radius
-            active_domain_boundary = True
-        if on_seam:
-            candidate[2] = period if seam_side > 0 else 0.0
-        projected = candidate
-    raise SurfaceExtractionError(
-        SurfaceStatus.ROOT_FAILURE, "PyVista contour-point projection failed"
+        residual = np.zeros(n_points)
+        residual[todo] = _evaluate_B(field, projected[todo]) - b
+        done = todo & (np.abs(residual) <= config.B_tolerance)
+        out_of_domain = done & (
+            np.linalg.norm(projected[:, :2], axis=1) > 1.0 + config.merge_tolerance
+        )
+        converged |= done & ~out_of_domain
+        hopeless |= out_of_domain
+        stepping = todo & ~done
+        if not stepping.any():
+            continue
+        gradient = np.zeros((n_points, 3))
+        gradient[stepping] = _logical_B_gradients(field, projected[stepping])
+        constrained = stepping & active_boundary
+        if constrained.any():
+            radial = projected[constrained].copy()
+            radial[:, 2] = 0.0
+            overlap = np.einsum("ij,ij->i", gradient[constrained], radial)
+            gradient[constrained] -= overlap[:, np.newaxis] * radial
+        gradient[stepping & on_axis, :2] = 0.0
+        gradient[stepping & on_seam, 2] = 0.0
+        norm_squared = np.einsum("ij,ij->i", gradient, gradient)
+        dead = stepping & (norm_squared <= np.finfo(float).eps)
+        hopeless |= dead
+        stepping &= ~dead
+        if not stepping.any():
+            continue
+        candidate = (
+            projected[stepping]
+            - (residual[stepping] / norm_squared[stepping])[:, np.newaxis]
+            * gradient[stepping]
+        )
+        axis_lane = on_axis[stepping]
+        candidate[axis_lane, :2] = 0.0
+        lane_radius = np.linalg.norm(candidate[:, :2], axis=1)
+        clamp = ~axis_lane & (active_boundary[stepping] | (lane_radius > 1.0))
+        candidate[clamp, :2] *= (guarded_unit_radius / lane_radius[clamp])[
+            :, np.newaxis
+        ]
+        seam_lane = on_seam[stepping]
+        candidate[seam_lane, 2] = seam_targets[stepping][seam_lane]
+        projected[stepping] = candidate
+        active_boundary[np.flatnonzero(stepping)[clamp]] = True
+    if not np.all(converged):
+        raise SurfaceExtractionError(
+            SurfaceStatus.ROOT_FAILURE, "PyVista contour-point projection failed"
+        )
+    return _canonicalize_points(projected, period, config.merge_tolerance)
+
+
+def _field_quantities(field: BoozerFieldLike, s, theta, zeta, quantities):
+    """Evaluate several field quantities, fused into one Fourier pass when the
+    backend offers ``fourier_quantities`` (one shared phase/trig table), and
+    through the individual §7.2 protocol methods otherwise. ``quantities``
+    are protocol method names; results come back as float64 arrays in
+    matching order."""
+    fused = getattr(field, "fourier_quantities", None)
+    if fused is not None:
+        return tuple(
+            np.asarray(value, dtype=np.float64)
+            for value in fused(s, theta, zeta, quantities)
+        )
+    return tuple(
+        np.asarray(getattr(field, name)(s, theta, zeta), dtype=np.float64)
+        for name in quantities
     )
 
 
@@ -878,8 +1773,7 @@ def _physical_g(field: BoozerFieldLike, points: np.ndarray) -> np.ndarray:
     if not len(points):
         return np.empty(0, dtype=np.float64)
     s, theta, zeta = _logical_coordinates(points)
-    B = np.asarray(field.B(s, theta, zeta), dtype=np.float64)
-    derivative = np.asarray(field.D_B(s, theta, zeta), dtype=np.float64)
+    B, derivative = _field_quantities(field, s, theta, zeta, ("B", "D_B"))
     current = np.asarray(field.G(s), dtype=np.float64) + np.asarray(
         field.iota(s), dtype=np.float64
     ) * np.asarray(field.I(s), dtype=np.float64)
@@ -900,29 +1794,47 @@ def _logical_coordinates(points: np.ndarray):
 
 
 def _logical_B_gradient(field: BoozerFieldLike, point: np.ndarray) -> np.ndarray:
-    x, y, zeta = point
-    s = x * x + y * y
-    if s == 0.0:
+    return _logical_B_gradients(field, np.asarray(point)[np.newaxis, :])[0]
+
+
+def _logical_B_gradients(field: BoozerFieldLike, points: np.ndarray) -> np.ndarray:
+    """Return the logical ``(x, y, zeta)`` gradient of ``B`` at each point.
+
+    One fused Fourier pass serves all regular points; the (rare) exact-axis
+    points use the centered Cartesian differences of the §7.3 regular limit.
+    """
+    points = np.asarray(points, dtype=np.float64)
+    s, theta, zeta = _logical_coordinates(points)
+    result = np.empty((len(points), 3), dtype=np.float64)
+    regular = s != 0.0
+    if np.any(regular):
+        dB_ds, dB_dtheta, dB_dzeta = _field_quantities(
+            field,
+            s[regular],
+            theta[regular],
+            zeta[regular],
+            ("dB_ds", "dB_dtheta", "dB_dzeta"),
+        )
+        x = points[regular, 0]
+        y = points[regular, 1]
+        s_regular = s[regular]
+        result[regular, 0] = 2.0 * x * dB_ds - y * dB_dtheta / s_regular
+        result[regular, 1] = 2.0 * y * dB_ds + x * dB_dtheta / s_regular
+        result[regular, 2] = dB_dzeta
+    for index in np.flatnonzero(~regular):
         epsilon = 1.0e-6
         epsilon_s = epsilon**2
-        dB_dx = (
-            float(field.B(epsilon_s, 0.0, zeta))
-            - float(field.B(epsilon_s, np.pi, zeta))
+        zeta_axis = zeta[index]
+        result[index, 0] = (
+            float(field.B(epsilon_s, 0.0, zeta_axis))
+            - float(field.B(epsilon_s, np.pi, zeta_axis))
         ) / (2.0 * epsilon)
-        dB_dy = (
-            float(field.B(epsilon_s, 0.5 * np.pi, zeta))
-            - float(field.B(epsilon_s, -0.5 * np.pi, zeta))
+        result[index, 1] = (
+            float(field.B(epsilon_s, 0.5 * np.pi, zeta_axis))
+            - float(field.B(epsilon_s, -0.5 * np.pi, zeta_axis))
         ) / (2.0 * epsilon)
-        theta = 0.0
-    else:
-        theta = float(np.arctan2(y, x))
-        dB_ds = float(field.dB_ds(s, theta, zeta))
-        dB_dtheta = float(field.dB_dtheta(s, theta, zeta))
-        dB_dx = 2.0 * x * dB_ds - y * dB_dtheta / s
-        dB_dy = 2.0 * y * dB_ds + x * dB_dtheta / s
-    return np.array(
-        [dB_dx, dB_dy, float(field.dB_dzeta(s, theta, zeta))], dtype=np.float64
-    )
+        result[index, 2] = float(field.dB_dzeta(0.0, 0.0, zeta_axis))
+    return result
 
 
 def _edge_boundary_tag(background: BackgroundMesh, first: int, second: int) -> int:
@@ -984,16 +1896,20 @@ def _orient_triangles(
     period: float,
 ) -> np.ndarray:
     result = np.asarray(triangles, dtype=np.int64).copy()
-    for index, triangle in enumerate(result):
-        vertices = _unwrap_triangle(points[triangle], period)
-        normal = np.cross(vertices[1] - vertices[0], vertices[2] - vertices[0])
-        if np.linalg.norm(normal) <= 32.0 * np.finfo(float).eps:
-            raise SurfaceExtractionError(
-                SurfaceStatus.DEGENERATE, "marching produced a zero-area triangle"
-            )
-        gradient = _logical_B_gradient(field, np.mean(vertices, axis=0))
-        if np.dot(normal, gradient) < 0.0:
-            result[index, 1], result[index, 2] = result[index, 2], result[index, 1]
+    if not len(result):
+        return result
+    vertices = points[result].copy()
+    for index in (1, 2):
+        difference = vertices[:, index, 2] - vertices[:, 0, 2]
+        vertices[:, index, 2] -= period * np.round(difference / period)
+    normals = np.cross(vertices[:, 1] - vertices[:, 0], vertices[:, 2] - vertices[:, 0])
+    if np.any(np.linalg.norm(normals, axis=1) <= 32.0 * np.finfo(float).eps):
+        raise SurfaceExtractionError(
+            SurfaceStatus.DEGENERATE, "marching produced a zero-area triangle"
+        )
+    gradients = _logical_B_gradients(field, np.mean(vertices, axis=1))
+    flip = np.einsum("ij,ij->i", normals, gradients) < 0.0
+    result[flip] = result[flip][:, [0, 2, 1]]
     return result
 
 
@@ -1021,6 +1937,17 @@ def _canonicalize_point(
     result[2] %= period
     if result[2] <= tolerance or period - result[2] <= tolerance:
         result[2] = 0.0
+    return result
+
+
+def _canonicalize_points(
+    points: np.ndarray, period: float, tolerance: float
+) -> np.ndarray:
+    """Vectorized :func:`_canonicalize_point` over an ``(n, 3)`` array."""
+    result = np.asarray(points, dtype=np.float64).copy()
+    result[:, 2] %= period
+    snap = (result[:, 2] <= tolerance) | (period - result[:, 2] <= tolerance)
+    result[snap, 2] = 0.0
     return result
 
 
