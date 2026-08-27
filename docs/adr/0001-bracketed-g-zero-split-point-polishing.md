@@ -120,8 +120,8 @@ Option 2 decided.
   vertices. Downstream milestones must treat `UNRESOLVED` extractions as
   requiring background refinement before entering a production result.
 - New tests: `test_g_zero_crossing_exits_through_the_outer_boundary`,
-  `test_gmsh_extraction_polishes_boundary_exit_split_points` (slow),
+  `test_surface_split_preserves_boundary_exit_provenance`,
   `test_sheet_bridging_edge_yields_an_unresolved_g_jump_split`,
-  `test_gmsh_extraction_reports_unresolved_sheet_bridging_splits` (slow), and
+  `test_surface_split_reports_unresolved_sheet_bridging_splits`, and
   `test_g_zero_polish_reports_an_unresolved_split_when_no_local_root_exists`
   (replacing the raise-on-no-root test).
