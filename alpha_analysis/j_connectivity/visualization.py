@@ -483,6 +483,115 @@ def plot_surface_data(data, *, output_path=None, metadata=None):
     return figure, axes
 
 
+def plot_transition_diagnostics(field, transition, *, output_path=None):
+    """Plot matched transition geometry and action diagnostics (§17.5).
+
+    The four panels show ``GAMMA_MAX`` and ``T`` with pointwise connectors,
+    the three limiting action curves, the additivity residual, and selected
+    lifted well profiles. Field and action values retain their supplied
+    units; all angular coordinates are radians. Non-regular transitions are
+    labeled explicitly rather than omitted.
+    """
+    import matplotlib.pyplot as plt
+
+    figure = plt.figure(figsize=(12, 9), constrained_layout=True)
+    geometry_axis = figure.add_subplot(2, 2, 1, projection="3d")
+    action_axis = figure.add_subplot(2, 2, 2)
+    residual_axis = figure.add_subplot(2, 2, 3)
+    profile_axis = figure.add_subplot(2, 2, 4)
+    axes = (geometry_axis, action_axis, residual_axis, profile_axis)
+
+    by_role = {port.role: port for port in transition.ports}
+    companion = by_role["parent"].points
+    marginal = transition.marginal_points
+    geometry_axis.plot(*companion.T, color="tab:blue", label=r"$T$")
+    geometry_axis.plot(*marginal.T, color="tab:red", label=r"$\Gamma_{\max}$")
+    for first, second in zip(companion, marginal):
+        geometry_axis.plot(
+            [first[0], second[0]],
+            [first[1], second[1]],
+            [first[2], second[2]],
+            color="0.6",
+            linewidth=0.6,
+        )
+    geometry_axis.set_xlabel("x")
+    geometry_axis.set_ylabel("y")
+    geometry_axis.set_zlabel(r"$\zeta$ [rad]")
+    geometry_axis.legend()
+
+    labels = {
+        "parent": r"$A_W$",
+        "child_1": r"$A_1$",
+        "child_3": r"$A_3$",
+    }
+    for port in transition.ports:
+        action_axis.plot(
+            transition.u,
+            port.action_values,
+            marker="o",
+            markersize=2.5,
+            label=labels.get(port.role, port.role),
+        )
+    action_axis.set_xlabel(r"common curve parameter $u$")
+    action_axis.set_ylabel(r"action length $A$ [length]")
+    action_axis.legend()
+
+    residual_axis.axhline(0.0, color="black", linewidth=0.7)
+    residual_axis.plot(
+        transition.u,
+        transition.additivity_residual,
+        color="tab:purple",
+        marker="o",
+        markersize=2.5,
+    )
+    residual_axis.set_xlabel(r"common curve parameter $u$")
+    residual_axis.set_ylabel(r"$A_W-A_1-A_3$ [length]")
+
+    finite_events = np.all(np.isfinite(transition.event_zeta_unwrapped), axis=1)
+    selected = np.flatnonzero(finite_events)
+    if len(selected):
+        selected = np.unique(selected[[0, len(selected) // 2, -1]])
+        b = None
+        for sample in selected:
+            s, alpha = transition.field_line_identity[sample]
+            zeta_a, zeta_m, zeta_d = transition.event_zeta_unwrapped[sample]
+            zeta = np.linspace(zeta_a, zeta_d, 257)
+            iota = float(np.asarray(field.iota(s)).reshape(()))
+            theta = alpha + iota * zeta
+            B = np.asarray(field.B(s, theta, zeta), dtype=float)
+            b = float(np.asarray(field.B(s, alpha + iota * zeta_m, zeta_m)).reshape(()))
+            profile_axis.plot(zeta, B, label=f"u={transition.u[sample]:.3g}")
+            profile_axis.axvline(zeta_m, color="0.75", linewidth=0.5)
+        profile_axis.axhline(
+            b,
+            color="black",
+            linestyle="--",
+            linewidth=0.8,
+            label="b",
+        )
+        profile_axis.legend(fontsize="small")
+    else:
+        profile_axis.text(
+            0.5,
+            0.5,
+            f"unresolved: {transition.status.name}",
+            color="magenta",
+            ha="center",
+            va="center",
+            transform=profile_axis.transAxes,
+        )
+    profile_axis.set_xlabel(r"lifted $\zeta$ [rad]")
+    profile_axis.set_ylabel("B [field units]")
+    figure.suptitle(
+        f"Transition {transition.transition_id}: b={transition.b:.8g}, "
+        f"{transition.status.name}, "
+        f"{len(transition.u)} matched samples"
+    )
+    if output_path is not None:
+        figure.savefig(output_path, dpi=160)
+    return figure, axes
+
+
 def _periodic_plot_triangles(surface):
     triangles = []
     for triangle in surface.triangles:

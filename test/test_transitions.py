@@ -1,0 +1,224 @@
+"""Transition-map physics tests (DESIGN.md §§5.3, 10.2, 20.2, and 23)."""
+
+from __future__ import annotations
+
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.integrate import quad
+
+from alpha_analysis.j_connectivity import (
+    CriticalKind,
+    SurfaceCurveMesh,
+    SurfaceMesh,
+    TransitionMappingConfig,
+    TransitionStatus,
+    extract_critical_curves,
+    map_transitions,
+)
+from alpha_analysis.j_connectivity.synthetic_fields import SyntheticFourierField
+from alpha_analysis.j_connectivity.visualization import plot_transition_diagnostics
+
+
+def _field(
+    *, double_maximum: bool = False, iota: float = 0.0, C: float = 3.0
+) -> SyntheticFourierField:
+    if double_maximum:
+        # B=2-cos(2 zeta) has two distinct equal-height marginal maxima in
+        # one field period, so no generic three-port event can be assigned.
+        modes = np.array([0, 2])
+        cosine = np.array([[2.0], [-1.0]])
+    else:
+        # B=2-cos(zeta)+(0.3+0.2s)cos(2zeta).  At b=1.4, s=0.5,
+        # zeta=0 is a marginal maximum separating two child wells.  The
+        # surrounding regular crossings have cos(zeta)=1/4 exactly.
+        modes = np.array([0, 1, 2])
+        cosine = np.array([[2.0, 0.0], [-1.0, 0.0], [0.3, 0.2]])
+    return SyntheticFourierField(
+        nfp=1,
+        m=np.zeros(len(modes), dtype=np.int64),
+        n=modes,
+        cosine_coefficients=cosine,
+        sine_coefficients=np.zeros_like(cosine),
+        iota_coefficients=np.array([iota]),
+        G_coefficients=np.array([C]),
+        I_coefficients=np.array([0.0]),
+    )
+
+
+def _critical_circles(
+    field: SyntheticFourierField,
+    *,
+    s: float,
+    zeta_values: tuple[float, ...],
+    count: int = 8,
+):
+    points = []
+    segments = []
+    for zeta in zeta_values:
+        offset = len(points)
+        theta = np.linspace(0.0, 2.0 * np.pi, count, endpoint=False)
+        points.extend(
+            np.column_stack(
+                (
+                    np.sqrt(s) * np.cos(theta),
+                    np.sqrt(s) * np.sin(theta),
+                    np.full(count, zeta),
+                )
+            )
+        )
+        ids = offset + np.arange(count)
+        segments.extend(np.column_stack((ids, np.roll(ids, -1))))
+    points = np.asarray(points)
+    segments = np.asarray(segments, dtype=np.int64)
+    s_values = np.sum(points[:, :2] ** 2, axis=1)
+    theta = np.arctan2(points[:, 1], points[:, 0])
+    B = np.asarray(field.B(s_values, theta, points[:, 2]))
+    C = np.asarray(field.G(s_values) + field.iota(s_values) * field.I(s_values))
+    g = B * np.asarray(field.D_B(s_values, theta, points[:, 2])) / C
+    curve = SurfaceCurveMesh(
+        period=2.0 * np.pi,
+        points=points,
+        segments=segments,
+        B=B,
+        g=g,
+        boundary_tags=np.full(len(points), SurfaceMesh.G_ZERO, dtype=np.int64),
+    )
+    return extract_critical_curves(curve, field, b=float(B[0]))
+
+
+def _port(transition, role: str):
+    return next(port for port in transition.ports if port.role == role)
+
+
+def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path):
+    iota = 0.4
+    field = _field(iota=iota)
+    critical = _critical_circles(field, s=0.5, zeta_values=(0.0,))
+    assert {polyline.kind for polyline in critical.polylines} == {
+        CriticalKind.GAMMA_MAX
+    }
+
+    coarse = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(action_quadrature_order=12),
+    )[0]
+    fine = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(action_quadrature_order=48),
+    )[0]
+
+    assert fine.status is TransitionStatus.REGULAR
+    assert len(fine.ports) == 3
+    parent = _port(fine, "parent")
+    child_1 = _port(fine, "child_1")
+    child_3 = _port(fine, "child_3")
+    root = np.arccos(0.25)
+    np.testing.assert_allclose(parent.zeta_unwrapped, -root, atol=2.0e-11)
+    np.testing.assert_allclose(child_1.zeta_unwrapped, -root, atol=2.0e-11)
+    np.testing.assert_allclose(child_3.zeta_unwrapped, 0.0, atol=2.0e-11)
+    np.testing.assert_allclose(parent.points, child_1.points, atol=2.0e-11)
+    np.testing.assert_allclose(child_3.points, fine.marginal_points, atol=2.0e-11)
+
+    # Identity is derived independently from every lifted port sample.  A
+    # nearest-neighbor permutation of either curve therefore cannot pass.
+    expected_identity = np.column_stack(
+        (
+            np.full(len(fine.u), 0.5),
+            np.mod(
+                np.arctan2(fine.marginal_points[:, 1], fine.marginal_points[:, 0]),
+                2.0 * np.pi,
+            ),
+        )
+    )
+    np.testing.assert_allclose(fine.field_line_identity, expected_identity, atol=2e-12)
+    for port in fine.ports:
+        theta = np.arctan2(port.points[:, 1], port.points[:, 0])
+        alpha = np.mod(theta - iota * port.zeta_unwrapped, 2.0 * np.pi)
+        expected_alpha = np.mod(fine.field_line_identity[:, 1], 2.0 * np.pi)
+        periodic_error = np.mod(alpha - expected_alpha + np.pi, 2.0 * np.pi) - np.pi
+        np.testing.assert_allclose(
+            np.sum(port.points[:, :2] ** 2, axis=1),
+            fine.field_line_identity[:, 0],
+            atol=2.0e-11,
+        )
+        np.testing.assert_allclose(periodic_error, 0.0, atol=2.0e-11)
+    np.testing.assert_array_equal(
+        child_3.source_vertex_ids,
+        next(
+            polyline.vertex_ids
+            for polyline in critical.polylines
+            if polyline.kind is CriticalKind.GAMMA_MAX
+        ),
+    )
+
+    def B(zeta):
+        return 2.0 - np.cos(zeta) + 0.4 * np.cos(2.0 * zeta)
+
+    expected_child = quad(
+        lambda zeta: 3.0 / B(zeta) * np.sqrt(1.0 - B(zeta) / 1.4),
+        -root,
+        0.0,
+        epsabs=1.0e-12,
+        epsrel=1.0e-12,
+    )[0]
+    np.testing.assert_allclose(child_1.action_values, expected_child, rtol=2.0e-10)
+    np.testing.assert_allclose(child_3.action_values, expected_child, rtol=2.0e-10)
+    np.testing.assert_allclose(parent.action_values, 2.0 * expected_child, rtol=2.0e-8)
+    assert np.max(np.abs(fine.additivity_residual)) < 2.0e-8
+    assert np.max(np.abs(fine.additivity_residual)) < 0.15 * np.max(
+        np.abs(coarse.additivity_residual)
+    )
+
+    # The common PL arc-length parameter has an independently known circle
+    # limit, and its error decreases when transition-curve sampling doubles.
+    sampled_finer = map_transitions(
+        field,
+        _critical_circles(field, s=0.5, zeta_values=(0.0,), count=16),
+        TransitionMappingConfig(action_quadrature_order=48),
+    )[0]
+    exact_length = 2.0 * np.pi * np.sqrt(0.5)
+    assert abs(sampled_finer.total_u_length - exact_length) < abs(
+        fine.total_u_length - exact_length
+    )
+
+    # Reversing G+iota*I reverses physical tracing: T moves from the negative
+    # lifted root to the positive one while the action remains unchanged.
+    reverse_field = _field(iota=iota, C=-3.0)
+    reverse = map_transitions(
+        reverse_field,
+        critical,
+        TransitionMappingConfig(action_quadrature_order=48),
+    )[0]
+    assert reverse.status is TransitionStatus.REGULAR
+    np.testing.assert_allclose(
+        _port(reverse, "parent").zeta_unwrapped, root, atol=2.0e-11
+    )
+    np.testing.assert_allclose(
+        _port(reverse, "parent").action_values,
+        parent.action_values,
+        rtol=2.0e-10,
+    )
+
+    output = tmp_path / "transition.png"
+    figure, axes = plot_transition_diagnostics(field, fine, output_path=output)
+    assert output.exists()
+    assert len(axes) == 4
+    assert any(line.get_label() == r"$T$" for line in axes[0].lines)
+    plt.close(figure)
+
+
+def test_equal_height_multiway_event_is_explicit_and_never_gets_actions():
+    field = _field(double_maximum=True)
+    critical = _critical_circles(field, s=0.5, zeta_values=(0.5 * np.pi, 1.5 * np.pi))
+
+    transitions = map_transitions(field, critical)
+
+    assert len(transitions) == 2
+    assert all(item.status is TransitionStatus.MULTIWAY for item in transitions)
+    assert all(
+        np.isnan(port.action_values).all()
+        for item in transitions
+        for port in item.ports
+    )

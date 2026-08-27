@@ -80,6 +80,12 @@ from .types import (
     TransitionStatus,
     WellTrace,
 )
+from .transitions import (
+    TransitionCurve,
+    TransitionMappingConfig,
+    TransitionPort,
+    map_transitions,
+)
 from .well_trace import (
     WellProfile,
     WellTraceConfig,
@@ -132,6 +138,9 @@ __all__ = [
     "SurfaceStatus",
     "TraceStatus",
     "TransitionStatus",
+    "TransitionCurve",
+    "TransitionMappingConfig",
+    "TransitionPort",
     "WellTrace",
     "WellTraceConfig",
     "WellProfile",
@@ -150,6 +159,7 @@ __all__ = [
     "tetrahedron_quality",
     "sample_well_profile",
     "trace_regular_well",
+    "map_transitions",
 ]
 
 
