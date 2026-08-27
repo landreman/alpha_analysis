@@ -1,6 +1,6 @@
 # ADR 0002: Axis-regular coefficients by harmonic continuation below the innermost surface
 
-- **Status:** Proposed
+- **Status:** Decided.
 - **Date:** 2026-08-26
 - **Milestone:** 5 (robustness follow-up on branch `more_robust_surfaces`)
 - **Design sections:** §7.3 (axis behavior), §7.1 (field interface), §8.3
@@ -46,9 +46,7 @@ does not settle the interpolation scheme.
 
 ## Decision
 
-Option 1, implemented at the researcher's direction in the session of 2026-08-26 as
-part of making pitch-surface extraction robust for every
-\(b\in(\min B, \max B)\). Researcher acceptance of this record is pending.
+Option 1 decided.
 
 ## Consequences
 

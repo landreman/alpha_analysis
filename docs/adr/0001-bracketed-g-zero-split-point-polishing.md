@@ -1,6 +1,6 @@
 # ADR 0001: Polish g=0 split points with bracketed fallbacks, not Newton alone
 
-- **Status:** Proposed
+- **Status:** Decided
 - **Date:** 2026-08-26
 - **Milestone:** 5 (robustness follow-up on branch `more_robust_surfaces`)
 - **Design sections:** §8.3 (surface extraction), §21.2 (forbidden numerics)
@@ -85,10 +85,7 @@ when the local Newton solve escapes, and §21.2 forbids hiding the failure.
 
 ## Decision
 
-Option 2, implemented at the researcher's direction in the session of 2026-08-26
-("I need the pitch surface extraction to be robust, so these failures reliably don't
-occur for any value of b between min(B) and max(B)"). Researcher acceptance of this
-record is pending.
+Option 2 decided.
 
 ## Consequences
 
