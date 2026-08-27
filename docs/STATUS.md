@@ -21,7 +21,7 @@ lowest-numbered unchecked row.
 | 4 | Gmsh background backend | Add the production mesher behind the same interface | [x] | #7 |
 | 5 | \(B=b\) surface extraction | Extract all level-surface components and incoming/outgoing halves | [x] | #8 |
 | 6 | Regular well tracer | Trace every regular surface vertex, not only the well near \(\pi/N_{\mathrm{fp}}\) | [x] | #10 |
-| 7 | Surface data, refinement, and sheet candidates | Evaluate action data over a whole pitch surface and refine discontinuity candidates | [ ] | |
+| 7 | Surface data, refinement, and sheet candidates | Evaluate action data over a whole pitch surface and refine discontinuity candidates | [x] | #12 |
 | 8 | Critical curves | Robustly extract and classify \(\Gamma_{\min}\), \(\Gamma_{\max}\), and degenerate portions | [ ] | |
 | 9 | Transition mapping and action additivity | Construct \(T\) and matched parent/child ports without yet cutting the full mesh | [ ] | |
 | 10 | Constrained cuts and sheet IDs | Insert \(T\), duplicate vertices, and make \(A\) continuous on each sheet | [ ] | |
@@ -56,6 +56,7 @@ move it into `docs/DESIGN.md` and delete it here.
 - Milestone 6's conservative Fourier-aware scan includes every retained mode regardless of amplitude (about 1125 samples per field period on the W7-X reference surface); Milestone 7 should profile this cost and add a demonstrated amplitude-aware cutoff before batch tracing if needed.
 - Milestone 6's `quadrature_error_K` is an adaptive-subdivision estimate, not a floating-point cancellation bound near an internal maximum with `B_max` close to `b`; Milestones 8–9 own special treatment of that `Gamma_max` band, and surface-wide tracing should track its explicit failure fraction.
 - Pitch surfaces can be downsampled before Milestone 7's batch traces with topology-preserving shortest-edge collapses. Moved vertices are reprojected to `B=b`; physical, periodic-seam, and `g=0` boundary vertices remain fixed; each face remains close to its original normal; drift in the scalar axis-regular `|ds wedge d alpha|` measure is bounded globally and per connected component; the achieved reduction and rejection reasons are reported; and changed provenance is explicitly invalidated rather than guessed. The scalar budgets do not control local or within-component cancellation or weighted bounce integrals, so later refinement and convergence remain necessary. This is a staged utility rather than a pipeline caller; Milestone 10 must continue to forbid coarsening after transition cuts.
+- Milestone 7's `SurfaceRefinementResult.edge_indicators` retains final edge IDs, midpoint `A`/`K` interpolation errors, and unquantized-itinerary candidate flags for Milestone 8; any non-regular endpoint or midpoint stays a candidate, projected refinement invalidates changed provenance, and edges shared by a tagged boundary remain explicitly `refinement_blocked` until Milestone 8 can refine them on the boundary curve. The extrema-height comparison is normalized by `b` using the global itinerary tolerance; Milestone 8 should assess local `b-B_extremum` gap scaling while resolving critical curves.
 
 ## Accepted deviations
 

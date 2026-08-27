@@ -53,8 +53,9 @@ class SurfaceExtractionConfig:
 class SurfaceMesh:
     """Authoritative triangular mesh on the one-field-period quotient (§8.1).
 
-    Points use dimensionless logical ``(x, y, zeta)`` coordinates, with zeta
-    in radians and canonicalized to ``0 <= zeta < period``. ``B`` retains the
+    Points use dimensionless logical ``(x, y, zeta)`` coordinates. On
+    construction, zeta is reduced in radians to ``0 <= zeta < period`` and
+    values within roundoff of either seam are snapped to zero. ``B`` retains the
     field's units and ``g`` stores the physical signed
     ``B D_parallel B / (G + iota I)`` from DESIGN.md §5.1. Point parent edges
     are canonical background-node IDs; a ``(-1, -1)`` entry denotes a point
@@ -85,7 +86,15 @@ class SurfaceMesh:
     component_ids: np.ndarray
 
     def __post_init__(self) -> None:
-        points = np.asarray(self.points, dtype=np.float64)
+        if not np.isfinite(self.period) or self.period <= 0.0:
+            raise ValueError("surface period must be finite and positive")
+        points = np.asarray(self.points, dtype=np.float64).copy()
+        if points.ndim == 2 and points.shape[1:] == (3,):
+            points[:, 2] = np.mod(points[:, 2], self.period)
+            near_seam = np.minimum(points[:, 2], self.period - points[:, 2]) <= (
+                16.0 * np.finfo(float).eps * self.period
+            )
+            points[near_seam, 2] = 0.0
         triangles = np.asarray(self.triangles, dtype=np.int64)
         B = np.asarray(self.B, dtype=np.float64)
         g = np.asarray(self.g, dtype=np.float64)
@@ -117,8 +126,6 @@ class SurfaceMesh:
             raise ValueError("surface triangle point index is outside the mesh")
         if not np.isfinite(self.level):
             raise ValueError("surface level must be finite")
-        if not np.isfinite(self.period) or self.period <= 0.0:
-            raise ValueError("surface period must be finite and positive")
         for name, values in (
             ("points", points),
             ("triangles", triangles),
