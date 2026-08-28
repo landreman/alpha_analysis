@@ -79,13 +79,16 @@ boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMer
 boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc
 boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc
 ~~~~
+For each boozmn file, try both the structured mesh backend and gmsh backend, and try both the
+MarchingTetrahedraExtractor and PyVistaSurfaceExtractor surface extractors.
 If the new machinery is specific to one value of \(b = B_{bounce}\), then
 exercise the functionality for
 \(\lambda_n = 0.05, 0.1, 0.5, 0.9, 0.95\) where \(\lambda_n\) is defined by
 \(b = B_{min} + \lambda_n * (B_{max} - B_{min})\) and \(B_{min}\) and \(B_{max}\) are radially global
 (extrema over all radii).
 
-Inspect the results to look for problems. Fix any problems before considering
+Inspect the results to see if they make sense, check that results are consistent between the
+different backends and surface extractors, and generally look for problems. Fix any problems before considering
 the task complete.
 
 ## Definition of done
