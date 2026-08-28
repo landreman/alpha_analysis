@@ -460,7 +460,16 @@ def trace_regular_well(
                 for _ in range(64):
                     f_interior = F(interior)
                     if not np.isfinite(f_interior):
-                        break
+                        return _failed_trace(
+                            TraceStatus.ROOT_FAILURE,
+                            b=b,
+                            q_in=q_reduced,
+                            B_residual_in=residual_in,
+                            field_period_count=period_index,
+                            extrema_zeta=extrema_zeta,
+                            extrema_B=extrema_values,
+                            extrema_kind=extrema_kinds,
+                        )
                     if f_interior < 0.0:
                         try:
                             crossing = brentq(
@@ -484,6 +493,17 @@ def trace_regular_well(
                         break
                     last_outside = interior
                     interior *= 0.5
+                if crossing is None:
+                    return _failed_trace(
+                        TraceStatus.ROOT_FAILURE,
+                        b=b,
+                        q_in=q_reduced,
+                        B_residual_in=residual_in,
+                        field_period_count=period_index,
+                        extrema_zeta=extrema_zeta,
+                        extrema_B=extrema_values,
+                        extrema_kind=extrema_kinds,
+                    )
             elif f_left < 0.0 <= f_right:
                 try:
                     crossing = brentq(
@@ -740,9 +760,9 @@ def trace_regular_well(
         """Integrate monotone field-line segments with a global error budget."""
         edges = np.concatenate(([0.0], np.asarray(points, dtype=float), [1.0]))
         n_intervals = len(edges) - 1
-        # Each positive integrand gets half of both global budgets. Summing
-        # the local error estimates then remains below the larger requested
-        # global absolute or relative tolerance.
+        # For each positive integrand, reserve half of its global absolute and
+        # relative budgets. Summing that component's local error estimates
+        # then remains below its larger requested global tolerance.
         local_atol = cfg.quadrature_atol / (2.0 * n_intervals)
         local_rtol = cfg.quadrature_rtol / 2.0
 

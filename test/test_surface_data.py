@@ -10,6 +10,7 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.optimize import brentq
 
+import alpha_analysis.j_connectivity.surface_data as surface_data_module
 from alpha_analysis import BoozerField
 from alpha_analysis.j_connectivity import (
     BoundsConfig,
@@ -25,12 +26,6 @@ from alpha_analysis.j_connectivity import (
     find_global_B_bounds,
     itineraries_are_continuous,
     refine_surface_data,
-)
-from alpha_analysis.j_connectivity.surface_data import (
-    _block_face_invalid_edges,
-    _edge_samples,
-    _refine_edges,
-    _selected_edges,
 )
 from alpha_analysis.j_connectivity.synthetic_fields import SyntheticFourierField
 from alpha_analysis.j_connectivity.visualization import plot_surface_data
@@ -385,17 +380,77 @@ def test_real_surface_inverting_projected_bisection_stays_unresolved():
     ).surface
 
     refinement_config = SurfaceRefinementConfig(
-        max_levels=1,
+        max_levels=0,
         action_interpolation_rtol=5.0e-2,
         bounce_time_interpolation_rtol=5.0e-2,
     )
     trace_config = WellTraceConfig(quadrature_rtol=1.0e-8, quadrature_atol=1.0e-9)
-    data = evaluate_surface_data(reduced, field, trace_config)
-    samples = _edge_samples(data, field, refinement_config, trace_config)
-    selected = _selected_edges(data, samples, refinement_config)
-    selected, samples = _block_face_invalid_edges(reduced, samples, selected)
-    refined = _refine_edges(reduced, samples, selected)
+    result = refine_surface_data(reduced, field, refinement_config, trace_config)
 
-    assert sum(sample.face_validity_failed for sample in samples.values()) >= 1
-    assert np.all(data.regular[reduced.g < -1.0e-10])
-    np.testing.assert_allclose(refined.B, b, atol=1.0e-10)
+    assert result.report.levels[0].face_validity_failed_edge_count >= 1
+    assert np.all(result.data.regular[result.surface.g < -1.0e-10])
+    np.testing.assert_allclose(result.surface.B, b, atol=1.0e-10)
+    for triangle in result.surface.triangles:
+        vertices = result.surface.points[triangle]
+        normal = np.cross(vertices[1] - vertices[0], vertices[2] - vertices[0])
+        assert np.linalg.norm(normal) > np.finfo(float).eps
+
+
+def test_sliver_projected_child_is_blocked_on_the_public_refinement_path(monkeypatch):
+    field = SyntheticFourierField(
+        nfp=1,
+        m=np.array([0, 0]),
+        n=np.array([0, 1]),
+        cosine_coefficients=np.array([[2.0], [-1.0]]),
+        sine_coefficients=np.zeros((2, 1)),
+        iota_coefficients=np.array([0.0]),
+        G_coefficients=np.array([1.0, 5.0]),
+        I_coefficients=np.array([0.0]),
+    )
+    b = 2.5
+    zeta = 4.0 * np.pi / 3.0
+    points = np.array(
+        [
+            [np.sqrt(0.2), 0.0, zeta],
+            [np.sqrt(0.8), 0.0, zeta],
+            [0.7, 0.2, zeta],
+        ]
+    )
+    s, theta, zeta_values = _coordinates(points)
+    B = np.asarray(field.B(s, theta, zeta_values), dtype=float)
+    C = np.asarray(field.G(s) + field.iota(s) * field.I(s), dtype=float)
+    g = B * np.asarray(field.D_B(s, theta, zeta_values), dtype=float) / C
+    surface = SurfaceMesh(
+        level=b,
+        period=2.0 * np.pi,
+        points=points,
+        triangles=np.array([[0, 1, 2]]),
+        B=B,
+        g=g,
+        boundary_tags=np.zeros(3, dtype=np.int64),
+        point_parent_edges=np.full((3, 2), -1, dtype=np.int64),
+        triangle_parent_tetrahedra=np.array([-1]),
+        component_ids=np.array([0]),
+    )
+    original_projection = surface_data_module._projected_midpoint
+    unsafe = points[2].copy()
+    unsafe[1] = np.nextafter(unsafe[1], -np.inf)
+
+    def sliver_projection(candidate_surface, candidate_field, edge, config):
+        if edge != (0, 1):
+            return original_projection(candidate_surface, candidate_field, edge, config)
+        s_mid, theta_mid, zeta_mid = _coordinates(unsafe[np.newaxis, :])
+        C_mid = float(field.G(s_mid[0]) + field.iota(s_mid[0]) * field.I(s_mid[0]))
+        g_mid = b * float(field.D_B(s_mid[0], theta_mid[0], zeta_mid[0])) / C_mid
+        return unsafe, b, g_mid
+
+    monkeypatch.setattr(surface_data_module, "_projected_midpoint", sliver_projection)
+    result = refine_surface_data(
+        surface,
+        field,
+        SurfaceRefinementConfig(max_levels=1),
+        _TRACE_CONFIG,
+    )
+
+    assert result.report.levels[0].face_validity_failed_edge_count >= 1
+    assert result.report.levels[0].refined_edge_count >= 1

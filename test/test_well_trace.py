@@ -425,6 +425,34 @@ def test_shallow_wells_narrower_than_one_scan_cell_remain_regular():
         )
 
 
+def test_nonfinite_first_cell_backoff_is_an_explicit_root_failure():
+    field = _simple_well()
+    depth = 1.0e-4
+    b = 1.0 + depth
+    root = np.arccos(1.0 - depth)
+
+    class NonfiniteScalarInterior:
+        nfp = field.nfp
+
+        def B(self, s, theta, zeta):
+            value = field.B(s, theta, zeta)
+            zeta_array = np.asarray(zeta)
+            if zeta_array.ndim == 0 and float(zeta_array) > -root + 1.0e-12:
+                return np.asarray(np.nan)
+            return value
+
+        def __getattr__(self, name):
+            return getattr(field, name)
+
+    trace = trace_regular_well(
+        NonfiniteScalarInterior(), b, np.array([0.4, 0.7, -root])
+    )
+
+    assert trace.status is TraceStatus.ROOT_FAILURE
+    assert np.isnan(trace.action_length)
+    assert np.isnan(trace.bounce_time_length)
+
+
 def test_first_cell_backoff_returns_first_crossing_among_multiple_roots():
     # B = 2 + 0.1 sin(6 zeta). Hiding the Fourier metadata exercises the
     # four-sample fallback cell, which contains three crossings after back-off.

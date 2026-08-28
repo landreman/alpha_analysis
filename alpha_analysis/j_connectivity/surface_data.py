@@ -490,10 +490,10 @@ def _edge_samples(
                 data.surface, field, edge, config
             )
         except SurfaceRefinementError:
-            # The nearest gradient projection can leave the plasma when a
-            # level surface bows through s>1 between two in-domain vertices.
-            # Searching for another root risks jumping sheets. Keep the edge
-            # as an explicit unresolved candidate instead (§§8.4, 21.2).
+            # Any failed local projection/evaluation (including leaving the
+            # plasma or crossing to g>0) has no safe substitute. Searching for
+            # another root risks jumping sheets, so keep the edge as an
+            # explicit unresolved candidate instead (§§8.4, 21.2).
             result[edge] = _EdgeSample(
                 point=None,
                 B=np.nan,
@@ -650,7 +650,8 @@ def _refinement_preserves_triangle_orientation(
         parent_vertices[1] - parent_vertices[0],
         parent_vertices[2] - parent_vertices[0],
     )
-    if not np.any(parent_normal):
+    normal_tolerance = np.finfo(float).eps
+    if np.linalg.norm(parent_normal) <= normal_tolerance:
         return False
     for child in _children_for_triangle(triangle, midpoint_ids):
         child_vertices = _unwrap_vertices(
@@ -661,7 +662,10 @@ def _refinement_preserves_triangle_orientation(
             child_vertices[1] - child_vertices[0],
             child_vertices[2] - child_vertices[0],
         )
-        if np.dot(child_normal, parent_normal) <= 0.0:
+        if (
+            np.linalg.norm(child_normal) <= normal_tolerance
+            or np.dot(child_normal, parent_normal) <= 0.0
+        ):
             return False
     return True
 
