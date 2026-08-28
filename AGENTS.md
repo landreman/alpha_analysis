@@ -81,6 +81,7 @@ boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc
 ~~~~
 For each boozmn file, try both the structured mesh backend and gmsh backend, and try both the
 MarchingTetrahedraExtractor and PyVistaSurfaceExtractor surface extractors.
+Downsampling of the surfaces using `downsample_surface()` is recommended to keep these calculations from taking too long.
 If the new machinery is specific to one value of \(b = B_{bounce}\), then
 exercise the functionality for
 \(\lambda_n = 0.05, 0.1, 0.5, 0.9, 0.95\) where \(\lambda_n\) is defined by
@@ -88,8 +89,8 @@ exercise the functionality for
 (extrema over all radii).
 
 Inspect the results to see if they make sense, check that results are consistent between the
-different backends and surface extractors, and generally look for problems. Fix any problems before considering
-the task complete.
+different backends and surface extractors, and generally look for problems. Diagnose and fix any
+problems before considering the task complete.
 
 ## Definition of done
 
