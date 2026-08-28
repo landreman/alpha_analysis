@@ -510,6 +510,8 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
     """
     import matplotlib.pyplot as plt
 
+    from .types import TransitionStatus
+
     figure = plt.figure(figsize=(12, 9), constrained_layout=True)
     geometry_axis = figure.add_subplot(2, 2, 1, projection="3d")
     action_axis = figure.add_subplot(2, 2, 2)
@@ -603,7 +605,8 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
     figure.suptitle(
         f"Transition {transition.transition_id}: b={transition.b:.8g}, "
         f"{transition.status.name}, "
-        f"{len(transition.u)} matched samples"
+        f"{sum(status is TransitionStatus.REGULAR for status in transition.sample_status)}"
+        f"/{len(transition.u)} regular samples"
     )
     if output_path is not None:
         figure.savefig(output_path, dpi=160)

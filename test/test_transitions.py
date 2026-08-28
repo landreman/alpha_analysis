@@ -13,6 +13,7 @@ from alpha_analysis.j_connectivity import (
     CriticalCurveStatus,
     SurfaceCurveMesh,
     SurfaceMesh,
+    TransitionCurve,
     TransitionMappingConfig,
     TransitionStatus,
     extract_critical_curves,
@@ -105,15 +106,34 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
     coarse = map_transitions(
         field,
         critical,
-        TransitionMappingConfig(action_quadrature_order=12),
+        TransitionMappingConfig(
+            action_quadrature_order=12, max_action_quadrature_order=24
+        ),
     )[0]
     fine = map_transitions(
         field,
         critical,
-        TransitionMappingConfig(action_quadrature_order=48),
+        TransitionMappingConfig(
+            action_quadrature_order=48, max_action_quadrature_order=96
+        ),
     )[0]
 
     assert fine.status is TransitionStatus.REGULAR
+    legacy_positional_curve = TransitionCurve(
+        fine.transition_id,
+        fine.b,
+        fine.u,
+        fine.total_u_length,
+        fine.ports,
+        fine.marginal_points,
+        fine.field_line_identity,
+        fine.event_zeta_unwrapped,
+        fine.additivity_residual,
+        fine.status,
+        fine.source_critical_status,
+        fine.controls,
+    )
+    assert legacy_positional_curve.sample_status == (fine.status,) * len(fine.u)
     assert fine.source_critical_status is CriticalCurveStatus.REGULAR
     assert len(fine.ports) == 3
     parent = _port(fine, "parent")
@@ -175,16 +195,22 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
     assert np.all(child_1.quadrature_error >= 0.0)
     assert np.all(child_3.quadrature_error >= 0.0)
     assert np.max(np.abs(fine.additivity_residual)) < 2.0e-8
-    assert np.max(np.abs(fine.additivity_residual)) < 0.15 * np.max(
-        np.abs(coarse.additivity_residual)
+    assert np.max(
+        _port(fine, "child_1").quadrature_error
+        + _port(fine, "child_3").quadrature_error
+    ) < 0.15 * np.max(
+        _port(coarse, "child_1").quadrature_error
+        + _port(coarse, "child_3").quadrature_error
     )
     underresolved = map_transitions(
         field,
         critical,
-        TransitionMappingConfig(action_quadrature_order=2),
+        TransitionMappingConfig(
+            action_quadrature_order=2, max_action_quadrature_order=4
+        ),
     )[0]
     assert underresolved.status is TransitionStatus.UNRESOLVED
-    assert np.max(np.abs(underresolved.additivity_residual)) > 0.1
+    assert np.max(np.abs(underresolved.additivity_residual)) > 1.0e-5
 
     # The common PL arc-length parameter has an independently known circle
     # limit, and its error decreases when transition-curve sampling doubles.
@@ -197,6 +223,18 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
     assert abs(sampled_finer.total_u_length - exact_length) < abs(
         fine.total_u_length - exact_length
     )
+    capped = map_transitions(
+        field,
+        _critical_circles(field, s=0.5, zeta_values=(0.0,), count=16),
+        TransitionMappingConfig(action_quadrature_order=48, max_curve_samples=5),
+    )[0]
+    np.testing.assert_array_equal(
+        _port(capped, "child_3").source_vertex_ids,
+        np.array([0, 3, 6, 9, 12]),
+    )
+    assert len(capped.u) == 5
+    assert capped.controls.max_curve_samples == 5
+    assert capped.total_u_length == sampled_finer.total_u_length
 
     # Reversing G+iota*I reverses physical tracing: T moves from the negative
     # lifted root to the positive one while the action remains unchanged.
@@ -288,6 +326,92 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
     assert source_unresolved.source_critical_status is CriticalCurveStatus.UNRESOLVED
 
 
+def test_one_degenerate_sample_does_not_erase_a_regular_transition_curve():
+    """A nongeneric endpoint stays explicit without discarding valid samples."""
+    field = _field(iota=0.4)
+    critical = _critical_circles(field, s=0.5, zeta_values=(0.0,))
+    maximum = critical.polylines[0]
+    point_kind = critical.point_kind.copy()
+    point_kind[maximum.vertex_ids[0]] = CriticalKind.DEGENERATE.value
+    critical = replace(
+        critical,
+        point_kind=point_kind,
+        status=CriticalCurveStatus.DEGENERATE,
+    )
+
+    transition = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(action_quadrature_order=48),
+    )[0]
+
+    assert transition.status is TransitionStatus.UNRESOLVED
+    assert transition.sample_status[0] is TransitionStatus.UNRESOLVED
+    assert transition.sample_failure_reason[0] == "source_classification"
+    assert all(
+        status is TransitionStatus.REGULAR for status in transition.sample_status[1:]
+    )
+    assert set(transition.sample_failure_reason[1:]) == {"regular"}
+    for port in transition.ports:
+        assert np.isnan(port.action_values[0])
+        assert np.all(np.isfinite(port.action_values[1:]))
+
+
+def test_high_mode_transition_actions_resolve_every_internal_extremum():
+    """Internal ripple must not fool either child or parent quadrature."""
+    ripple = 2.0e-4
+    field = SyntheticFourierField(
+        nfp=1,
+        m=np.array([0, 0, 0, 0]),
+        n=np.array([0, 1, 2, 120]),
+        cosine_coefficients=np.array(
+            [[2.0 - ripple, 0.0], [-1.0, 0.0], [0.3, 0.2], [ripple, 0.0]]
+        ),
+        sine_coefficients=np.zeros((4, 2)),
+        iota_coefficients=np.array([0.4]),
+        G_coefficients=np.array([3.0]),
+        I_coefficients=np.array([0.0]),
+    )
+    critical = _critical_circles(field, s=0.5, zeta_values=(0.0,))
+
+    transition = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(action_quadrature_order=32),
+    )[0]
+
+    assert transition.status is TransitionStatus.REGULAR
+    parent = _port(transition, "parent")
+    child_1 = _port(transition, "child_1")
+    child_3 = _port(transition, "child_3")
+    root = brentq(
+        lambda zeta: float(field.B(0.5, 0.4 * zeta, zeta)) - 1.4,
+        -np.pi,
+        -0.1,
+    )
+    breakpoints = np.linspace(root, 0.0, 961)
+    expected_child = quad(
+        lambda zeta: 3.0
+        / float(field.B(0.5, 0.4 * zeta, zeta))
+        * np.sqrt(max(1.0 - float(field.B(0.5, 0.4 * zeta, zeta)) / 1.4, 0.0)),
+        root,
+        0.0,
+        points=breakpoints[1:-1],
+        epsabs=1.0e-11,
+        epsrel=1.0e-11,
+        limit=1000,
+    )[0]
+    assert np.all(
+        np.abs(child_1.action_values - expected_child)
+        <= 1.01 * child_1.quadrature_error
+    )
+    assert np.all(
+        np.abs(child_3.action_values - expected_child)
+        <= 1.01 * child_3.quadrature_error
+    )
+    np.testing.assert_allclose(parent.action_values, 2.0 * expected_child, rtol=2.0e-8)
+
+
 def test_equal_height_multiway_event_is_explicit_and_never_gets_actions():
     field = _field(double_maximum=True)
     critical = _critical_circles(field, s=0.5, zeta_values=(0.5 * np.pi, 1.5 * np.pi))
@@ -302,13 +426,30 @@ def test_equal_height_multiway_event_is_explicit_and_never_gets_actions():
         for port in item.ports
     )
 
-    duplicate_components = map_transitions(
-        _field(),
-        _critical_circles(_field(), s=0.5, zeta_values=(0.0, 0.0)),
+    duplicate_field = _field()
+    duplicate_critical = _critical_circles(
+        duplicate_field, s=0.5, zeta_values=(0.0, 0.0)
     )
+    duplicate_components = map_transitions(duplicate_field, duplicate_critical)
     assert len(duplicate_components) == 2
     assert all(
         item.status is TransitionStatus.MULTIWAY for item in duplicate_components
+    )
+
+    point_kind = duplicate_critical.point_kind.copy()
+    for polyline in duplicate_critical.polylines:
+        point_kind[polyline.vertex_ids[0]] = CriticalKind.DEGENERATE.value
+    partially_degenerate_duplicates = map_transitions(
+        duplicate_field,
+        replace(
+            duplicate_critical,
+            point_kind=point_kind,
+            status=CriticalCurveStatus.DEGENERATE,
+        ),
+    )
+    assert all(
+        item.status is TransitionStatus.MULTIWAY
+        for item in partially_degenerate_duplicates
     )
 
 
