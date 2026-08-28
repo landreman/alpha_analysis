@@ -185,6 +185,67 @@ def test_long_well_preserves_period_count_and_cap_is_unresolved():
     assert np.isnan(capped.B_residual_out)
 
 
+def test_real_long_well_quadrature_splits_at_known_internal_extrema():
+    field = BoozerField.from_boozmn(
+        os.path.join(DATA_DIR, "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc")
+    )
+    b = 3.316712409154168
+    q_in = np.array([0.8498967707915923, 3.1340240295405226, 0.00438532802598616])
+    traces = [
+        trace_regular_well(
+            field,
+            b,
+            q_in,
+            WellTraceConfig(
+                quadrature_rtol=tolerance,
+                quadrature_atol=0.1 * tolerance,
+            ),
+        )
+        for tolerance in (1.0e-6, 1.0e-8)
+    ]
+
+    assert all(trace.status is TraceStatus.REGULAR for trace in traces)
+    assert all(trace.field_period_count == 68 for trace in traces)
+    assert all(trace.n_internal_maxima == 75 for trace in traces)
+    np.testing.assert_allclose(
+        [traces[0].action_length, traces[0].bounce_time_length],
+        [traces[1].action_length, traces[1].bounce_time_length],
+        rtol=2.0e-6,
+    )
+
+
+def test_real_long_well_quadrature_honors_a_global_piecewise_error_budget():
+    field = BoozerField.from_boozmn(
+        os.path.join(DATA_DIR, "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc")
+    )
+    b = 6.853746323425908
+    # This lambda_n=0.9 incoming point produces 101 internal extrema. A
+    # single QUADPACK call reports roundoff before meeting the K tolerance.
+    x, y, zeta = -0.57571474, -0.72530933, 0.43810828
+    theta = float(np.mod(np.arctan2(y, x), 2.0 * np.pi))
+    s_guess = x * x + y * y
+    s = brentq(
+        lambda radius: float(field.B(radius, theta, zeta)) - b,
+        s_guess - 0.02,
+        s_guess + 0.02,
+    )
+
+    trace = trace_regular_well(
+        field,
+        b,
+        np.array([s, theta, zeta]),
+        WellTraceConfig(quadrature_rtol=1.0e-8, quadrature_atol=1.0e-9),
+    )
+
+    assert trace.status is TraceStatus.REGULAR
+    assert trace.field_period_count == 30
+    assert trace.n_internal_maxima == 50
+    assert trace.quadrature_error_A <= max(1.0e-9, 1.0e-8 * abs(trace.action_length))
+    assert trace.quadrature_error_K <= max(
+        1.0e-9, 1.0e-8 * abs(trace.bounce_time_length)
+    )
+
+
 def test_fourier_aware_scan_finds_a_narrow_high_mode_first_return():
     mode = 128
     b = 1.01
@@ -223,6 +284,91 @@ def test_fourier_aware_scan_finds_a_narrow_high_mode_first_return():
         under_resolved.status is TraceStatus.REGULAR
         and np.array_equal(under_resolved.extrema_kind, [1])
     )
+
+
+def test_scan_recovers_first_return_before_an_internal_above_b_extremum():
+    # A shallow high-mode bump rises above b and falls below it within one
+    # Fourier-aware scan cell. The cell endpoints are both inside the well,
+    # but the analytically located internal maximum brackets the first
+    # outgoing crossing with the preceding negative value.
+    field = _fourier_field(
+        nfp=1,
+        m=[0, 0, 0],
+        n=[0, 1, 16],
+        cosine=[2.0, -0.4, 0.08],
+        C=1.0,
+    )
+    b = 2.083829683510348
+    root_in = brentq(
+        lambda zeta: float(field.B(0.5, 0.0, zeta)) - b,
+        4.43,
+        4.45,
+        xtol=1.0e-14,
+    )
+    grid = np.linspace(root_in + 1.0e-10, root_in + 2.0 * np.pi, 200_001)
+    residual = np.asarray(field.B(0.5, 0.0, grid), dtype=float) - b
+    outgoing_cells = np.flatnonzero((residual[:-1] < 0.0) & (residual[1:] >= 0.0))
+    first = int(outgoing_cells[0])
+    expected_out = brentq(
+        lambda zeta: float(field.B(0.5, 0.0, zeta)) - b,
+        grid[first],
+        grid[first + 1],
+        xtol=1.0e-14,
+    )
+
+    trace = trace_regular_well(
+        field,
+        b,
+        np.array([0.5, 0.0, root_in]),
+        WellTraceConfig(quadrature_rtol=1.0e-8, quadrature_atol=1.0e-9),
+    )
+
+    assert trace.status is TraceStatus.REGULAR
+    np.testing.assert_allclose(trace.zeta_out_unwrapped, expected_out, atol=2.0e-12)
+
+
+def test_first_scan_cell_uses_a_strictly_interior_bracket_on_real_field():
+    field = BoozerField.from_boozmn(
+        os.path.join(
+            DATA_DIR,
+            "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_"
+            "eval000290_low_resolution.nc",
+        )
+    )
+    # lambda_n=0.1 using refined radially global extrema. Scalar and batched
+    # evaluation round the input residual to opposite signs at this root, so
+    # u=0 itself is not a safe Brent endpoint.
+    b = 8.147184858800973
+    q_in = np.array([0.7373651801259851, 5.679715401720161, 1.4300389475121953])
+    iota = float(field.iota(q_in[0]))
+    grid = np.linspace(q_in[2] + 1.0e-10, q_in[2] + 0.01, 10_001)
+    theta = q_in[1] + iota * (grid - q_in[2])
+    residual = np.asarray(field.B(q_in[0], theta, grid), dtype=float) - b
+    outgoing_cells = np.flatnonzero((residual[:-1] < 0.0) & (residual[1:] >= 0.0))
+    first = int(outgoing_cells[0])
+    expected_out = brentq(
+        lambda zeta: float(
+            field.B(
+                q_in[0],
+                q_in[1] + iota * (zeta - q_in[2]),
+                zeta,
+            )
+        )
+        - b,
+        grid[first],
+        grid[first + 1],
+        xtol=1.0e-14,
+    )
+
+    trace = trace_regular_well(
+        field,
+        b,
+        q_in,
+        WellTraceConfig(quadrature_rtol=1.0e-8, quadrature_atol=1.0e-9),
+    )
+
+    assert trace.status is TraceStatus.REGULAR
+    np.testing.assert_allclose(trace.zeta_out_unwrapped, expected_out, atol=2.0e-12)
 
 
 def test_shallow_wells_narrower_than_one_scan_cell_remain_regular():
