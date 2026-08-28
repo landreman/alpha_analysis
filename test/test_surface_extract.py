@@ -136,6 +136,33 @@ def test_extractors_return_two_closed_periodic_tori_with_polished_roots(
         assert np.all(surface.triangle_parent_tetrahedra == -1)
 
 
+def test_pyvista_polishes_the_same_background_edge_roots_as_marching_tetrahedra():
+    """VTK points must not jump between sheets during nonlinear polishing."""
+    field = BoozerField.from_boozmn(
+        os.path.join(
+            DATA_DIR,
+            "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_"
+            "eval000290_low_resolution.nc",
+        )
+    )
+    # Radially global lambda_n=0.05 from the independently refined bounds.
+    b = 7.9314345648115845
+    background = StructuredPrismMeshBackend(
+        BackgroundMeshConfig(n_radial=6, n_poloidal=24, n_zeta=12)
+    ).build(field)
+
+    reference = MarchingTetrahedraExtractor().extract(background, field, b).full
+    prototype = PyVistaSurfaceExtractor().extract(background, field, b).full
+
+    assert len(reference.points) == len(prototype.points)
+    distances = np.linalg.norm(
+        reference.points[:, np.newaxis, :] - prototype.points[np.newaxis, :, :],
+        axis=2,
+    )
+    assert np.max(np.min(distances, axis=0)) <= 1.0e-9
+    assert np.max(np.min(distances, axis=1)) <= 1.0e-9
+
+
 @pytest.mark.parametrize(
     "extractor_type,resolutions,max_imbalance,expected_seam_points",
     [
@@ -826,9 +853,17 @@ def test_pyvista_prototype_returns_plain_arrays(monkeypatch):
         UnstructuredGrid = FakeGrid
 
     import alpha_analysis.j_connectivity as package
+    import alpha_analysis.j_connectivity.surface_extract as surface_extract_module
 
     monkeypatch.setattr(
         package, "optional_import", lambda *_args, **_kwargs: FakePyVista
+    )
+    # This test double has no real background-edge interpolation. The real-VTK
+    # edge-reconstruction contract is covered by the regression above.
+    monkeypatch.setattr(
+        surface_extract_module,
+        "_polish_pyvista_background_edge_roots",
+        lambda points, *_args, **_kwargs: points,
     )
     background = StructuredPrismMeshBackend(
         BackgroundMeshConfig(n_radial=1, n_poloidal=3, n_zeta=1)

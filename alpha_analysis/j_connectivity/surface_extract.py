@@ -8,6 +8,7 @@ from typing import ClassVar
 
 import numpy as np
 from scipy.optimize import brentq, linear_sum_assignment, root
+from scipy.spatial import cKDTree
 
 from .field import BoozerFieldLike
 from .types import BackgroundMesh, SurfaceStatus
@@ -307,14 +308,13 @@ class PyVistaSurfaceExtractor:
             period,
             self.config.merge_tolerance,
         )
-        points = _project_points_to_level(
+        points = _polish_pyvista_background_edge_roots(
             points,
+            background,
             field,
             float(b),
             period,
             self.config,
-            source_boundary_tags,
-            seam_sides,
         )
         points = _match_pyvista_periodic_seam(
             points, seam_sides, self.config.merge_tolerance
@@ -560,6 +560,77 @@ def _polish_background_edges(
             "edge-root residual exceeds B_tolerance after polishing",
         )
     return _canonicalize_points(points, period, config.merge_tolerance)
+
+
+def _polish_pyvista_background_edge_roots(
+    contour_points: np.ndarray,
+    background: BackgroundMesh,
+    field: BoozerFieldLike,
+    b: float,
+    period: float,
+    config: SurfaceExtractionConfig,
+) -> np.ndarray:
+    """Polish each VTK contour point on its originating background edge.
+
+    VTK linearly interpolates one contour point on every tetrahedron edge
+    whose sampled endpoint values straddle ``b``.  A free multidimensional
+    Newton projection can leave that edge and converge to another nearby
+    sheet of a nonlinear ``B=b`` surface.  Reconstruct the originating edge
+    from VTK's linear point, then use the same bracketed chord solve as the
+    marching-tetrahedra extractor.  Parent IDs remain intentionally absent
+    from the returned PyVista prototype; the reconstructed edges only bound
+    root polishing (DESIGN.md §§8.3 and 21.2).
+    """
+    points = np.asarray(contour_points, dtype=np.float64).reshape(-1, 3)
+    values = np.asarray(background.B, dtype=np.float64) - b
+    if np.any(np.abs(values) <= config.B_tolerance):
+        raise SurfaceExtractionError(
+            SurfaceStatus.DEGENERATE,
+            "B=b passes through a background vertex; refine or perturb the slice",
+        )
+    local_edges = ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3))
+    active_edges = sorted(
+        {
+            tuple(sorted((int(tetrahedron[first]), int(tetrahedron[second]))))
+            for tetrahedron in background.tetrahedra
+            for first, second in local_edges
+            if values[tetrahedron[first]] * values[tetrahedron[second]] < 0.0
+        }
+    )
+    if len(points) != len(active_edges):
+        raise SurfaceExtractionError(
+            SurfaceStatus.DEGENERATE,
+            "PyVista contour points do not correspond one-to-one with active "
+            "background edges",
+        )
+    if not len(points):
+        return points
+    edge_array = np.asarray(active_edges, dtype=np.int64)
+    first = edge_array[:, 0]
+    second = edge_array[:, 1]
+    fraction = -values[first] / (values[second] - values[first])
+    linear_points = background.points[first] + fraction[:, np.newaxis] * (
+        background.points[second] - background.points[first]
+    )
+    distances, edge_ids = cKDTree(linear_points).query(points)
+    coordinate_scale = max(
+        1.0,
+        float(np.max(np.abs(points))),
+        float(np.max(np.abs(linear_points))),
+    )
+    vtk_tolerance = max(
+        config.merge_tolerance,
+        8.0 * np.sqrt(np.finfo(float).eps) * coordinate_scale,
+    )
+    if np.any(distances > vtk_tolerance) or len(np.unique(edge_ids)) != len(points):
+        raise SurfaceExtractionError(
+            SurfaceStatus.DEGENERATE,
+            "PyVista contour geometry cannot be matched uniquely to background edges",
+        )
+    polished = _polish_background_edges(
+        background, active_edges, field, b, period, config
+    )
+    return polished[edge_ids]
 
 
 def _chandrupatla_roots(
@@ -1660,94 +1731,6 @@ def _project_to_level_near(
             return None
         current, residual = improved
     return None
-
-
-def _project_points_to_level(
-    points: np.ndarray,
-    field: BoozerFieldLike,
-    b: float,
-    period: float,
-    config: SurfaceExtractionConfig,
-    boundary_tags: np.ndarray,
-    seam_sides: np.ndarray,
-) -> np.ndarray:
-    """Project VTK contour points to ``B=b`` within the §8.2 disk domain.
-
-    Vectorized constrained Newton: each iteration serves every
-    still-unconverged point from one batched field evaluation, with the
-    axis, periodic-seam, and outer-boundary constraints applied per point
-    exactly as the previous per-point loop did. Any point that fails to
-    converge fails the whole projection (§21.2 — no silent substitutes).
-    """
-    projected = np.array(points, dtype=np.float64).reshape(-1, 3)
-    n_points = len(projected)
-    if not n_points:
-        return projected
-    on_axis = (np.asarray(boundary_tags) & SurfaceMesh.AXIS) != 0
-    on_seam = (np.asarray(boundary_tags) & SurfaceMesh.PERIODIC_SEAM) != 0
-    seam_targets = np.where(np.asarray(seam_sides) > 0, period, 0.0)
-    projected[on_axis, :2] = 0.0
-    projected[on_seam, 2] = seam_targets[on_seam]
-    guarded_unit_radius = 1.0 - 8.0 * np.finfo(float).eps
-    radius = np.linalg.norm(projected[:, :2], axis=1)
-    active_boundary = radius > 1.0
-    projected[active_boundary, :2] *= (guarded_unit_radius / radius[active_boundary])[
-        :, np.newaxis
-    ]
-    converged = np.zeros(n_points, dtype=bool)
-    hopeless = np.zeros(n_points, dtype=bool)
-    for _ in range(20):
-        todo = ~converged & ~hopeless
-        if not todo.any():
-            break
-        residual = np.zeros(n_points)
-        residual[todo] = _evaluate_B(field, projected[todo]) - b
-        done = todo & (np.abs(residual) <= config.B_tolerance)
-        out_of_domain = done & (
-            np.linalg.norm(projected[:, :2], axis=1) > 1.0 + config.merge_tolerance
-        )
-        converged |= done & ~out_of_domain
-        hopeless |= out_of_domain
-        stepping = todo & ~done
-        if not stepping.any():
-            continue
-        gradient = np.zeros((n_points, 3))
-        gradient[stepping] = _logical_B_gradients(field, projected[stepping])
-        constrained = stepping & active_boundary
-        if constrained.any():
-            radial = projected[constrained].copy()
-            radial[:, 2] = 0.0
-            overlap = np.einsum("ij,ij->i", gradient[constrained], radial)
-            gradient[constrained] -= overlap[:, np.newaxis] * radial
-        gradient[stepping & on_axis, :2] = 0.0
-        gradient[stepping & on_seam, 2] = 0.0
-        norm_squared = np.einsum("ij,ij->i", gradient, gradient)
-        dead = stepping & (norm_squared <= np.finfo(float).eps)
-        hopeless |= dead
-        stepping &= ~dead
-        if not stepping.any():
-            continue
-        candidate = (
-            projected[stepping]
-            - (residual[stepping] / norm_squared[stepping])[:, np.newaxis]
-            * gradient[stepping]
-        )
-        axis_lane = on_axis[stepping]
-        candidate[axis_lane, :2] = 0.0
-        lane_radius = np.linalg.norm(candidate[:, :2], axis=1)
-        clamp = ~axis_lane & (active_boundary[stepping] | (lane_radius > 1.0))
-        candidate[clamp, :2] *= (guarded_unit_radius / lane_radius[clamp])[
-            :, np.newaxis
-        ]
-        seam_lane = on_seam[stepping]
-        candidate[seam_lane, 2] = seam_targets[stepping][seam_lane]
-        projected[stepping] = candidate
-        active_boundary[np.flatnonzero(stepping)[clamp]] = True
-    if not np.all(converged):
-        raise SurfaceExtractionError(
-            SurfaceStatus.ROOT_FAILURE, "PyVista contour-point projection failed"
-        )
-    return _canonicalize_points(projected, period, config.merge_tolerance)
 
 
 def _field_quantities(field: BoozerFieldLike, s, theta, zeta, quantities):

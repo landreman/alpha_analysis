@@ -205,6 +205,10 @@ def test_real_long_well_quadrature_splits_at_known_internal_extrema():
     ]
 
     assert all(trace.status is TraceStatus.REGULAR for trace in traces)
+    assert all(
+        abs(trace.B_residual_in) <= 32.0 * np.finfo(float).eps * max(abs(b), 1.0)
+        for trace in traces
+    )
     assert all(trace.field_period_count == 68 for trace in traces)
     assert all(trace.n_internal_maxima == 75 for trace in traces)
     np.testing.assert_allclose(
@@ -687,6 +691,42 @@ def test_unattainable_quadrature_tolerance_is_an_explicit_failure():
     assert trace.status is TraceStatus.QUADRATURE_FAILURE
     assert np.isnan(trace.action_length)
     assert np.isnan(trace.bounce_time_length)
+
+
+def test_real_surface_residual_does_not_create_a_false_endpoint_singularity():
+    """An accepted mesh residual must not become an interior pole in K."""
+    field = BoozerField.from_boozmn(
+        os.path.join(
+            DATA_DIR,
+            "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_"
+            "eval000290_low_resolution.nc",
+        )
+    )
+    b = 8.147184858800973
+    q_in = np.array([0.7589870238134653, 3.1232439109495953, 0.7028053263654811])
+    assert 0.0 < float(field.B(*q_in)) - b < 1.0e-10
+
+    traces = [
+        trace_regular_well(
+            field,
+            b,
+            q_in,
+            WellTraceConfig(
+                max_field_periods=256,
+                quadrature_rtol=rtol,
+                quadrature_atol=1.0e-9,
+            ),
+        )
+        for rtol in (1.0e-8, 1.0e-10)
+    ]
+
+    assert all(trace.status is TraceStatus.REGULAR for trace in traces)
+    np.testing.assert_allclose(
+        traces[0].action_length, traces[1].action_length, rtol=1.0e-10
+    )
+    np.testing.assert_allclose(
+        traces[0].bounce_time_length, traces[1].bounce_time_length, rtol=1.0e-8
+    )
 
 
 def test_well_profile_plot_writes_the_required_static_diagnostic(tmp_path):
