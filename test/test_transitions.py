@@ -401,13 +401,14 @@ def test_high_mode_transition_actions_resolve_every_internal_extremum():
         epsrel=1.0e-11,
         limit=1000,
     )[0]
+    roundoff = 8.0 * np.finfo(float).eps * abs(expected_child)
     assert np.all(
         np.abs(child_1.action_values - expected_child)
-        <= 1.01 * child_1.quadrature_error
+        <= 1.01 * child_1.quadrature_error + roundoff
     )
     assert np.all(
         np.abs(child_3.action_values - expected_child)
-        <= 1.01 * child_3.quadrature_error
+        <= 1.01 * child_3.quadrature_error + roundoff
     )
     np.testing.assert_allclose(parent.action_values, 2.0 * expected_child, rtol=2.0e-8)
 
