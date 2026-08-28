@@ -205,10 +205,6 @@ def test_real_long_well_quadrature_splits_at_known_internal_extrema():
     ]
 
     assert all(trace.status is TraceStatus.REGULAR for trace in traces)
-    assert all(
-        abs(trace.B_residual_in) <= 32.0 * np.finfo(float).eps * max(abs(b), 1.0)
-        for trace in traces
-    )
     assert all(trace.field_period_count == 68 for trace in traces)
     assert all(trace.n_internal_maxima == 75 for trace in traces)
     np.testing.assert_allclose(
@@ -721,12 +717,40 @@ def test_real_surface_residual_does_not_create_a_false_endpoint_singularity():
     ]
 
     assert all(trace.status is TraceStatus.REGULAR for trace in traces)
+    assert all(
+        abs(trace.B_residual_in) <= 32.0 * np.finfo(float).eps * max(abs(b), 1.0)
+        for trace in traces
+    )
+    assert all(np.linalg.norm(trace.q_in - q_in) > 1.0e-12 for trace in traces)
     np.testing.assert_allclose(
         traces[0].action_length, traces[1].action_length, rtol=1.0e-10
     )
     np.testing.assert_allclose(
         traces[0].bounce_time_length, traces[1].bounce_time_length, rtol=1.0e-8
     )
+
+
+def test_incoming_root_polish_rejects_a_nonlocal_shallow_slope_correction():
+    # B = 2 - 1e-8 sin(zeta). The accepted B residual at zeta=-0.01
+    # corresponds to a 0.01-rad displacement, not a localized mesh root.
+    field = _fourier_field(
+        nfp=1,
+        m=[0, 0],
+        n=[0, 1],
+        cosine=[2.0, 0.0],
+        sine=[0.0, 1.0e-8],
+    )
+    config = WellTraceConfig()
+    q_in = np.array([0.5, 0.0, -0.01])
+    residual = float(field.B(*q_in)) - 2.0
+    slope = float(field.D_B(*q_in))
+    assert 0.0 < residual <= config.root_atol_B
+    assert slope < -config.extrema_tolerance
+
+    trace = trace_regular_well(field, 2.0, q_in, config)
+
+    assert trace.status is TraceStatus.ROOT_FAILURE
+    assert abs(residual / slope) > config.incoming_root_max_offset
 
 
 def test_well_profile_plot_writes_the_required_static_diagnostic(tmp_path):

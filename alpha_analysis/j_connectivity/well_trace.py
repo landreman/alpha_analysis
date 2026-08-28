@@ -20,9 +20,12 @@ class WellTraceConfig:
     """Numerical controls for a regular well trace (DESIGN.md §§9.2–9.4).
 
     ``root_atol_B`` and ``tangent_atol_B`` are absolute magnetic-field
-    tolerances. ``root_atol_zeta`` is in radians and ``root_rtol`` is
-    dimensionless. The scan takes at least ``samples_per_field_period``
-    samples per field period and, when the
+    tolerances. ``root_atol_zeta`` and ``incoming_root_max_offset`` are in
+    radians, and ``root_rtol`` is dimensionless. The latter offset bounds how
+    far an accepted surface vertex may move to reach the exact incoming root;
+    its default is the square-root machine-precision angular scale, and a
+    correction beyond it is explicitly non-regular. The scan takes at least
+    ``samples_per_field_period`` samples per field period and, when the
     field exposes Fourier mode numbers, at least
     ``samples_per_wavelength`` samples for the fastest retained mode along the
     field line. ``extrema_tolerance`` is in field units per radian and
@@ -41,6 +44,7 @@ class WellTraceConfig:
     quadrature_atol: float = 1.0e-10
     samples_per_wavelength: int = 24
     root_atol_zeta: float = 1.0e-12
+    incoming_root_max_offset: float = 1.5e-8
     tangent_atol_B: float = 1.0e-9
     itinerary_quantization: float = 1.0e-8
 
@@ -53,6 +57,7 @@ class WellTraceConfig:
             "quadrature_rtol",
             "quadrature_atol",
             "root_atol_zeta",
+            "incoming_root_max_offset",
             "tangent_atol_B",
             "itinerary_quantization",
         )
@@ -327,8 +332,8 @@ def _polish_incoming_root(
     a tiny forbidden interval followed by a false interior square-root pole.
     A bounded Newton iteration removes that artifact before the §9.2 scan.
     The offset is in the nonnegative scan coordinate but may have either sign;
-    leaving one resolved scan cell or losing the incoming slope is a failure,
-    never a distant substitute (DESIGN.md §§9.2, 9.4, and 21.2).
+    leaving the configured locality bound or losing the incoming slope is a
+    failure, never a distant substitute (DESIGN.md §§9.2, 9.4, and 21.2).
     """
     offset = 0.0
     rounding_tolerance = 32.0 * np.finfo(float).eps * max(abs(b), 1.0)
@@ -465,7 +470,7 @@ def trace_regular_well(
             derivative,
             residual_in,
             b,
-            max_offset=step,
+            max_offset=min(step, cfg.incoming_root_max_offset),
             config=cfg,
         )
         if incoming_offset is None:
@@ -476,6 +481,8 @@ def trace_regular_well(
                 B_residual_in=residual_in,
             )
         theta_in, zeta_in = map(float, coordinates(incoming_offset))
+        # Reassignment deliberately re-anchors the late-bound coordinate, F,
+        # and derivative closures so their new u=0 is the polished root.
         q_reduced = np.array(
             [
                 s,
