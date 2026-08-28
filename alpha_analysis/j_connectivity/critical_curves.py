@@ -55,6 +55,17 @@ class CriticalCurveConfig:
     Zero ``max_refinement_levels`` disables junction refinement; a positive
     value permits the direct degenerate-point solve. A failed solve is reported
     as an unresolved segment rather than guessed or discarded.
+
+    A mesh segment can chord across the neck of a fold of the ``B=b, g=0``
+    curve, so its junction lies many chord lengths away and the chord gate
+    above rejects a correct root.  When that happens the segment is resolved
+    instead by walking the curve itself from both endpoints:
+    ``max_walk_arclength_ratio`` bounds the walked arc length in units of the
+    chord length, ``max_walk_steps`` bounds the predictor-corrector steps per
+    walk, and ``junction_match_tolerance`` is the dimensionless logical
+    distance within which the two endpoint walks must agree before their
+    common junction is accepted.  Both bounds are finite by construction: an
+    exhausted walk is reported, never extended.
     """
 
     B_tolerance: float = 1.0e-9
@@ -63,6 +74,9 @@ class CriticalCurveConfig:
     merge_tolerance: float = 1.0e-9
     max_refinement_levels: int = 6
     max_midpoint_displacement_ratio: float = 2.0
+    max_walk_arclength_ratio: float = 24.0
+    max_walk_steps: int = 48
+    junction_match_tolerance: float = 1.0e-6
 
     def __post_init__(self) -> None:
         for name in (
@@ -71,12 +85,16 @@ class CriticalCurveConfig:
             "D2_tolerance",
             "merge_tolerance",
             "max_midpoint_displacement_ratio",
+            "max_walk_arclength_ratio",
+            "junction_match_tolerance",
         ):
             value = getattr(self, name)
             if not np.isfinite(value) or value <= 0.0:
                 raise ValueError(f"{name} must be finite and positive")
         if self.max_refinement_levels < 0:
             raise ValueError("max_refinement_levels must be nonnegative")
+        if self.max_walk_steps < 1:
+            raise ValueError("max_walk_steps must be at least one")
 
 
 @dataclass(frozen=True)
@@ -99,7 +117,14 @@ class CriticalPolyline:
 
 @dataclass(frozen=True)
 class CriticalCurveReport:
-    """Machine-readable classification-refinement diagnostics (§21.3)."""
+    """Machine-readable classification-refinement diagnostics (§21.3).
+
+    ``curve_walk_junction_count`` counts junctions the chord-local solve
+    rejected and the two-sided curve walk then confirmed;
+    ``boundary_exit_split_count`` counts fold necks whose junction lies
+    outside ``s <= 1`` and whose bridging segment was replaced by two arms
+    ending on the ``EDGE`` boundary.
+    """
 
     refined_segment_count: int
     unresolved_segment_count: int
@@ -107,6 +132,8 @@ class CriticalCurveReport:
     unresolved_endpoint_count: int
     source_unresolved_split_count: int
     ambiguous_segment_length_history: tuple[float, ...]
+    curve_walk_junction_count: int = 0
+    boundary_exit_split_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -368,6 +395,342 @@ def _degenerate_point(
     raise CriticalCurveError("degenerate point violates B, g, D2_B, or locality bounds")
 
 
+def _point_values(
+    field: BoozerFieldLike, point: FloatArray
+) -> tuple[float, float, float]:
+    """Return scalar ``(B, g, D_parallel^2 B)`` at one logical point."""
+    B, g, D2_B = _field_values(
+        field, np.asarray(point, dtype=np.float64)[np.newaxis, :]
+    )
+    return float(B[0]), float(g[0]), float(D2_B[0])
+
+
+def _logical_s(point: FloatArray) -> float:
+    """Normalized toroidal flux ``s = x^2 + y^2`` of a logical point."""
+    return float(point[0] ** 2 + point[1] ** 2)
+
+
+def _curve_tangent(field: BoozerFieldLike, point: FloatArray) -> FloatArray | None:
+    """Unit tangent of the curve ``B=b, g=0`` at ``point`` (§5.2).
+
+    The curve is the intersection of the level sets of ``B`` and ``g``, so its
+    tangent is parallel to ``grad B x grad g`` in logical ``(x,y,zeta)``.  The
+    gradients use centered differences; only the direction matters, because
+    every predicted step is corrected back onto both level sets.
+    """
+    step = 1.0e-6
+    gradients = np.empty((2, 3), dtype=np.float64)
+    for axis in range(3):
+        offset = np.zeros(3, dtype=np.float64)
+        offset[axis] = step
+        B_plus, g_plus, _ = _point_values(field, point + offset)
+        B_minus, g_minus, _ = _point_values(field, point - offset)
+        gradients[0, axis] = 0.5 * (B_plus - B_minus) / step
+        gradients[1, axis] = 0.5 * (g_plus - g_minus) / step
+    tangent = np.cross(gradients[0], gradients[1])
+    norm = float(np.linalg.norm(tangent))
+    if not np.isfinite(norm) or norm == 0.0:
+        return None
+    return tangent / norm
+
+
+def _project_to_curve(
+    field: BoozerFieldLike,
+    b: float,
+    predicted: FloatArray,
+    tangent: FloatArray,
+    config: CriticalCurveConfig,
+) -> FloatArray | None:
+    """Correct ``predicted`` onto ``B=b, g=0`` in the plane normal to ``tangent``."""
+
+    def residual(point: np.ndarray) -> np.ndarray:
+        B, g, _ = _point_values(field, point)
+        return np.array([B - b, g, float(np.dot(point - predicted, tangent))])
+
+    solved = root(
+        residual, np.asarray(predicted, dtype=np.float64), options={"xtol": 1.0e-13}
+    )
+    point = np.asarray(solved.x, dtype=np.float64)
+    if point.shape != (3,) or not np.all(np.isfinite(point)):
+        return None
+    B, g, _ = _point_values(field, point)
+    if abs(B - b) > config.B_tolerance or abs(g) > config.g_tolerance:
+        return None
+    return point
+
+
+@dataclass(frozen=True)
+class _WalkResult:
+    """Outcome of one bounded walk along ``B=b, g=0`` from a segment endpoint.
+
+    ``reason`` is ``junction`` (``D_parallel^2 B`` changed sign between two
+    walked points), ``boundary`` (the walk left ``s <= 1``), or ``exhausted``
+    (the step, arc-length, or corrector bounds were reached).  ``seed`` and
+    ``bracket`` are the bracketing data for the corresponding local solve.
+    """
+
+    reason: str
+    seed: FloatArray | None
+    bracket: float
+    first_D2_magnitude: float
+
+
+def _walk_curve(
+    field: BoozerFieldLike,
+    b: float,
+    start: FloatArray,
+    orientation: float,
+    scale: float,
+    budget: float,
+    config: CriticalCurveConfig,
+) -> _WalkResult:
+    """Follow ``B=b, g=0`` from ``start`` until a bounded stopping condition.
+
+    This is a predictor-corrector continuation: the tangent of §5.2 predicts,
+    and ``_project_to_curve`` corrects back onto both level sets, so every
+    walked point satisfies ``B=b`` and ``g=0`` to the configured tolerances.
+    The walk stops at the first sign change of ``D_parallel^2 B`` (a junction
+    bracket), at the first exit from ``s <= 1``, or when its finite step and
+    arc-length bounds are spent.  Steps are measured in units of ``scale``,
+    the segment chord length, so the walk resolves the curve on the mesh's own
+    length scale and cannot step over an intervening event.
+    """
+    point = np.asarray(start, dtype=np.float64).copy()
+    tangent = _curve_tangent(field, point)
+    if tangent is None:
+        return _WalkResult("exhausted", None, 0.0, np.inf)
+    tangent = orientation * tangent
+    _, _, D2_B = _point_values(field, point)
+    arclength = 0.0
+    step = 0.5 * scale
+    minimum_step = 1.0e-3 * scale
+    bracket_target = 0.05 * scale
+    first_D2_magnitude = np.inf
+    for _ in range(config.max_walk_steps):
+        candidate = _project_to_curve(field, b, point + step * tangent, tangent, config)
+        if candidate is None:
+            step *= 0.5
+            if step < minimum_step:
+                return _WalkResult("exhausted", None, 0.0, first_D2_magnitude)
+            continue
+        delta = candidate - point
+        moved = float(np.linalg.norm(delta))
+        if moved <= 0.0 or not np.isfinite(moved):
+            return _WalkResult("exhausted", None, 0.0, first_D2_magnitude)
+        _, _, candidate_D2 = _point_values(field, candidate)
+        outside = _logical_s(candidate) > 1.0 + config.merge_tolerance
+        crosses = D2_B * candidate_D2 < 0.0
+        if (crosses or outside) and moved > bracket_target and step > minimum_step:
+            # Tighten the bracket before solving: a long step can carry the
+            # walk past the first event to a different one on the same curve.
+            step *= 0.5
+            continue
+        if not np.isfinite(first_D2_magnitude):
+            first_D2_magnitude = abs(candidate_D2)
+        if crosses:
+            fraction = D2_B / (D2_B - candidate_D2)
+            return _WalkResult(
+                "junction", point + fraction * delta, moved, first_D2_magnitude
+            )
+        if outside:
+            return _WalkResult("boundary", candidate, moved, first_D2_magnitude)
+        arclength += moved
+        if arclength >= budget:
+            return _WalkResult("exhausted", None, 0.0, first_D2_magnitude)
+        following = _curve_tangent(field, candidate)
+        if following is None:
+            return _WalkResult("exhausted", None, 0.0, first_D2_magnitude)
+        orientation = float(np.dot(following, delta))
+        if orientation == 0.0:
+            return _WalkResult("exhausted", None, 0.0, first_D2_magnitude)
+        tangent = following * np.sign(orientation)
+        point, D2_B = candidate, candidate_D2
+        step = min(1.5 * step, scale)
+    return _WalkResult("exhausted", None, 0.0, first_D2_magnitude)
+
+
+def _walk_outcomes(
+    field: BoozerFieldLike,
+    b: float,
+    start: FloatArray,
+    scale: float,
+    budget: float,
+    config: CriticalCurveConfig,
+) -> list[_WalkResult]:
+    """Walk both ways along the curve, preferring decreasing ``|D2_B|``."""
+    results = [
+        _walk_curve(field, b, start, orientation, scale, budget, config)
+        for orientation in (1.0, -1.0)
+    ]
+    return sorted(results, key=lambda result: result.first_D2_magnitude)
+
+
+def _polish_junction(
+    seed: FloatArray,
+    bracket: float,
+    field: BoozerFieldLike,
+    b: float,
+    period: float,
+    config: CriticalCurveConfig,
+) -> FloatArray | None:
+    """Solve ``B-b = g = D_parallel^2 B = 0`` from a bracketing seed.
+
+    The seed comes from one walked step that brackets the sign change, so the
+    locality gate here is the bracket length itself rather than a mesh chord.
+    """
+
+    def residual(coordinates: np.ndarray) -> np.ndarray:
+        point = _point_from_coordinates(coordinates, period)
+        B, g, D2_B = _point_values(field, point)
+        return np.array([B - b, g, D2_B])
+
+    coordinates = np.array(
+        [_logical_s(seed), float(np.arctan2(seed[1], seed[0])), float(seed[2])]
+    )
+    solved = root(residual, coordinates, options={"xtol": 1.0e-13})
+    solution = np.asarray(solved.x, dtype=np.float64)
+    if solution.shape != (3,) or not np.all(np.isfinite(solution)):
+        return None
+    point = _point_from_coordinates(solution, period)
+    B, g, D2_B = _point_values(field, point)
+    if (
+        not (0.0 <= solution[0] <= 1.0 + config.merge_tolerance)
+        or abs(B - b) > config.B_tolerance
+        or abs(g) > config.g_tolerance
+        or abs(D2_B) > config.D2_tolerance
+        or float(np.linalg.norm(_periodic_delta(seed, point, period))) > 2.0 * bracket
+    ):
+        return None
+    return point
+
+
+def _boundary_exit_point(
+    outside: FloatArray,
+    bracket: float,
+    field: BoozerFieldLike,
+    b: float,
+    period: float,
+    config: CriticalCurveConfig,
+) -> FloatArray | None:
+    """Solve ``B-b = g = 0`` with ``s = 1`` near a walked outside point."""
+
+    def residual(coordinates: np.ndarray) -> np.ndarray:
+        point = _point_from_coordinates(coordinates, period)
+        B, g, _ = _point_values(field, point)
+        return np.array([B - b, g, coordinates[0] - 1.0])
+
+    coordinates = np.array(
+        [
+            _logical_s(outside),
+            float(np.arctan2(outside[1], outside[0])),
+            float(outside[2]),
+        ]
+    )
+    solved = root(residual, coordinates, options={"xtol": 1.0e-13})
+    solution = np.asarray(solved.x, dtype=np.float64)
+    if solution.shape != (3,) or not np.all(np.isfinite(solution)):
+        return None
+    point = _point_from_coordinates(solution, period)
+    B, g, _ = _point_values(field, point)
+    if (
+        abs(_logical_s(point) - 1.0) > config.merge_tolerance
+        or abs(B - b) > config.B_tolerance
+        or abs(g) > config.g_tolerance
+        or float(np.linalg.norm(_periodic_delta(outside, point, period)))
+        > 2.0 * bracket
+    ):
+        return None
+    return point
+
+
+def _resolve_by_curve_walk(
+    first: FloatArray,
+    second: FloatArray,
+    field: BoozerFieldLike,
+    b: float,
+    period: float,
+    config: CriticalCurveConfig,
+) -> tuple[str, tuple[FloatArray | None, ...]]:
+    """Resolve a segment whose junction is not chord-local (§5.4).
+
+    A marching-triangle segment can bridge the neck of a fold of ``B=b, g=0``:
+    its two endpoints then lie on the two arms of one curve that turns around
+    at a junction several chord lengths away, and no junction lies on the
+    chord at all.  Both endpoints are walked along the curve; the junction is
+    accepted only when the two independent walks agree on it, which is a
+    connectivity statement about the curve rather than a distance in the mesh.
+    When the arms instead leave ``s <= 1`` before meeting, the junction is
+    outside the plasma and the bridging segment is replaced by two arms that
+    each end on the boundary; nothing is merged across the neck.
+    """
+    scale = float(np.linalg.norm(_periodic_delta(first, second, period)))
+    budget = config.max_walk_arclength_ratio * scale
+    if not np.isfinite(budget) or budget <= 0.0:
+        raise CriticalCurveError("curve walk needs a positive segment length")
+    outcomes = [
+        _walk_outcomes(field, b, endpoint, scale, budget, config)
+        for endpoint in (first, second)
+    ]
+    junctions: list[list[FloatArray]] = []
+    bracketed = False
+    for endpoint_outcomes in outcomes:
+        found: list[FloatArray] = []
+        for result in endpoint_outcomes:
+            if result.reason != "junction" or result.seed is None:
+                continue
+            bracketed = True
+            point = _polish_junction(
+                result.seed, result.bracket, field, b, period, config
+            )
+            if point is not None:
+                found.append(point)
+        junctions.append(found)
+    for from_first in junctions[0]:
+        for from_second in junctions[1]:
+            if (
+                float(np.linalg.norm(_periodic_delta(from_first, from_second, period)))
+                <= config.junction_match_tolerance
+            ):
+                return "junction", (from_first,)
+    if any(junctions):
+        raise CriticalCurveError(
+            "curve walks from the two endpoints found different junctions"
+        )
+    if bracketed:
+        # A walk bracketed a sign change inside the domain: the event is real
+        # and unsolved, so it must not be reinterpreted as a boundary exit.
+        raise CriticalCurveError("a bracketed junction did not solve")
+    exits: list[FloatArray | None] = []
+    for endpoint, endpoint_outcomes in zip((first, second), outcomes):
+        if _logical_s(endpoint) >= 1.0 - config.merge_tolerance:
+            # This arm already ends on the boundary; it is its own exit.
+            exits.append(None)
+            continue
+        preferred = endpoint_outcomes[0]
+        _, _, endpoint_D2 = _point_values(field, endpoint)
+        if (
+            preferred.reason != "boundary"
+            or preferred.seed is None
+            or preferred.first_D2_magnitude >= abs(endpoint_D2)
+        ):
+            break
+        point = _boundary_exit_point(
+            preferred.seed, preferred.bracket, field, b, period, config
+        )
+        if point is None:
+            break
+        if (
+            float(np.linalg.norm(_periodic_delta(endpoint, point, period)))
+            <= config.merge_tolerance
+        ):
+            exits.append(None)
+            continue
+        exits.append(point)
+    if len(exits) == 2 and not all(exit_point is None for exit_point in exits):
+        return "boundary", tuple(exits)
+    raise CriticalCurveError("bounded curve walk did not resolve the segment")
+
+
 def _segment_midpoint_data(
     points: FloatArray,
     segments: IntArray,
@@ -388,6 +751,87 @@ def _segment_midpoint_data(
         return midpoints, np.empty(0, dtype=np.int64)
     _, _, midpoint_D2 = _field_values(field, midpoints)
     return midpoints, _point_kinds(midpoint_D2, tolerance)
+
+
+def _projected_midpoint(
+    first: FloatArray,
+    second: FloatArray,
+    midpoint: FloatArray,
+    field: BoozerFieldLike,
+    b: float,
+    period: float,
+    config: CriticalCurveConfig,
+) -> FloatArray | None:
+    """Return the curve point at the chord midpoint, or ``None``.
+
+    ``D_parallel^2 B`` classifies points *of the curve* (§5.2), but a chord
+    midpoint lies off the curve wherever the curve bends, which reports a
+    kind the curve never takes.  Correcting the midpoint onto ``B=b, g=0``
+    within the plane normal to the chord samples the curve itself; the point
+    is rejected when it is not local to the chord or leaves the domain, in
+    which case the caller keeps the chord sample and the segment stays
+    ambiguous.
+    """
+    chord = _periodic_delta(first, second, period)
+    length = float(np.linalg.norm(chord))
+    if length <= 0.0:
+        return None
+    tangent = chord / length
+    point = _project_to_curve(field, b, midpoint, tangent, config)
+    if point is None:
+        return None
+    if (
+        _logical_s(point) > 1.0 + config.merge_tolerance
+        or float(np.linalg.norm(_periodic_delta(midpoint, point, period))) > length
+    ):
+        return None
+    return np.array([point[0], point[1], float(point[2]) % period])
+
+
+def _midpoint_data(
+    points: FloatArray,
+    segments: IntArray,
+    field: BoozerFieldLike,
+    b: float,
+    period: float,
+    config: CriticalCurveConfig,
+) -> tuple[FloatArray, np.ndarray, np.ndarray]:
+    """Sample ``D_parallel^2 B`` between segment endpoints and flag ambiguity.
+
+    Chord midpoints are sampled first; every segment they make ambiguous is
+    resampled on the curve itself, which removes ambiguities that are chord
+    artifacts and sharpens the bracket for the ones that are real.
+    """
+    midpoints, midpoint_kind = _segment_midpoint_data(
+        points, segments, field, period, config.D2_tolerance
+    )
+    if not len(midpoints):
+        return midpoints, midpoint_kind, np.zeros(0, dtype=bool)
+    point_kind = _point_kinds(_field_values(field, points)[2], config.D2_tolerance)
+    ambiguous = _ambiguous_segments(segments, point_kind, midpoint_kind)
+    for segment_id in np.flatnonzero(ambiguous):
+        first, second = map(int, segments[segment_id])
+        projected = _projected_midpoint(
+            points[first],
+            points[second],
+            midpoints[segment_id],
+            field,
+            b,
+            period,
+            config,
+        )
+        if projected is None:
+            continue
+        midpoints[segment_id] = projected
+        _, _, projected_D2 = _field_values(field, projected[np.newaxis, :])
+        midpoint_kind[segment_id] = int(
+            _point_kinds(projected_D2, config.D2_tolerance)[0]
+        )
+    return (
+        midpoints,
+        midpoint_kind,
+        _ambiguous_segments(segments, point_kind, midpoint_kind),
+    )
 
 
 def _refinement_bracket(
@@ -600,17 +1044,28 @@ def extract_critical_curves(
     kind_list = list(point_kind)
     refined_count = 0
     solve_failure_count = 0
+    walk_junction_count = 0
+    boundary_split_count = 0
     history: list[float] = []
     failed_segment_keys: set[tuple[int, int]] = set()
+
+    def add_point(point: FloatArray, tag: int) -> int:
+        """Append a refined curve point with its classification and tag."""
+        _, _, point_D2 = _field_values(field, point[np.newaxis, :])
+        point_id = len(points_list)
+        points_list.append(point)
+        tags_list.append(tag)
+        D2_list.append(float(point_D2[0]))
+        kind_list.append(int(_point_kinds(point_D2, cfg.D2_tolerance)[0]))
+        return point_id
 
     for level in range(cfg.max_refinement_levels + 1):
         segment_array = np.asarray(segments_list, dtype=np.int64).reshape(-1, 2)
         kind_array = np.asarray(kind_list, dtype=np.int64)
         point_array = np.asarray(points_list, dtype=np.float64)
-        midpoint_points, midpoint_kind = _segment_midpoint_data(
-            point_array, segment_array, field, curve.period, cfg.D2_tolerance
+        midpoint_points, midpoint_kind, ambiguous = _midpoint_data(
+            point_array, segment_array, field, b, curve.period, cfg
         )
-        ambiguous = _ambiguous_segments(segment_array, kind_array, midpoint_kind)
         retry = ambiguous.copy()
         for segment_id, segment in enumerate(segment_array):
             if tuple(sorted(map(int, segment))) in failed_segment_keys:
@@ -644,18 +1099,49 @@ def extract_critical_curves(
                     curve.period,
                     cfg,
                 )
+                outcome: tuple[str, tuple[FloatArray | None, ...]] = (
+                    "junction",
+                    (midpoint,),
+                )
             except CriticalCurveError:
-                replacement.append((first, second))
-                solve_failure_count += 1
-                failed_segment_keys.add(tuple(sorted((first, second))))
-                continue
-            _, _, midpoint_D2 = _field_values(field, midpoint[np.newaxis, :])
-            midpoint_id = len(points_list)
-            points_list.append(midpoint)
-            tags_list.append(SurfaceMesh.G_ZERO)
-            D2_list.append(float(midpoint_D2[0]))
-            kind_list.append(int(_point_kinds(midpoint_D2, cfg.D2_tolerance)[0]))
-            replacement.extend(((first, midpoint_id), (midpoint_id, second)))
+                # The chord gate rejects a correct junction when the segment
+                # bridges the neck of a fold; walk the curve itself before
+                # giving up, and never invent a junction if that also fails.
+                try:
+                    outcome = _resolve_by_curve_walk(
+                        point_array[first],
+                        point_array[second],
+                        field,
+                        b,
+                        curve.period,
+                        cfg,
+                    )
+                except CriticalCurveError:
+                    replacement.append((first, second))
+                    solve_failure_count += 1
+                    failed_segment_keys.add(tuple(sorted((first, second))))
+                    continue
+                if outcome[0] == "junction":
+                    walk_junction_count += 1
+                else:
+                    boundary_split_count += 1
+
+            if outcome[0] == "junction":
+                junction = outcome[1][0]
+                assert junction is not None
+                midpoint_id = add_point(junction, SurfaceMesh.G_ZERO)
+                replacement.extend(((first, midpoint_id), (midpoint_id, second)))
+            else:
+                # The two arms leave the domain before meeting: keep them as
+                # separate boundary-terminated curves instead of a bridge.  A
+                # ``None`` exit is an endpoint that already lies on ``s=1``,
+                # so that arm needs no new vertex and no new segment.
+                for endpoint, exit_point in zip((first, second), outcome[1]):
+                    if exit_point is None:
+                        continue
+                    replacement.append(
+                        (endpoint, add_point(exit_point, SurfaceMesh.EDGE))
+                    )
             refined_count += 1
         segments_list = replacement
 
@@ -663,10 +1149,9 @@ def extract_critical_curves(
     segments = np.asarray(segments_list, dtype=np.int64).reshape(-1, 2)
     D2_B = np.asarray(D2_list, dtype=np.float64)
     point_kind = np.asarray(kind_list, dtype=np.int64)
-    _, midpoint_kind = _segment_midpoint_data(
-        points, segments, field, curve.period, cfg.D2_tolerance
+    _, midpoint_kind, unresolved = _midpoint_data(
+        points, segments, field, b, curve.period, cfg
     )
-    unresolved = _ambiguous_segments(segments, point_kind, midpoint_kind)
     segment_kind = _classify_segments(segments, point_kind, midpoint_kind, unresolved)
     polylines = _walk_polylines(points, segments, segment_kind, curve.period)
     unresolved_count = int(np.count_nonzero(unresolved))
@@ -711,5 +1196,7 @@ def extract_critical_curves(
             unresolved_endpoint_count=unresolved_endpoint_count,
             source_unresolved_split_count=source_unresolved_splits,
             ambiguous_segment_length_history=tuple(history),
+            curve_walk_junction_count=walk_junction_count,
+            boundary_exit_split_count=boundary_split_count,
         ),
     )

@@ -60,6 +60,19 @@ move it into `docs/DESIGN.md` and delete it here.
 - Milestone 8's `CriticalCurves` stores point and segment classifications plus ordered, cumulative-arc-length polylines using global vertex IDs. Production seam continuity is established by surface extraction's canonical seam vertex IDs; critical-curve stitching additionally supports uniquely matched lower/upper degree-one endpoints carrying `PERIODIC_SEAM` provenance for staged callers. Vertex and intrinsic-midpoint `D_parallel^2 B` sampling drives direct `B-b=g=D_parallel^2 B=0` junction solves, including a true-fold, nonzero-iota production-path synthetic test with independently derived analytic coordinates. `GAMMA_MAX` polylines are ready for Milestone 9's common-parameter transition mapping, while failed local degenerate-point solves and all other `DEGENERATE` or `UNRESOLVED` results remain explicit rather than being mapped as generic transitions.
 - Milestone 8 refines standalone critical-curve arrays. Inserting those vertices into `SurfaceMesh` and clearing Milestone 7's boundary `refinement_blocked` edges is deferred to Milestone 10's constrained cuts; local `b-B_extremum` gap scaling and transition-sampling convergence belong to Milestone 9. The cumulative `u` parameter is currently a piecewise-linear chord-length sum whose convergence is not yet controlled and must be included in that Milestone 9 study. The combined pitch-surface diagnostic must add `EDGE`/`AXIS` overlays when Milestone 15 assembles the pipeline view.
 
+- Milestone 8's junction refinement no longer relies on the chord-local solve alone. A
+  marching-triangle segment can bridge the neck of a fold of `B=b, g=0`, so its junction
+  lies several chord lengths off the chord: the segment is then resolved by a bounded
+  predictor-corrector walk of the curve from both endpoints, and the junction is accepted
+  only when the two independent walks agree on it. Segment midpoints that make a segment
+  ambiguous are resampled on the curve instead of on the `(s, theta, zeta)` chord, which
+  removes ambiguities that were chord artifacts. When the arms leave `s <= 1` before
+  meeting, the junction is outside the plasma and the bridging segment is replaced by two
+  arms that each end on a solved `EDGE` point with `s = 1`; nothing is merged across the
+  neck, and `CriticalCurveReport` counts both outcomes (`curve_walk_junction_count` and
+  `boundary_exit_split_count`). Milestone 10 must carry those `EDGE` vertices through the
+  constrained cut rather than reconnecting the two arms.
+
 ## Accepted deviations
 
 Design decisions taken during implementation that differ from `docs/DESIGN.md` live in
