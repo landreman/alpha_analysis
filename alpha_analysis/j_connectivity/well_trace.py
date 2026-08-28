@@ -20,9 +20,12 @@ class WellTraceConfig:
     """Numerical controls for a regular well trace (DESIGN.md §§9.2–9.4).
 
     ``root_atol_B`` and ``tangent_atol_B`` are absolute magnetic-field
-    tolerances. ``root_atol_zeta`` is in radians and ``root_rtol`` is
-    dimensionless. The scan takes at least ``samples_per_field_period``
-    samples per field period and, when the
+    tolerances. ``root_atol_zeta`` and ``incoming_root_max_offset`` are in
+    radians, and ``root_rtol`` is dimensionless. The latter offset bounds how
+    far an accepted surface vertex may move to reach the exact incoming root;
+    its default is the square-root machine-precision angular scale, and a
+    correction beyond it is explicitly non-regular. The scan takes at least
+    ``samples_per_field_period`` samples per field period and, when the
     field exposes Fourier mode numbers, at least
     ``samples_per_wavelength`` samples for the fastest retained mode along the
     field line. ``extrema_tolerance`` is in field units per radian and
@@ -41,6 +44,7 @@ class WellTraceConfig:
     quadrature_atol: float = 1.0e-10
     samples_per_wavelength: int = 24
     root_atol_zeta: float = 1.0e-12
+    incoming_root_max_offset: float = 1.5e-8
     tangent_atol_B: float = 1.0e-9
     itinerary_quantization: float = 1.0e-8
 
@@ -53,6 +57,7 @@ class WellTraceConfig:
             "quadrature_rtol",
             "quadrature_atol",
             "root_atol_zeta",
+            "incoming_root_max_offset",
             "tangent_atol_B",
             "itinerary_quantization",
         )
@@ -312,6 +317,54 @@ def _regularized_integrands(
     return pair
 
 
+def _polish_incoming_root(
+    F,
+    derivative,
+    residual: float,
+    b: float,
+    max_offset: float,
+    config: WellTraceConfig,
+) -> float | None:
+    """Return the nearby exact incoming root along the same field line.
+
+    Surface extraction guarantees ``|B-b|`` only to ``root_atol_B``.  If a
+    slightly outside mesh point is treated as the exact endpoint, ``K`` sees
+    a tiny forbidden interval followed by a false interior square-root pole.
+    A bounded Newton iteration removes that artifact before the §9.2 scan.
+    The offset is in the nonnegative scan coordinate but may have either sign;
+    leaving the configured locality bound or losing the incoming slope is a
+    failure, never a distant substitute (DESIGN.md §§9.2, 9.4, and 21.2).
+    """
+    offset = 0.0
+    rounding_tolerance = 32.0 * np.finfo(float).eps * max(abs(b), 1.0)
+    if abs(residual) <= rounding_tolerance:
+        return offset
+    for _ in range(12):
+        value = float(F(offset))
+        slope = float(derivative(offset))
+        if not np.isfinite(value) or not np.isfinite(slope) or slope >= 0.0:
+            return None
+        if abs(value) <= rounding_tolerance:
+            return offset
+        candidate = offset - value / slope
+        if not np.isfinite(candidate) or abs(candidate) > max_offset:
+            return None
+        if abs(candidate - offset) <= 4.0 * np.finfo(float).eps * max(1.0, abs(offset)):
+            offset = candidate
+            break
+        offset = candidate
+    value = float(F(offset))
+    slope = float(derivative(offset))
+    if (
+        not np.isfinite(value)
+        or not np.isfinite(slope)
+        or abs(value) > max(rounding_tolerance, config.root_atol_B * 1.0e-4)
+        or slope >= -config.extrema_tolerance
+    ):
+        return None
+    return offset
+
+
 def trace_regular_well(
     field: BoozerFieldLike,
     b: float,
@@ -411,6 +464,35 @@ def trace_regular_well(
         cfg.samples_per_field_period,
         cfg.samples_per_wavelength,
     )
+    if residual_in != 0.0:
+        incoming_offset = _polish_incoming_root(
+            F,
+            derivative,
+            residual_in,
+            b,
+            max_offset=min(step, cfg.incoming_root_max_offset),
+            config=cfg,
+        )
+        if incoming_offset is None:
+            return _failed_trace(
+                TraceStatus.ROOT_FAILURE,
+                b=b,
+                q_in=q_reduced,
+                B_residual_in=residual_in,
+            )
+        theta_in, zeta_in = map(float, coordinates(incoming_offset))
+        # Reassignment deliberately re-anchors the late-bound coordinate, F,
+        # and derivative closures so their new u=0 is the polished root.
+        q_reduced = np.array(
+            [
+                s,
+                _reduced(theta_in, 2.0 * np.pi, cfg.root_atol_zeta),
+                _reduced(zeta_in, period, cfg.root_atol_zeta),
+            ]
+        )
+        B_in = _scalar(field.B(s, theta_in, zeta_in))
+        residual_in = B_in - b
+        slope_in = derivative(0.0)
     steps_per_period = int(np.ceil(period / step))
 
     extrema_zeta: list[float] = []

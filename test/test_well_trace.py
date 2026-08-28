@@ -689,6 +689,70 @@ def test_unattainable_quadrature_tolerance_is_an_explicit_failure():
     assert np.isnan(trace.bounce_time_length)
 
 
+def test_real_surface_residual_does_not_create_a_false_endpoint_singularity():
+    """An accepted mesh residual must not become an interior pole in K."""
+    field = BoozerField.from_boozmn(
+        os.path.join(
+            DATA_DIR,
+            "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_"
+            "eval000290_low_resolution.nc",
+        )
+    )
+    b = 8.147184858800973
+    q_in = np.array([0.7589870238134653, 3.1232439109495953, 0.7028053263654811])
+    assert 0.0 < float(field.B(*q_in)) - b < 1.0e-10
+
+    traces = [
+        trace_regular_well(
+            field,
+            b,
+            q_in,
+            WellTraceConfig(
+                max_field_periods=256,
+                quadrature_rtol=rtol,
+                quadrature_atol=1.0e-9,
+            ),
+        )
+        for rtol in (1.0e-8, 1.0e-10)
+    ]
+
+    assert all(trace.status is TraceStatus.REGULAR for trace in traces)
+    assert all(
+        abs(trace.B_residual_in) <= 32.0 * np.finfo(float).eps * max(abs(b), 1.0)
+        for trace in traces
+    )
+    assert all(np.linalg.norm(trace.q_in - q_in) > 1.0e-12 for trace in traces)
+    np.testing.assert_allclose(
+        traces[0].action_length, traces[1].action_length, rtol=1.0e-10
+    )
+    np.testing.assert_allclose(
+        traces[0].bounce_time_length, traces[1].bounce_time_length, rtol=1.0e-8
+    )
+
+
+def test_incoming_root_polish_rejects_a_nonlocal_shallow_slope_correction():
+    # B = 2 - 1e-8 sin(zeta). The accepted B residual at zeta=-0.01
+    # corresponds to a 0.01-rad displacement, not a localized mesh root.
+    field = _fourier_field(
+        nfp=1,
+        m=[0, 0],
+        n=[0, 1],
+        cosine=[2.0, 0.0],
+        sine=[0.0, 1.0e-8],
+    )
+    config = WellTraceConfig()
+    q_in = np.array([0.5, 0.0, -0.01])
+    residual = float(field.B(*q_in)) - 2.0
+    slope = float(field.D_B(*q_in))
+    assert 0.0 < residual <= config.root_atol_B
+    assert slope < -config.extrema_tolerance
+
+    trace = trace_regular_well(field, 2.0, q_in, config)
+
+    assert trace.status is TraceStatus.ROOT_FAILURE
+    assert abs(residual / slope) > config.incoming_root_max_offset
+
+
 def test_well_profile_plot_writes_the_required_static_diagnostic(tmp_path):
     root = 2.0 * np.pi / 3.0
     field = _simple_well()
