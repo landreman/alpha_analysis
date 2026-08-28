@@ -20,9 +20,12 @@ class WellTraceConfig:
     """Numerical controls for a regular well trace (DESIGN.md §§9.2–9.4).
 
     ``root_atol_B`` and ``tangent_atol_B`` are absolute magnetic-field
-    tolerances. ``root_atol_zeta`` is in radians and ``root_rtol`` is
-    dimensionless. The scan takes at least ``samples_per_field_period``
-    samples per field period and, when the
+    tolerances. ``root_atol_zeta`` and ``incoming_root_max_offset`` are in
+    radians, and ``root_rtol`` is dimensionless. The latter offset bounds how
+    far an accepted surface vertex may move to reach the exact incoming root;
+    its default is the square-root machine-precision angular scale, and a
+    correction beyond it is explicitly non-regular. The scan takes at least
+    ``samples_per_field_period`` samples per field period and, when the
     field exposes Fourier mode numbers, at least
     ``samples_per_wavelength`` samples for the fastest retained mode along the
     field line. ``extrema_tolerance`` is in field units per radian and
@@ -41,6 +44,7 @@ class WellTraceConfig:
     quadrature_atol: float = 1.0e-10
     samples_per_wavelength: int = 24
     root_atol_zeta: float = 1.0e-12
+    incoming_root_max_offset: float = 1.5e-8
     tangent_atol_B: float = 1.0e-9
     itinerary_quantization: float = 1.0e-8
 
@@ -53,6 +57,7 @@ class WellTraceConfig:
             "quadrature_rtol",
             "quadrature_atol",
             "root_atol_zeta",
+            "incoming_root_max_offset",
             "tangent_atol_B",
             "itinerary_quantization",
         )
@@ -312,6 +317,54 @@ def _regularized_integrands(
     return pair
 
 
+def _polish_incoming_root(
+    F,
+    derivative,
+    residual: float,
+    b: float,
+    max_offset: float,
+    config: WellTraceConfig,
+) -> float | None:
+    """Return the nearby exact incoming root along the same field line.
+
+    Surface extraction guarantees ``|B-b|`` only to ``root_atol_B``.  If a
+    slightly outside mesh point is treated as the exact endpoint, ``K`` sees
+    a tiny forbidden interval followed by a false interior square-root pole.
+    A bounded Newton iteration removes that artifact before the §9.2 scan.
+    The offset is in the nonnegative scan coordinate but may have either sign;
+    leaving the configured locality bound or losing the incoming slope is a
+    failure, never a distant substitute (DESIGN.md §§9.2, 9.4, and 21.2).
+    """
+    offset = 0.0
+    rounding_tolerance = 32.0 * np.finfo(float).eps * max(abs(b), 1.0)
+    if abs(residual) <= rounding_tolerance:
+        return offset
+    for _ in range(12):
+        value = float(F(offset))
+        slope = float(derivative(offset))
+        if not np.isfinite(value) or not np.isfinite(slope) or slope >= 0.0:
+            return None
+        if abs(value) <= rounding_tolerance:
+            return offset
+        candidate = offset - value / slope
+        if not np.isfinite(candidate) or abs(candidate) > max_offset:
+            return None
+        if abs(candidate - offset) <= 4.0 * np.finfo(float).eps * max(1.0, abs(offset)):
+            offset = candidate
+            break
+        offset = candidate
+    value = float(F(offset))
+    slope = float(derivative(offset))
+    if (
+        not np.isfinite(value)
+        or not np.isfinite(slope)
+        or abs(value) > max(rounding_tolerance, config.root_atol_B * 1.0e-4)
+        or slope >= -config.extrema_tolerance
+    ):
+        return None
+    return offset
+
+
 def trace_regular_well(
     field: BoozerFieldLike,
     b: float,
@@ -411,6 +464,35 @@ def trace_regular_well(
         cfg.samples_per_field_period,
         cfg.samples_per_wavelength,
     )
+    if residual_in != 0.0:
+        incoming_offset = _polish_incoming_root(
+            F,
+            derivative,
+            residual_in,
+            b,
+            max_offset=min(step, cfg.incoming_root_max_offset),
+            config=cfg,
+        )
+        if incoming_offset is None:
+            return _failed_trace(
+                TraceStatus.ROOT_FAILURE,
+                b=b,
+                q_in=q_reduced,
+                B_residual_in=residual_in,
+            )
+        theta_in, zeta_in = map(float, coordinates(incoming_offset))
+        # Reassignment deliberately re-anchors the late-bound coordinate, F,
+        # and derivative closures so their new u=0 is the polished root.
+        q_reduced = np.array(
+            [
+                s,
+                _reduced(theta_in, 2.0 * np.pi, cfg.root_atol_zeta),
+                _reduced(zeta_in, period, cfg.root_atol_zeta),
+            ]
+        )
+        B_in = _scalar(field.B(s, theta_in, zeta_in))
+        residual_in = B_in - b
+        slope_in = derivative(0.0)
     steps_per_period = int(np.ceil(period / step))
 
     extrema_zeta: list[float] = []
@@ -449,37 +531,27 @@ def trace_regular_well(
             d_right = float(D_grid[index + 1])
 
             crossing = None
-            if f_left < 0.0 <= f_right:
-                try:
-                    crossing = brentq(
-                        F,
-                        left,
-                        right,
-                        xtol=cfg.root_atol_zeta,
-                        rtol=max(cfg.root_rtol, 4.0 * np.finfo(float).eps),
-                    )
-                except ValueError:
-                    return _failed_trace(
-                        TraceStatus.ROOT_FAILURE,
-                        b=b,
-                        q_in=q_reduced,
-                        B_residual_in=residual_in,
-                        field_period_count=period_index,
-                        extrema_zeta=extrema_zeta,
-                        extrema_B=extrema_values,
-                        extrema_kind=extrema_kinds,
-                    )
-            elif period_index == 0 and index == 0 and f_right >= 0.0:
+            if period_index == 0 and index == 0 and f_right >= 0.0:
                 # The prescribed scan begins just inside the well, not at the
                 # incoming root. A shallow well can enter and leave before the
-                # first regular scan point, so geometrically back off from that
-                # point until a strictly interior negative value is resolved.
+                # first regular scan point. Always construct a strictly
+                # interior negative endpoint: scalar and batched field
+                # evaluation can round the u=0 residual to opposite signs.
                 last_outside = right
                 interior = 0.5 * right
                 for _ in range(64):
                     f_interior = F(interior)
                     if not np.isfinite(f_interior):
-                        break
+                        return _failed_trace(
+                            TraceStatus.ROOT_FAILURE,
+                            b=b,
+                            q_in=q_reduced,
+                            B_residual_in=residual_in,
+                            field_period_count=period_index,
+                            extrema_zeta=extrema_zeta,
+                            extrema_B=extrema_values,
+                            extrema_kind=extrema_kinds,
+                        )
                     if f_interior < 0.0:
                         try:
                             crossing = brentq(
@@ -503,7 +575,37 @@ def trace_regular_well(
                         break
                     last_outside = interior
                     interior *= 0.5
-
+                if crossing is None:
+                    return _failed_trace(
+                        TraceStatus.ROOT_FAILURE,
+                        b=b,
+                        q_in=q_reduced,
+                        B_residual_in=residual_in,
+                        field_period_count=period_index,
+                        extrema_zeta=extrema_zeta,
+                        extrema_B=extrema_values,
+                        extrema_kind=extrema_kinds,
+                    )
+            elif f_left < 0.0 <= f_right:
+                try:
+                    crossing = brentq(
+                        F,
+                        left,
+                        right,
+                        xtol=cfg.root_atol_zeta,
+                        rtol=max(cfg.root_rtol, 4.0 * np.finfo(float).eps),
+                    )
+                except ValueError:
+                    return _failed_trace(
+                        TraceStatus.ROOT_FAILURE,
+                        b=b,
+                        q_in=q_reduced,
+                        B_residual_in=residual_in,
+                        field_period_count=period_index,
+                        extrema_zeta=extrema_zeta,
+                        extrema_B=extrema_values,
+                        extrema_kind=extrema_kinds,
+                    )
             extremum = None
             if d_left == 0.0 and left > cfg.root_atol_zeta:
                 extremum = left
@@ -567,19 +669,66 @@ def trace_regular_well(
                             tangent_B=[B_ext],
                         )
                     if B_ext > b + cfg.root_atol_B:
-                        return _failed_trace(
-                            TraceStatus.ROOT_FAILURE,
-                            b=b,
-                            q_in=q_reduced,
-                            B_residual_in=residual_in,
-                            field_period_count=period_index,
-                            extrema_zeta=extrema_zeta,
-                            extrema_B=extrema_values,
-                            extrema_kind=extrema_kinds,
-                        )
-                    extrema_zeta.append(float(zeta_ext))
-                    extrema_values.append(B_ext)
-                    extrema_kinds.append(kind)
+                        # A shallow above-b excursion can rise and fall within
+                        # one scan cell, leaving both cell endpoints below b.
+                        # The analytic derivative still brackets its maximum.
+                        # Recover the first outgoing root on the rising side
+                        # instead of reporting a scan-resolution failure (§9.2).
+                        if _mode_frequency(field, iota) <= 0.0:
+                            return _failed_trace(
+                                TraceStatus.ROOT_FAILURE,
+                                b=b,
+                                q_in=q_reduced,
+                                B_residual_in=residual_in,
+                                field_period_count=period_index,
+                                extrema_zeta=extrema_zeta,
+                                extrema_B=extrema_values,
+                                extrema_kind=extrema_kinds,
+                            )
+                        bracket_left = left
+                        bracket_value = f_left
+                        if not bracket_value < 0.0 and left <= cfg.root_atol_zeta:
+                            span = extremum - left
+                            for backoff in range(1, 65):
+                                trial = left + span * 2.0**-backoff
+                                trial_value = F(trial)
+                                if np.isfinite(trial_value) and trial_value < 0.0:
+                                    bracket_left = trial
+                                    bracket_value = trial_value
+                                    break
+                        try:
+                            missed_crossing = (
+                                brentq(
+                                    F,
+                                    bracket_left,
+                                    extremum,
+                                    xtol=cfg.root_atol_zeta,
+                                    rtol=max(
+                                        cfg.root_rtol,
+                                        4.0 * np.finfo(float).eps,
+                                    ),
+                                )
+                                if bracket_value < 0.0
+                                else None
+                            )
+                        except ValueError:
+                            missed_crossing = None
+                        if missed_crossing is None:
+                            return _failed_trace(
+                                TraceStatus.ROOT_FAILURE,
+                                b=b,
+                                q_in=q_reduced,
+                                B_residual_in=residual_in,
+                                field_period_count=period_index,
+                                extrema_zeta=extrema_zeta,
+                                extrema_B=extrema_values,
+                                extrema_kind=extrema_kinds,
+                            )
+                        crossing = float(missed_crossing)
+                    else:
+                        extrema_zeta.append(float(zeta_ext))
+                        extrema_values.append(B_ext)
+                        extrema_kinds.append(kind)
 
             if crossing is not None:
                 slope_candidate = derivative(crossing)
@@ -646,14 +795,27 @@ def trace_regular_well(
         endpoint_window=step,
         root_tolerance=cfg.root_atol_B,
     )
-    try:
+    extrema_u = sigma * (np.asarray(extrema_zeta, dtype=float) - zeta_in)
+    extrema_u = extrema_u[
+        (extrema_u > cfg.root_atol_zeta) & (extrema_u < u_out - cfg.root_atol_zeta)
+    ]
+    quadrature_points = (
+        np.unique(
+            (2.0 / np.pi) * np.arcsin(np.sqrt(np.clip(extrema_u / u_out, 0.0, 1.0)))
+        )
+        if extrema_u.size
+        else None
+    )
+
+    def integrate(points, limit: int) -> tuple[float, float, float, float]:
         action_result = quad(
             lambda x: pair(x)[0],
             0.0,
             1.0,
             epsabs=cfg.quadrature_atol,
             epsrel=cfg.quadrature_rtol,
-            limit=200,
+            points=points,
+            limit=limit,
             full_output=1,
         )
         bounce_time_result = quad(
@@ -662,7 +824,8 @@ def trace_regular_well(
             1.0,
             epsabs=cfg.quadrature_atol,
             epsrel=cfg.quadrature_rtol,
-            limit=200,
+            points=points,
+            limit=limit,
             full_output=1,
         )
         if len(action_result) > 3 or len(bounce_time_result) > 3:
@@ -671,18 +834,82 @@ def trace_regular_well(
             )
         action, error_A = action_result[:2]
         bounce_time, error_K = bounce_time_result[:2]
+        if not np.all(np.isfinite([action, bounce_time, error_A, error_K])):
+            raise _QuadratureDomainError("quadrature returned a non-finite result")
+        return float(action), float(bounce_time), float(error_A), float(error_K)
+
+    def integrate_piecewise(points: FloatArray) -> tuple[float, float, float, float]:
+        """Integrate monotone field-line segments with a global error budget."""
+        edges = np.concatenate(([0.0], np.asarray(points, dtype=float), [1.0]))
+        n_intervals = len(edges) - 1
+        # For each positive integrand, reserve half of its global absolute and
+        # relative budgets. Summing that component's local error estimates
+        # then remains below its larger requested global tolerance.
+        local_atol = cfg.quadrature_atol / (2.0 * n_intervals)
+        local_rtol = cfg.quadrature_rtol / 2.0
+
+        def integrate_component(index: int) -> tuple[float, float]:
+            value = 0.0
+            error = 0.0
+            for left, right in zip(edges[:-1], edges[1:]):
+                result = quad(
+                    lambda x: pair(x)[index],
+                    float(left),
+                    float(right),
+                    epsabs=local_atol,
+                    epsrel=local_rtol,
+                    limit=100,
+                    full_output=1,
+                )
+                if len(result) > 3:
+                    raise _QuadratureDomainError(
+                        "piecewise quadrature tolerance was not achieved"
+                    )
+                interval_value, interval_error = result[:2]
+                if not np.all(np.isfinite([interval_value, interval_error])):
+                    raise _QuadratureDomainError(
+                        "piecewise quadrature returned a non-finite result"
+                    )
+                value += float(interval_value)
+                error += float(interval_error)
+            requested = max(
+                cfg.quadrature_atol,
+                cfg.quadrature_rtol * abs(value),
+            )
+            if error > requested:
+                raise _QuadratureDomainError(
+                    "piecewise quadrature exceeded the global error budget"
+                )
+            return value, error
+
+        action, error_A = integrate_component(0)
+        bounce_time, error_K = integrate_component(1)
+        return action, bounce_time, error_A, error_K
+
+    try:
+        try:
+            action, bounce_time, error_A, error_K = integrate(None, 200)
+        except (_QuadratureDomainError, ValueError, FloatingPointError):
+            if quadrature_points is None:
+                raise
+            # Internal extrema are already authoritative trace data. On a
+            # failed global attempt, retry with them as breakpoints so a long
+            # multi-period well does not exhaust one adaptive budget while
+            # resolving many narrow but smooth peaks.
+            retry_limit = max(200, 4 * (len(quadrature_points) + 1))
+            try:
+                action, bounce_time, error_A, error_K = integrate(
+                    quadrature_points, retry_limit
+                )
+            except (_QuadratureDomainError, ValueError, FloatingPointError):
+                # QUADPACK can still lose the requested global error budget
+                # to roundoff when one call spans dozens of smooth extrema.
+                # The extrema delimit monotone B segments, so integrate them
+                # independently and account for the summed error explicitly.
+                action, bounce_time, error_A, error_K = integrate_piecewise(
+                    quadrature_points
+                )
     except (_QuadratureDomainError, ValueError, FloatingPointError):
-        return _failed_trace(
-            TraceStatus.QUADRATURE_FAILURE,
-            b=b,
-            q_in=q_reduced,
-            B_residual_in=residual_in,
-            field_period_count=int(np.floor(u_out / period)),
-            extrema_zeta=extrema_zeta,
-            extrema_B=extrema_values,
-            extrema_kind=extrema_kinds,
-        )
-    if not np.all(np.isfinite([action, bounce_time, error_A, error_K])):
         return _failed_trace(
             TraceStatus.QUADRATURE_FAILURE,
             b=b,

@@ -68,6 +68,30 @@ lower resolution, shrink the grid, share a fixture, cache the loaded field. Ever
 scientific claim keeps at least one *fast* test on the production path that fails under
 a mutation of the physics it checks.
 
+## Checking new features on real plasma equilibria
+
+When implementing new functionality related to j_connectivity, exercise the new
+machinery on these 5 boozmn files in the `data` directory:
+~~~~
+boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc
+boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc
+boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc
+boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc
+boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc
+~~~~
+For each boozmn file, try both the structured mesh backend and gmsh backend, and try both the
+MarchingTetrahedraExtractor and PyVistaSurfaceExtractor surface extractors.
+Downsampling of the surfaces using `downsample_surface()` is recommended to keep these calculations from taking too long.
+If the new machinery is specific to one value of \(b = B_{bounce}\), then
+exercise the functionality for
+\(\lambda_n = 0.05, 0.1, 0.5, 0.9, 0.95\) where \(\lambda_n\) is defined by
+\(b = B_{min} + \lambda_n * (B_{max} - B_{min})\) and \(B_{min}\) and \(B_{max}\) are radially global
+(extrema over all radii).
+
+Inspect the results to see if they make sense, check that results are consistent between the
+different backends and surface extractors, and generally look for problems. Diagnose and fix any
+problems before considering the task complete.
+
 ## Definition of done
 
 A milestone is done when all of these hold:

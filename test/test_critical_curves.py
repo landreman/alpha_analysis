@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 from scipy.optimize import brentq
+
+from alpha_analysis import DATA_DIR, BoozerField
 
 from alpha_analysis.j_connectivity import (
     BackgroundMeshConfig,
@@ -20,7 +25,14 @@ from alpha_analysis.j_connectivity import (
     SurfaceStatus,
     extract_critical_curves,
 )
+from alpha_analysis.j_connectivity.critical_curves import (
+    CriticalCurveError,
+    _degenerate_point,
+    _field_values,
+    _resolve_by_curve_walk,
+)
 from alpha_analysis.j_connectivity.synthetic_fields import SyntheticFourierField
+from alpha_analysis.j_connectivity.denominator import find_global_B_bounds
 from alpha_analysis.j_connectivity.visualization import plot_critical_curves
 
 
@@ -246,6 +258,45 @@ def test_failed_degenerate_solve_returns_explicit_unresolved_segments():
         boundary_tags=np.full(4, SurfaceMesh.G_ZERO, dtype=np.int64),
     )
 
+    # Both bounded searches are disabled: the chord-local solve by its
+    # locality ratio, and the curve walk by its arc-length budget.
+    result = extract_critical_curves(
+        curve,
+        field,
+        b=2.0,
+        config=CriticalCurveConfig(
+            max_midpoint_displacement_ratio=1.0e-3,
+            max_walk_arclength_ratio=1.0e-6,
+        ),
+    )
+
+    assert result.status is CriticalCurveStatus.UNRESOLVED
+    assert result.report.unresolved_segment_count == 2
+    assert result.report.degenerate_solve_failure_count == 2
+    assert result.report.curve_walk_junction_count == 0
+    assert result.report.boundary_exit_split_count == 0
+
+
+def test_curve_walk_resolves_junctions_the_chord_gate_rejects():
+    # Same configuration as the test above, with the curve walk left enabled:
+    # a junction the chord-local gate rejects must still be found, and at the
+    # analytic degenerate points theta = pi/2 and 3 pi/2 of _sign_changing_field.
+    field = _sign_changing_field()
+    input_theta = np.array([np.pi / 6, 3 * np.pi / 4, 7 * np.pi / 6, 7 * np.pi / 4])
+    points = np.vstack([_sign_changing_point(value) for value in input_theta])
+    theta = np.arctan2(points[:, 1], points[:, 0])
+    s = np.sum(points[:, :2] ** 2, axis=1)
+    curve = SurfaceCurveMesh(
+        period=2.0 * np.pi,
+        points=points,
+        segments=np.column_stack((np.arange(4), np.roll(np.arange(4), -1))),
+        B=np.asarray(field.B(s, theta, points[:, 2])),
+        g=np.asarray(
+            field.B(s, theta, points[:, 2]) * field.D_B(s, theta, points[:, 2])
+        ),
+        boundary_tags=np.full(4, SurfaceMesh.G_ZERO, dtype=np.int64),
+    )
+
     result = extract_critical_curves(
         curve,
         field,
@@ -253,9 +304,20 @@ def test_failed_degenerate_solve_returns_explicit_unresolved_segments():
         config=CriticalCurveConfig(max_midpoint_displacement_ratio=1.0e-3),
     )
 
-    assert result.status is CriticalCurveStatus.UNRESOLVED
-    assert result.report.unresolved_segment_count == 2
-    assert result.report.degenerate_solve_failure_count == 2
+    assert result.report.degenerate_solve_failure_count == 0
+    assert result.report.curve_walk_junction_count == 2
+    assert result.report.unresolved_segment_count == 0
+    degenerate = result.points[result.point_kind == CriticalKind.DEGENERATE]
+    assert len(degenerate) == 2
+    walked_theta = np.sort(
+        np.mod(np.arctan2(degenerate[:, 1], degenerate[:, 0]), 2.0 * np.pi)
+    )
+    np.testing.assert_allclose(
+        walked_theta, [0.5 * np.pi, 1.5 * np.pi], rtol=0.0, atol=1.0e-10
+    )
+    np.testing.assert_allclose(
+        np.sum(degenerate[:, :2] ** 2, axis=1), 0.5, rtol=0.0, atol=1.0e-10
+    )
 
 
 def _fold_junction_field() -> SyntheticFourierField:
@@ -449,3 +511,180 @@ def test_midpoint_sampling_finds_two_type_changes_inside_each_coarse_segment():
         CriticalKind.GAMMA_MIN,
         CriticalKind.GAMMA_MAX,
     }
+
+
+def _chord_curvature_field() -> SyntheticFourierField:
+    # B = 1.5 + s + 0.45 cos(theta) cos(zeta) + 0.2 s cos(2 zeta), iota = 0.
+    # On zeta=0 the marginal curve at b=2 is s(theta) = (0.5 - 0.45 cos theta)/1.2
+    # and D_parallel^2 B = -0.45 cos(theta) - 0.8 s, which on that curve is
+    # -(0.45 cos theta + 1)/3: negative for every theta, so the whole curve is
+    # GAMMA_MAX.  Interpolating (s, theta) between two curve points does not
+    # stay on the curve, and at the interpolated midpoint the same expression
+    # can be positive.
+    return SyntheticFourierField(
+        nfp=1,
+        m=np.array([0, 1, 1, 0]),
+        n=np.array([0, 1, -1, 2]),
+        cosine_coefficients=np.array(
+            [[1.5, 1.0], [0.225, 0.0], [0.225, 0.0], [0.0, 0.2]]
+        ),
+        sine_coefficients=np.zeros((4, 2)),
+        iota_coefficients=np.array([0.0]),
+        G_coefficients=np.array([1.0]),
+        I_coefficients=np.array([0.0]),
+    )
+
+
+def test_midpoint_is_sampled_on_the_curve_not_on_the_chord():
+    field = _chord_curvature_field()
+    b = 2.0
+    theta = np.array([0.55 * np.pi, 1.45 * np.pi])
+    s = (b - 1.5 - 0.45 * np.cos(theta)) / 1.2
+    points = np.column_stack(
+        (np.sqrt(s) * np.cos(theta), np.sqrt(s) * np.sin(theta), np.zeros(2))
+    )
+    np.testing.assert_allclose(
+        np.asarray(field.B(s, theta, np.zeros(2))), b, rtol=0.0, atol=1.0e-12
+    )
+    # The analytic trap: both endpoints are GAMMA_MAX, so is every point of the
+    # curve between them, but the interpolated midpoint reports GAMMA_MIN.
+    endpoint_D2 = np.asarray(field.D2_B(s, theta, np.zeros(2)))
+    assert np.all(endpoint_D2 < 0.0)
+    interpolated_s = float(np.mean(s))
+    interpolated_D2 = float(
+        np.asarray(field.D2_B(np.array([interpolated_s]), np.array([np.pi]), 0.0))[0]
+    )
+    assert interpolated_D2 > 0.0
+    curve_D2 = float(
+        np.asarray(
+            field.D2_B(np.array([(b - 1.5 + 0.45) / 1.2]), np.array([np.pi]), 0.0)
+        )[0]
+    )
+    assert curve_D2 < 0.0
+
+    curve = SurfaceCurveMesh(
+        period=2.0 * np.pi,
+        points=points,
+        segments=np.array([[0, 1]], dtype=np.int64),
+        B=np.full(2, b),
+        g=np.zeros(2),
+        boundary_tags=np.full(2, SurfaceMesh.G_ZERO, dtype=np.int64),
+    )
+
+    result = extract_critical_curves(curve, field, b=b)
+
+    assert result.segment_kind[0] == CriticalKind.GAMMA_MAX
+    assert result.report.unresolved_segment_count == 0
+    assert result.report.degenerate_solve_failure_count == 0
+    assert result.report.refined_segment_count == 0
+
+
+def _boozmn_field(name: str) -> BoozerField:
+    return BoozerField.from_boozmn(os.path.join(DATA_DIR, name))
+
+
+def test_boozmn_fold_neck_junction_is_found_beyond_the_chord_gate():
+    # Regression for a segment of the 038_Ax_PCA level b=9.8731865848854240
+    # whose two endpoints sit on the two arms of one fold of B=b, g=0.  The
+    # arms meet at a junction about three chord lengths away, so the
+    # chord-local solve rejects it; the two-sided curve walk must find it.
+    field = _boozmn_field(
+        "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc"
+    )
+    b = 9.873186584885424
+    period = 2.0 * np.pi / field.nfp
+    first = np.array([0.57398405, 0.53911234, 0.70652848])
+    second = np.array([0.57730641, 0.53089672, 0.72708667])
+    config = CriticalCurveConfig()
+    # The endpoints straddle a type change, so a junction must exist.
+    _, _, endpoint_D2 = _field_values(field, np.vstack((first, second)))
+    assert endpoint_D2[0] * endpoint_D2[1] < 0.0
+    with pytest.raises(CriticalCurveError):
+        _degenerate_point(first, second, field, b, period, config)
+
+    reason, resolved = _resolve_by_curve_walk(first, second, field, b, period, config)
+
+    assert reason == "junction"
+    junction = resolved[0]
+    B, g, D2_B = _field_values(field, junction[np.newaxis, :])
+    np.testing.assert_allclose(B, b, rtol=0.0, atol=config.B_tolerance)
+    np.testing.assert_allclose(g, 0.0, rtol=0.0, atol=config.g_tolerance)
+    np.testing.assert_allclose(D2_B, 0.0, rtol=0.0, atol=config.D2_tolerance)
+    assert float(np.sum(junction[:2] ** 2)) <= 1.0
+    # It is genuinely outside the old gate: that is why this test exists.
+    chord = float(np.linalg.norm(second - first))
+    assert np.linalg.norm(junction - 0.5 * (first + second)) > 2.0 * chord
+
+
+def test_boozmn_fold_neck_pitch_surface_resolves_end_to_end():
+    field = _boozmn_field(
+        "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc"
+    )
+    b = 9.873186584885424
+    background = StructuredPrismMeshBackend(BackgroundMeshConfig(6, 24, 12)).build(
+        field
+    )
+    extraction = MarchingTetrahedraExtractor().extract(background, field, b)
+    assert extraction.status is SurfaceStatus.REGULAR
+
+    result = extract_critical_curves(extraction, field, b)
+
+    assert result.report.degenerate_solve_failure_count == 0
+    assert result.report.unresolved_segment_count == 0
+    assert result.status is CriticalCurveStatus.DEGENERATE
+    assert not np.any(result.segment_kind == CriticalKind.DEGENERATE)
+
+
+def test_boozmn_fold_outside_the_plasma_splits_at_the_edge():
+    # Regression for the 178_TURBO level b=7.8114185899999997: the fold whose
+    # arms this segment bridges turns around at s slightly above one, so the
+    # junction is outside the plasma.  The bridge must be replaced by two arms
+    # that each end on s=1 instead of being solved outside the domain.
+    field = _boozmn_field(
+        "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc"
+    )
+    bounds = find_global_B_bounds(field)
+    b = bounds.refined_min + 0.1 * (bounds.refined_max - bounds.refined_min)
+    background = StructuredPrismMeshBackend(BackgroundMeshConfig(6, 24, 12)).build(
+        field
+    )
+    extraction = MarchingTetrahedraExtractor().extract(background, field, b)
+
+    config = CriticalCurveConfig()
+    result = extract_critical_curves(extraction, field, b, config)
+
+    assert result.report.boundary_exit_split_count == 2
+    assert result.report.degenerate_solve_failure_count == 0
+    assert result.status is CriticalCurveStatus.REGULAR
+    s = np.sum(result.points[:, :2] ** 2, axis=1)
+    inserted = ((result.boundary_tags & SurfaceMesh.EDGE) != 0) & (
+        np.abs(s - 1.0) <= config.merge_tolerance
+    )
+    assert np.count_nonzero(inserted) == 2 * result.report.boundary_exit_split_count
+    exits = result.points[inserted]
+    B, g, _ = _field_values(field, exits)
+    np.testing.assert_allclose(B, b, rtol=0.0, atol=config.B_tolerance)
+    np.testing.assert_allclose(g, 0.0, rtol=0.0, atol=config.g_tolerance)
+    # No arm is left dangling inside the domain by the split.
+    assert result.report.unresolved_endpoint_count == 0
+
+
+def test_boundary_exit_points_appear_in_the_critical_curve_diagnostic(tmp_path):
+    field = _boozmn_field(
+        "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc"
+    )
+    bounds = find_global_B_bounds(field)
+    b = bounds.refined_min + 0.1 * (bounds.refined_max - bounds.refined_min)
+    background = StructuredPrismMeshBackend(BackgroundMeshConfig(6, 24, 12)).build(
+        field
+    )
+    extraction = MarchingTetrahedraExtractor().extract(background, field, b)
+    result = extract_critical_curves(extraction, field, b)
+
+    output = tmp_path / "critical-curves-edge-exit.png"
+    figure, axis = plot_critical_curves(result, output_path=output)
+
+    assert output.exists()
+    labels = [collection.get_label() for collection in axis.collections]
+    assert "edge exit (s=1)" in labels
+    plt.close(figure)

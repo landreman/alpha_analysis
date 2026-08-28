@@ -8,7 +8,8 @@ hiding a candidate return-map discontinuity.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from itertools import combinations
 
 import numpy as np
 
@@ -154,6 +155,8 @@ class SurfaceRefinementLevel:
     max_bounce_time_interpolation_error: float
     max_candidate_edge_length: float
     max_B_residual: float
+    projection_failed_edge_count: int = 0
+    face_validity_failed_edge_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -171,11 +174,16 @@ class SurfaceEdgeIndicators:
     the length units of ``A`` and ``K``; they are ``NaN`` when any of the two
     endpoint traces or the projected midpoint trace is non-regular. In that
     case ``itinerary_candidate`` remains true, so failure cannot erase a
-    possible sheet boundary. ``refinement_blocked`` marks edges that share a
-    provenance boundary: inserting a merely ``B=b``-projected midpoint would
-    falsely claim ``EDGE``, ``G_ZERO``, ``AXIS``, or seam provenance, so those
-    edges remain explicit work for the curve-aware Milestone 8 refinement
-    rather than being silently corrupted (DESIGN.md §§8.4 and 21.2).
+    possible sheet boundary. ``projection_failed`` marks edges for which no
+    valid local, in-domain, incoming midpoint could be constructed. Selecting
+    a different root can jump to another sheet, so these edges stay
+    unresolved. ``face_validity_failed`` marks projected midpoints whose
+    insertion would invert a child triangle. ``refinement_blocked`` is true
+    for both failure cases and for edges that share a provenance boundary:
+    inserting a merely ``B=b``-projected midpoint there would falsely claim
+    ``EDGE``, ``G_ZERO``, ``AXIS``, or seam provenance. All three cases remain
+    explicit work for a later curve-aware stage rather than being silently
+    corrupted (DESIGN.md §§8.4 and 21.2).
     """
 
     edges: IntArray
@@ -183,6 +191,8 @@ class SurfaceEdgeIndicators:
     bounce_time_interpolation_error: FloatArray
     itinerary_candidate: np.ndarray
     refinement_blocked: np.ndarray
+    projection_failed: np.ndarray | None = None
+    face_validity_failed: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         edges = np.asarray(self.edges, dtype=np.int64)
@@ -193,16 +203,41 @@ class SurfaceEdgeIndicators:
         if edges.ndim != 2 or edges.shape[1:] != (2,):
             raise ValueError("edge indicators require edges with shape (n_edges, 2)")
         n_edges = len(edges)
+        projection_failed = (
+            np.zeros(n_edges, dtype=bool)
+            if self.projection_failed is None
+            else np.asarray(self.projection_failed, dtype=bool)
+        )
+        face_validity_failed = (
+            np.zeros(n_edges, dtype=bool)
+            if self.face_validity_failed is None
+            else np.asarray(self.face_validity_failed, dtype=bool)
+        )
         if any(
             values.shape != (n_edges,)
-            for values in (action, bounce_time, candidates, blocked)
+            for values in (
+                action,
+                bounce_time,
+                candidates,
+                blocked,
+                projection_failed,
+                face_validity_failed,
+            )
         ):
             raise ValueError("edge indicator arrays must have one value per edge")
+        if np.any(projection_failed & ~blocked):
+            raise ValueError("a projection-failed edge must remain refinement-blocked")
+        if np.any(face_validity_failed & ~blocked):
+            raise ValueError(
+                "a face-validity-failed edge must remain refinement-blocked"
+            )
         object.__setattr__(self, "edges", edges)
         object.__setattr__(self, "action_interpolation_error", action)
         object.__setattr__(self, "bounce_time_interpolation_error", bounce_time)
         object.__setattr__(self, "itinerary_candidate", candidates)
         object.__setattr__(self, "refinement_blocked", blocked)
+        object.__setattr__(self, "projection_failed", projection_failed)
+        object.__setattr__(self, "face_validity_failed", face_validity_failed)
 
 
 @dataclass(frozen=True)
@@ -225,6 +260,8 @@ class _EdgeSample:
     bounce_time_error: float
     candidate: bool
     refinement_blocked: bool
+    projection_failed: bool
+    face_validity_failed: bool
 
 
 def _logical_coordinates(
@@ -444,9 +481,32 @@ def _edge_samples(
                     config.itinerary_tolerance,
                 ),
                 refinement_blocked=True,
+                projection_failed=False,
+                face_validity_failed=False,
             )
             continue
-        point, B_value, g_value = _projected_midpoint(data.surface, field, edge, config)
+        try:
+            point, B_value, g_value = _projected_midpoint(
+                data.surface, field, edge, config
+            )
+        except SurfaceRefinementError:
+            # Any failed local projection/evaluation (including leaving the
+            # plasma or crossing to g>0) has no safe substitute. Searching for
+            # another root risks jumping sheets, so keep the edge as an
+            # explicit unresolved candidate instead (§§8.4, 21.2).
+            result[edge] = _EdgeSample(
+                point=None,
+                B=np.nan,
+                g=np.nan,
+                trace=None,
+                action_error=np.nan,
+                bounce_time_error=np.nan,
+                candidate=True,
+                refinement_blocked=True,
+                projection_failed=True,
+                face_validity_failed=False,
+            )
+            continue
         midpoint_trace = _trace_point(field, data.surface.level, point, trace_config)
         regular_triplet = all(
             trace.status is TraceStatus.REGULAR
@@ -498,6 +558,8 @@ def _edge_samples(
             bounce_time_error=float(bounce_time_error),
             candidate=bool(candidate),
             refinement_blocked=False,
+            projection_failed=False,
+            face_validity_failed=False,
         )
     return result
 
@@ -552,6 +614,129 @@ def _selected_edges(
     return selected
 
 
+def _triangle_edges(triangle: IntArray) -> set[tuple[int, int]]:
+    a, b, c = map(int, triangle)
+    return {
+        tuple(sorted((a, b))),
+        tuple(sorted((b, c))),
+        tuple(sorted((c, a))),
+    }
+
+
+def _refinement_preserves_triangle_orientation(
+    surface: SurfaceMesh,
+    samples: dict[tuple[int, int], _EdgeSample],
+    triangle: IntArray,
+    selected: set[tuple[int, int]],
+) -> bool:
+    """Whether the proposed conforming bisections preserve one face (§8.4)."""
+    if not selected:
+        return True
+    midpoint_ids = {}
+    midpoint_points = {}
+    for edge in sorted(selected):
+        sample = samples[edge]
+        if sample.point is None:
+            return False
+        midpoint_id = -1 - len(midpoint_ids)
+        midpoint_ids[edge] = midpoint_id
+        midpoint_points[midpoint_id] = sample.point
+
+    def child_point(point_id: int) -> FloatArray:
+        return surface.points[point_id] if point_id >= 0 else midpoint_points[point_id]
+
+    parent_vertices = _unwrap_vertices(surface.points[triangle], surface.period)
+    parent_normal = np.cross(
+        parent_vertices[1] - parent_vertices[0],
+        parent_vertices[2] - parent_vertices[0],
+    )
+    normal_tolerance = np.finfo(float).eps
+    if np.linalg.norm(parent_normal) <= normal_tolerance:
+        return False
+    for child in _children_for_triangle(triangle, midpoint_ids):
+        child_vertices = _unwrap_vertices(
+            np.asarray([child_point(point_id) for point_id in child]),
+            surface.period,
+        )
+        child_normal = np.cross(
+            child_vertices[1] - child_vertices[0],
+            child_vertices[2] - child_vertices[0],
+        )
+        if (
+            np.linalg.norm(child_normal) <= normal_tolerance
+            or np.dot(child_normal, parent_normal) <= 0.0
+        ):
+            return False
+    return True
+
+
+def _block_face_invalid_edges(
+    surface: SurfaceMesh,
+    samples: dict[tuple[int, int], _EdgeSample],
+    selected: set[tuple[int, int]],
+) -> tuple[set[tuple[int, int]], dict[tuple[int, int], _EdgeSample]]:
+    """Block rather than insert projected midpoints that invert faces (§21.2).
+
+    Edges are global conforming objects, so an edge invalid in either incident
+    triangle is removed everywhere. After individually invalid edges are
+    removed, the largest deterministic valid subset is retained in any face
+    where a combination of otherwise-valid bisections is still unsafe.
+    """
+    remaining = set(selected)
+    invalid: set[tuple[int, int]] = set()
+    while True:
+        newly_invalid: set[tuple[int, int]] = set()
+        for triangle in surface.triangles:
+            chosen = _triangle_edges(triangle) & remaining
+            newly_invalid.update(
+                edge
+                for edge in chosen
+                if not _refinement_preserves_triangle_orientation(
+                    surface, samples, triangle, {edge}
+                )
+            )
+        if newly_invalid:
+            invalid.update(newly_invalid)
+            remaining.difference_update(newly_invalid)
+            continue
+
+        for triangle in surface.triangles:
+            chosen = sorted(_triangle_edges(triangle) & remaining)
+            if _refinement_preserves_triangle_orientation(
+                surface, samples, triangle, set(chosen)
+            ):
+                continue
+            retained: set[tuple[int, int]] = set()
+            for count in range(len(chosen) - 1, -1, -1):
+                valid_subsets = [
+                    set(subset)
+                    for subset in combinations(chosen, count)
+                    if _refinement_preserves_triangle_orientation(
+                        surface, samples, triangle, set(subset)
+                    )
+                ]
+                if valid_subsets:
+                    retained = valid_subsets[0]
+                    break
+            newly_invalid.update(set(chosen) - retained)
+        if not newly_invalid:
+            break
+        invalid.update(newly_invalid)
+        remaining.difference_update(newly_invalid)
+
+    if not invalid:
+        return remaining, samples
+    updated = dict(samples)
+    for edge in invalid:
+        updated[edge] = replace(
+            samples[edge],
+            candidate=True,
+            refinement_blocked=True,
+            face_validity_failed=True,
+        )
+    return remaining, updated
+
+
 def _maximum_finite(values) -> float:
     finite = np.asarray(values, dtype=float)
     finite = finite[np.isfinite(finite)]
@@ -574,12 +759,22 @@ def _make_level(
         for first, second in candidates
     ]
     unresolved_edges = sum(
-        not np.isfinite(sample.action_error)
+        sample.refinement_blocked
+        or not np.isfinite(sample.action_error)
         or not np.isfinite(sample.bounce_time_error)
         for sample in samples.values()
     )
     boundary_protected_edges = sum(
-        sample.refinement_blocked for sample in samples.values()
+        sample.refinement_blocked
+        and not sample.projection_failed
+        and not sample.face_validity_failed
+        for sample in samples.values()
+    )
+    projection_failed_edges = sum(
+        sample.projection_failed for sample in samples.values()
+    )
+    face_validity_failed_edges = sum(
+        sample.face_validity_failed for sample in samples.values()
     )
     residuals = [
         abs(trace.B_residual_in)
@@ -596,6 +791,8 @@ def _make_level(
         candidate_edge_count=len(candidates),
         unresolved_edge_count=unresolved_edges,
         boundary_protected_edge_count=boundary_protected_edges,
+        projection_failed_edge_count=projection_failed_edges,
+        face_validity_failed_edge_count=face_validity_failed_edges,
         max_action_interpolation_error=_maximum_finite(
             [sample.action_error for sample in samples.values()]
         ),
@@ -624,6 +821,12 @@ def _make_edge_indicators(
         ),
         refinement_blocked=np.asarray(
             [samples[edge].refinement_blocked for edge in edges], dtype=bool
+        ),
+        projection_failed=np.asarray(
+            [samples[edge].projection_failed for edge in edges], dtype=bool
+        ),
+        face_validity_failed=np.asarray(
+            [samples[edge].face_validity_failed for edge in edges], dtype=bool
         ),
     )
 
@@ -688,8 +891,9 @@ def _refine_edges(
         points.append(sample.point)
         B_values.append(sample.B)
         g_values.append(sample.g)
-        # A shared provenance boundary would have been refinement_blocked, so
-        # every inserted midpoint is deliberately an untagged surface point.
+        # A shared provenance boundary or failed local projection would have
+        # been refinement_blocked, so every inserted midpoint is deliberately
+        # untagged and has already passed the in-domain checks.
         tags.append(0)
         parent_edges.append(np.array([-1, -1], dtype=np.int64))
 
@@ -750,13 +954,14 @@ def refine_surface_data(
 
     Every untagged edge is sampled at a locally projected ``B=b`` midpoint.
     Midpoint deviations from linear interpolation estimate errors in ``A``
-    and ``K``. Edges shared by a provenance boundary remain explicitly blocked
-    until curve-aware refinement can preserve that constraint. Unquantized
-    lifted return data identify candidate sheet discontinuities. Marked edges
-    are bisected conformingly, all changed provenance is invalidated, and every
-    new vertex is checked to remain on the incoming half. The report includes
-    the final unrefined indicator level, unresolved and protected edge counts,
-    and periodic geometric candidate length.
+    and ``K``. Edges shared by a provenance boundary, lacking a valid local
+    projection, or producing a face inversion remain explicitly blocked.
+    Unquantized lifted return data identify candidate sheet discontinuities.
+    Marked edges are bisected conformingly, all changed provenance is
+    invalidated, and every new vertex is checked to remain on the incoming
+    half. The report includes the final unrefined indicator level, unresolved
+    and protected edge counts with projection/face-validity reasons, and
+    periodic geometric candidate length.
     """
     cfg = SurfaceRefinementConfig() if config is None else config
     trace_cfg = WellTraceConfig() if trace_config is None else trace_config
@@ -768,6 +973,7 @@ def refine_surface_data(
     for level in range(cfg.max_levels + 1):
         samples = _edge_samples(data, field, cfg, trace_cfg)
         selected = _selected_edges(data, samples, cfg)
+        selected, samples = _block_face_invalid_edges(data.surface, samples, selected)
         will_refine = selected if level < cfg.max_levels else set()
         history.append(_make_level(level, data, samples, will_refine))
         if level == cfg.max_levels or not selected:

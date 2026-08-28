@@ -1438,6 +1438,7 @@ class WellTraceConfig:
     max_field_periods: int
     root_rtol: float
     root_atol_B: float
+    incoming_root_max_offset: float  # radians
     extrema_tolerance: float
     quadrature_rtol: float
     quadrature_atol: float

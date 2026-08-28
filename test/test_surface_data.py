@@ -3,17 +3,27 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import quad
 from scipy.optimize import brentq
 
+import alpha_analysis.j_connectivity.surface_data as surface_data_module
+from alpha_analysis import BoozerField
 from alpha_analysis.j_connectivity import (
+    BoundsConfig,
+    GmshBackgroundMeshBackend,
+    GmshBackgroundMeshConfig,
+    MarchingTetrahedraExtractor,
+    SurfaceDownsamplingConfig,
     SurfaceMesh,
     SurfaceRefinementConfig,
     TraceStatus,
+    downsample_surface,
     evaluate_surface_data,
+    find_global_B_bounds,
     itineraries_are_continuous,
     refine_surface_data,
 )
@@ -29,6 +39,8 @@ _TRACE_CONFIG = WellTraceConfig(
     quadrature_rtol=1.0e-7,
     quadrature_atol=1.0e-9,
 )
+
+_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 
 
 def _field(*, split: bool) -> SyntheticFourierField:
@@ -290,3 +302,155 @@ def test_shared_boundary_edge_is_reported_without_false_midpoint_provenance():
     ).all()
     assert result.report.levels[0].boundary_protected_edge_count == 1
     assert result.report.levels[0].unresolved_edge_count == 1
+
+
+def test_out_of_domain_midpoint_projection_remains_explicitly_unresolved():
+    # B = 2.97 - s - 0.04 cos(zeta), b=2.  The two endpoints of edge
+    # (0, 1) lie at s=0.99, while the level surface bows to s=1.01 at the
+    # geometric midpoint.  A local gradient projection therefore leaves the
+    # plasma.  Selecting another root from a different in-domain branch would
+    # be a silent topology change; the edge must stay blocked and unresolved.
+    field = SyntheticFourierField(
+        nfp=1,
+        m=np.array([0, 0]),
+        n=np.array([0, 1]),
+        cosine_coefficients=np.array([[2.97, -1.0], [-0.04, 0.0]]),
+        sine_coefficients=np.zeros((2, 2)),
+        iota_coefficients=np.array([0.0]),
+        G_coefficients=np.array([1.0]),
+        I_coefficients=np.array([0.0]),
+    )
+    radius = np.sqrt(0.99)
+    points = np.array(
+        [
+            [radius, 0.0, 2.0 * np.pi / 3.0],
+            [radius, 0.0, 4.0 * np.pi / 3.0],
+            [radius * np.cos(0.02), radius * np.sin(0.02), 2.0 * np.pi / 3.0],
+        ]
+    )
+    s, theta, zeta = _coordinates(points)
+    B = np.asarray(field.B(s, theta, zeta), dtype=float)
+    np.testing.assert_allclose(B, 2.0, atol=1.0e-14)
+    surface = SurfaceMesh(
+        level=2.0,
+        period=2.0 * np.pi,
+        points=points,
+        triangles=np.array([[0, 1, 2]]),
+        B=B,
+        g=-np.ones(3),
+        boundary_tags=np.zeros(3, dtype=np.int64),
+        point_parent_edges=np.full((3, 2), -1, dtype=np.int64),
+        triangle_parent_tetrahedra=np.array([-1]),
+        component_ids=np.array([0]),
+    )
+
+    result = refine_surface_data(
+        surface,
+        field,
+        SurfaceRefinementConfig(max_levels=0),
+        _TRACE_CONFIG,
+    )
+
+    edge_index = np.flatnonzero(
+        np.all(result.edge_indicators.edges == np.array([0, 1]), axis=1)
+    ).item()
+    assert result.edge_indicators.refinement_blocked[edge_index]
+    assert result.edge_indicators.projection_failed[edge_index]
+    assert result.edge_indicators.itinerary_candidate[edge_index]
+    assert np.isnan(result.edge_indicators.action_interpolation_error[edge_index])
+    assert result.report.levels[0].projection_failed_edge_count >= 1
+    assert result.report.levels[0].boundary_protected_edge_count == 0
+
+
+def test_real_surface_inverting_projected_bisection_stays_unresolved():
+    field = BoozerField.from_boozmn(
+        _DATA_DIR / "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_"
+        "allNfp_aspect6_eval000155.nc"
+    )
+    bounds = find_global_B_bounds(field, BoundsConfig(17, 32, 32))
+    b = 0.5 * (bounds.refined_min + bounds.refined_max)
+    background = GmshBackgroundMeshBackend(
+        GmshBackgroundMeshConfig(target_size=0.3)
+    ).build(field)
+    incoming = MarchingTetrahedraExtractor().extract(background, field, b).incoming
+    reduced = downsample_surface(
+        incoming,
+        field,
+        SurfaceDownsamplingConfig(target_reduction=0.8),
+    ).surface
+
+    refinement_config = SurfaceRefinementConfig(
+        max_levels=0,
+        action_interpolation_rtol=5.0e-2,
+        bounce_time_interpolation_rtol=5.0e-2,
+    )
+    trace_config = WellTraceConfig(quadrature_rtol=1.0e-8, quadrature_atol=1.0e-9)
+    result = refine_surface_data(reduced, field, refinement_config, trace_config)
+
+    assert result.report.levels[0].face_validity_failed_edge_count >= 1
+    assert np.all(result.data.regular[result.surface.g < -1.0e-10])
+    np.testing.assert_allclose(result.surface.B, b, atol=1.0e-10)
+    for triangle in result.surface.triangles:
+        vertices = result.surface.points[triangle]
+        normal = np.cross(vertices[1] - vertices[0], vertices[2] - vertices[0])
+        assert np.linalg.norm(normal) > np.finfo(float).eps
+
+
+def test_sliver_projected_child_is_blocked_on_the_public_refinement_path(monkeypatch):
+    field = SyntheticFourierField(
+        nfp=1,
+        m=np.array([0, 0]),
+        n=np.array([0, 1]),
+        cosine_coefficients=np.array([[2.0], [-1.0]]),
+        sine_coefficients=np.zeros((2, 1)),
+        iota_coefficients=np.array([0.0]),
+        G_coefficients=np.array([1.0, 5.0]),
+        I_coefficients=np.array([0.0]),
+    )
+    b = 2.5
+    zeta = 4.0 * np.pi / 3.0
+    points = np.array(
+        [
+            [np.sqrt(0.2), 0.0, zeta],
+            [np.sqrt(0.8), 0.0, zeta],
+            [0.7, 0.2, zeta],
+        ]
+    )
+    s, theta, zeta_values = _coordinates(points)
+    B = np.asarray(field.B(s, theta, zeta_values), dtype=float)
+    C = np.asarray(field.G(s) + field.iota(s) * field.I(s), dtype=float)
+    g = B * np.asarray(field.D_B(s, theta, zeta_values), dtype=float) / C
+    surface = SurfaceMesh(
+        level=b,
+        period=2.0 * np.pi,
+        points=points,
+        triangles=np.array([[0, 1, 2]]),
+        B=B,
+        g=g,
+        boundary_tags=np.zeros(3, dtype=np.int64),
+        point_parent_edges=np.full((3, 2), -1, dtype=np.int64),
+        triangle_parent_tetrahedra=np.array([-1]),
+        component_ids=np.array([0]),
+    )
+    original_projection = surface_data_module._projected_midpoint
+    unsafe = points[2].copy()
+    unsafe[1] = np.nextafter(unsafe[1], -np.inf)
+
+    def sliver_projection(candidate_surface, candidate_field, edge, config):
+        if edge != (0, 1):
+            return original_projection(candidate_surface, candidate_field, edge, config)
+        s_mid, theta_mid, zeta_mid = _coordinates(unsafe[np.newaxis, :])
+        C_mid = float(field.G(s_mid[0]) + field.iota(s_mid[0]) * field.I(s_mid[0]))
+        g_mid = b * float(field.D_B(s_mid[0], theta_mid[0], zeta_mid[0])) / C_mid
+        return unsafe, b, g_mid
+
+    monkeypatch.setattr(surface_data_module, "_projected_midpoint", sliver_projection)
+    result = refine_surface_data(
+        surface,
+        field,
+        SurfaceRefinementConfig(max_levels=1),
+        _TRACE_CONFIG,
+    )
+
+    assert result.report.levels[0].face_validity_failed_edge_count >= 1
+    assert result.report.levels[0].refined_edge_count >= 1

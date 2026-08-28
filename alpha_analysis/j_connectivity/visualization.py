@@ -10,12 +10,14 @@ from .denominator import DenominatorConvergence, GlobalBBounds
 def plot_critical_curves(curves, *, output_path=None):
     """Plot classified marginal polylines from DESIGN.md §§17.3 and 23.
 
-    Gamma-min, gamma-max, and degenerate portions are visually distinct, and
-    an unresolved result is called out in the title rather than hidden.
+    Gamma-min, gamma-max, and degenerate portions are visually distinct,
+    arms that terminate on the ``s=1`` boundary are marked, and an unresolved
+    result is called out in the title rather than hidden.
     """
     import matplotlib.pyplot as plt
 
     from .critical_curves import CriticalKind
+    from .surface_extract import SurfaceMesh
 
     figure = plt.figure(figsize=(7, 6), constrained_layout=True)
     axis = figure.add_subplot(111, projection="3d")
@@ -55,11 +57,25 @@ def plot_critical_curves(curves, *, output_path=None):
             s=36,
             label="degenerate point",
         )
+    edge_exit = ((curves.boundary_tags & SurfaceMesh.EDGE) != 0) & (
+        np.abs(np.sum(curves.points[:, :2] ** 2, axis=1) - 1.0) <= 1.0e-9
+    )
+    if np.any(edge_exit):
+        points = curves.points[edge_exit]
+        axis.scatter(
+            points[:, 0],
+            points[:, 1],
+            points[:, 2],
+            color="tab:green",
+            marker="s",
+            s=28,
+            label="edge exit (s=1)",
+        )
     axis.set_xlabel("x")
     axis.set_ylabel("y")
     axis.set_zlabel(r"$\zeta$ [rad]")
     axis.set_title(f"Critical curves: {curves.status.name}")
-    if curves.polylines or np.any(degenerate):
+    if curves.polylines or np.any(degenerate) or np.any(edge_exit):
         axis.legend(fontsize="small")
     if output_path is not None:
         figure.savefig(output_path, dpi=160)
