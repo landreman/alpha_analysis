@@ -680,6 +680,30 @@ def test_interior_maximum_data_reports_the_highest_barrier_inside_the_well():
     assert _interior_maximum_data(empty, config) == (0, np.inf)
 
 
+def test_a_bracket_never_outranks_a_sample_level_failure():
+    # docs/STATUS.md: "Cap exhaustion is distinct TransitionStatus.MAX_PERIODS".
+    # A stepped-over event is recorded in contact_sample_pairs regardless, so
+    # it may only lift a curve that is otherwise fully regular; relabeling a
+    # capped or failed curve MULTIWAY would hide why it is unusable (§21.2).
+    from alpha_analysis.j_connectivity.transitions import _curve_status
+
+    regular = (TransitionStatus.REGULAR,) * 3
+    assert _curve_status(regular, 0) is TransitionStatus.REGULAR
+    assert _curve_status(regular, 1) is TransitionStatus.MULTIWAY
+    for failure in (
+        TransitionStatus.MAX_PERIODS,
+        TransitionStatus.UNRESOLVED,
+        TransitionStatus.MATCH_FAILURE,
+        TransitionStatus.TANGENT,
+    ):
+        mixed = (TransitionStatus.REGULAR, failure, TransitionStatus.REGULAR)
+        assert _curve_status(mixed, 0) is failure
+        assert _curve_status(mixed, 2) is failure
+    # A sample that is itself a multiway event still aggregates to MULTIWAY.
+    sampled = (TransitionStatus.REGULAR, TransitionStatus.MULTIWAY)
+    assert _curve_status(sampled, 0) is TransitionStatus.MULTIWAY
+
+
 def test_contact_bracket_is_shaded_where_the_contact_actually_lies():
     # DESIGN.md §17.5: a stepped-over contact must be visible in the plot, not
     # only in the status, so a jump in A_p(u) is not read as a steep slope.

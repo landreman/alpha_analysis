@@ -107,6 +107,15 @@ Option 2 approved.
   is `REGULAR`. Milestone 10 must subdivide such curves at the located contact rather
   than treat the bracket as an ordinary monotone segment; until it does, a caller that
   needs the actions should read `sample_status`, not `status`.
+- A bracket lifts only a curve that is otherwise fully regular (`_curve_status`). It
+  never displaces a sample-level failure, so cap exhaustion remains
+  `MAX_PERIODS` and a failed action remains `UNRESOLVED` as `docs/STATUS.md` and
+  `docs/validation/milestone9-real-equilibria.md` record; the bracket is in
+  `contact_sample_pairs` either way.
+- The barrier count uses the same `D2_tolerance` gate as the existing tangent tests, so
+  an extremum with `|D_parallel^2 B|` below tolerance — §5.4's first bullet — counts as
+  neither barrier nor minimum. The bias is conservative: near a fold the count drops
+  and a bracket is emitted, which is the outcome §5.4 wants.
 - `plot_transition_diagnostics` shades each bracketed \(u\) band on the action panel,
   so a jump is not read as a steep regular slope (§17.5). A closed curve's wraparound
   bracket runs from the last sample through `total_u_length` to the first, so it is
@@ -121,13 +130,14 @@ Option 2 approved.
   `test_interior_maximum_data_reports_the_highest_barrier_inside_the_well` pins the
   reduction over several barriers and the exclusion of minima and of extrema beyond
   the crossing, which the field-based test alone does not reach.
-- Real equilibria make this the common case, not a corner case. With
-  `max_curve_samples=10` on a 6x24x12 structured background and marching tetrahedra,
-  all 16 mapped curves across `boozmn_20260402-01-038_Ax_PCA_...`,
-  `boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc`, and
-  `boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc`, each at lambda_n = 0.5 and 0.9, bracket
-  between two and seven events, with parent wells holding up to 103 interior maxima;
-  every additivity residual stays between 1e-14 and 1e-12. Coarse sampling of a long curve steps
+- Real equilibria make this the common case, not a corner case. Regenerating the
+  milestone-9 sweep (`examples/validate_transition_equilibria.py`: five equilibria,
+  five levels, structured and gmsh backends, both extractors, 8 samples per curve)
+  leaves only 6 of its 164 transition curves free of a stepped-over event: 53 move from
+  `REGULAR` to `MULTIWAY`, while the 92 `UNRESOLVED`, the 9 `MAX_PERIODS`, all 1,017
+  sample statuses, and every failure reason are unchanged, as are the largest
+  additivity ratio (7.83e-5) and identity errors (2.2e-16 in `s`, 1.4e-14 rad in
+  `alpha`). Parent wells hold up to 103 interior maxima at these levels. Coarse sampling of a long curve steps
   over many contacts, so `MULTIWAY` will be the usual pre-cut status until milestone
   10 subdivides. Callers must therefore branch on `contact_sample_pairs` and
   `sample_status`, not on `status is REGULAR`, and the useful question for a

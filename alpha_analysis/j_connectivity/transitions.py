@@ -181,9 +181,11 @@ class TransitionCurve:
     port actions discontinuous in ``u``, or a fold in which a barrier
     annihilates with its minimum, which does not; a small ``barrier_margin``
     at the bracket distinguishes the first. Such a curve is ``MULTIWAY`` even
-    when every sample is regular. Rows are in sample order and are not
-    sorted: a closed curve's wraparound row is ``(n_samples - 1, 0)``, whose
-    ``u`` values decrease.
+    when every sample is regular, but never in place of a sample-level
+    failure: a capped or failed sample keeps its own curve status and the
+    bracket is still recorded. Rows are in sample order and are not sorted: a
+    closed curve's wraparound row is ``(n_samples - 1, 0)``, whose ``u``
+    values decrease.
     """
 
     transition_id: int
@@ -802,6 +804,22 @@ def _between_sample_contacts(
     return np.asarray(brackets, dtype=np.int64).reshape(-1, 2)
 
 
+def _curve_status(
+    sample_status: tuple[TransitionStatus, ...], n_contacts: int
+) -> TransitionStatus:
+    """Lift an otherwise regular curve to ``MULTIWAY`` for a stepped-over event.
+
+    A bracket found between two regular samples never outranks a sample-level
+    failure: a capped scan stays ``MAX_PERIODS`` and a failed action stays
+    ``UNRESOLVED``, because those name why the curve is unusable, while the
+    bracket is recorded in ``contact_sample_pairs`` either way.
+    """
+    status = _aggregate_status(sample_status)
+    if status is TransitionStatus.REGULAR and n_contacts:
+        return TransitionStatus.MULTIWAY
+    return status
+
+
 def _curve_sample_indices(polyline, max_samples: int | None) -> IntArray:
     """Select deterministic, ordered samples without changing the PL curve."""
     count = len(polyline.vertex_ids)
@@ -1027,9 +1045,7 @@ def _map_polyline(
     )
     sample_status_tuple = tuple(sample_status)
     sample_failure_reason_tuple = tuple(sample_failure_reason)
-    status = _aggregate_status(
-        sample_status_tuple + (TransitionStatus.MULTIWAY,) * len(contact_sample_pairs)
-    )
+    status = _curve_status(sample_status_tuple, len(contact_sample_pairs))
     unknown = np.full(n_samples, -1, dtype=np.int64)
     ports = (
         TransitionPort(
