@@ -506,7 +506,9 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
     the three limiting action curves, the additivity residual, and selected
     lifted well profiles. Field and action values retain their supplied
     units; all angular coordinates are radians. Non-regular transitions are
-    labeled explicitly rather than omitted.
+    labeled explicitly rather than omitted, and every ``u`` band that brackets
+    an equal-height contact the sampling stepped over is shaded on the action
+    panel so a jump in ``A_p(u)`` is never read as a steep regular slope.
     """
     import matplotlib.pyplot as plt
 
@@ -552,9 +554,26 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
             markersize=2.5,
             label=labels.get(port.role, port.role),
         )
+    contacts = np.asarray(
+        (
+            np.empty((0, 2), dtype=np.int64)
+            if transition.contact_sample_pairs is None
+            else transition.contact_sample_pairs
+        ),
+        dtype=np.int64,
+    ).reshape(-1, 2)
+    for order, pair in enumerate(contacts):
+        first, second = transition.u[pair[0]], transition.u[pair[1]]
+        action_axis.axvspan(
+            min(first, second),
+            max(first, second),
+            color="magenta",
+            alpha=0.18,
+            label="equal-height contact between samples" if order == 0 else None,
+        )
     action_axis.set_xlabel(r"common curve parameter $u$")
     action_axis.set_ylabel(r"action length $A$ [length]")
-    action_axis.legend()
+    action_axis.legend(fontsize="small")
 
     residual_axis.axhline(0.0, color="black", linewidth=0.7)
     residual_axis.plot(

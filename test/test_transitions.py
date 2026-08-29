@@ -497,3 +497,151 @@ def test_transition_trace_cap_has_a_distinct_explicit_status():
     assert transitions[0].status is TransitionStatus.MAX_PERIODS
     assert transitions[0].controls.max_field_periods == 1
     assert all(np.isnan(port.action_values).all() for port in transitions[0].ports)
+
+
+def _stepped_over_contact_field(delta_0: float = 0.0530, delta_1: float = 0.0045):
+    """Return a field whose barrier crosses ``b`` between critical samples.
+
+    Along a field line (``iota=0``, so ``theta`` is constant) the profile is
+
+        B = 2 - cos(zeta) + (0.5 + 0.2 s) cos(2 zeta)
+            + delta(theta) [sin(6 zeta) - 6 sin(zeta)],
+        delta(theta) = delta_0 + delta_1 cos(theta).
+
+    The bump vanishes with its first and second derivatives at ``zeta=0``, so
+    ``zeta=0, s=0.5`` is a marginal maximum at ``b=1.6`` with curvature
+    ``-1.4`` for every ``theta``: the whole circle is ``Gamma_max``.  The
+    backward half of the parent well contains one further maximum whose height
+    passes through ``b`` at ``delta = 0.054276...``, between the eight sampled
+    ``theta`` values.  That contact is a second equal-height maximum: a
+    nongeneric multiway event (DESIGN.md §5.4) which no sample lands on.
+    """
+    m = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1])
+    n = np.array([0, 1, 2, 1, 6, -1, 1, -6, 6])
+    cosine = np.zeros((len(m), 2))
+    cosine[0, 0] = 2.0
+    cosine[1, 0] = -1.0
+    cosine[2] = (0.5, 0.2)
+    sine = np.zeros((len(m), 2))
+    sine[3, 0] = 6.0 * delta_0
+    sine[4, 0] = -delta_0
+    sine[5, 0] = -3.0 * delta_1
+    sine[6, 0] = 3.0 * delta_1
+    sine[7, 0] = 0.5 * delta_1
+    sine[8, 0] = -0.5 * delta_1
+    return SyntheticFourierField(
+        nfp=1,
+        m=m,
+        n=n,
+        cosine_coefficients=cosine,
+        sine_coefficients=sine,
+        iota_coefficients=np.array([0.0]),
+        G_coefficients=np.array([3.0]),
+        I_coefficients=np.array([0.0]),
+    )
+
+
+def _sampled_interior_maxima(field, b, s, theta, half_width=6.0, n_samples=240001):
+    """Count the parent well's other maxima by direct sampling of ``B``."""
+    zeta = np.linspace(-half_width, half_width, n_samples)
+    B = np.asarray(field.B(s, theta, zeta), dtype=float)
+    center = np.argmin(np.abs(zeta))
+    forward = np.flatnonzero(B[center + 1 :] >= b) + center + 1
+    backward = np.flatnonzero(B[:center] >= b)
+    assert len(forward) and len(backward), "the sampled well must be bounded"
+    inside = (zeta > zeta[backward[-1]]) & (zeta < zeta[forward[0]])
+    B_inside, zeta_inside = B[inside], zeta[inside]
+    peaks = (
+        np.flatnonzero(
+            (B_inside[1:-1] > B_inside[:-2]) & (B_inside[1:-1] >= B_inside[2:])
+        )
+        + 1
+    )
+    peaks = peaks[np.abs(zeta_inside[peaks]) > 1.0e-2]
+    return len(peaks), (b - np.max(B_inside[peaks]) if len(peaks) else np.inf)
+
+
+def test_equal_height_contact_between_samples_is_multiway_not_regular():
+    # DESIGN.md §5.4: a jump in itinerary larger than the generic one-maximum
+    # change must be reported, not mapped as a generic three-port event.  Here
+    # every sample is regular and additive to round-off, yet a second maximum
+    # of the marginal height sits between two adjacent Gamma_max samples, so
+    # the port actions are discontinuous in u inside the hyperedge.
+    field = _stepped_over_contact_field()
+    s, b = 0.5, 1.6
+    critical = _critical_circles(field, s=s, zeta_values=(0.0,), count=8)
+    assert {polyline.kind for polyline in critical.polylines} == {
+        CriticalKind.GAMMA_MAX
+    }
+
+    transition = map_transitions(field, critical, TransitionMappingConfig())[0]
+
+    # Independent physics: the interior-maximum count really does change, and
+    # only between samples 1-2 and 6-7.
+    theta = np.arctan2(
+        transition.marginal_points[:, 1], transition.marginal_points[:, 0]
+    )
+    sampled = np.array(
+        [_sampled_interior_maxima(field, b, s, float(value))[0] for value in theta]
+    )
+    np.testing.assert_array_equal(sampled, np.array([0, 0, 1, 1, 1, 1, 1, 0]))
+    np.testing.assert_array_equal(transition.interior_maximum_count, sampled)
+    np.testing.assert_array_equal(
+        transition.contact_sample_pairs, np.array([[1, 2], [6, 7]])
+    )
+
+    # The samples themselves are regular and the actions remain usable: the
+    # curve is not discarded, it is labeled.
+    assert transition.status is TransitionStatus.MULTIWAY
+    assert all(
+        status is TransitionStatus.REGULAR for status in transition.sample_status
+    )
+    assert np.max(np.abs(transition.additivity_residual)) < 1.0e-12
+    assert all(np.all(np.isfinite(port.action_values)) for port in transition.ports)
+
+    # The recorded barrier margin shrinks toward the contact and is infinite
+    # where the parent well has no other maximum at all.
+    assert np.all(np.isinf(transition.barrier_margin[[0, 1, 7]]))
+    assert 0.0 < transition.barrier_margin[2] < transition.barrier_margin[4]
+    np.testing.assert_allclose(
+        transition.barrier_margin[[2, 3, 4]],
+        [_sampled_interior_maxima(field, b, s, float(theta[i]))[1] for i in (2, 3, 4)],
+        atol=2.0e-6,
+    )
+
+    # The jump the contact produces is far larger than the generic variation
+    # of A_W along the rest of the curve.
+    parent = _port(transition, "parent")
+    steps = np.abs(np.diff(parent.action_values))
+    assert steps[1] > 10.0 * np.median(steps)
+
+    # A curve whose barrier never crosses b over the same sampling is still
+    # regular: the detector does not fire on ordinary variation.
+    quiet = map_transitions(
+        _stepped_over_contact_field(delta_0=0.050, delta_1=0.0015),
+        _critical_circles(
+            _stepped_over_contact_field(delta_0=0.050, delta_1=0.0015),
+            s=s,
+            zeta_values=(0.0,),
+            count=8,
+        ),
+        TransitionMappingConfig(),
+    )[0]
+    assert quiet.status is TransitionStatus.REGULAR
+    assert len(quiet.contact_sample_pairs) == 0
+    assert np.all(quiet.interior_maximum_count == 1)
+
+
+def test_contact_bracket_is_shaded_in_the_transition_diagnostic():
+    # DESIGN.md §17.5: a stepped-over contact must be visible in the plot, not
+    # only in the status, so a jump in A_p(u) is not read as a steep slope.
+    field = _stepped_over_contact_field()
+    critical = _critical_circles(field, s=0.5, zeta_values=(0.0,), count=8)
+    transition = map_transitions(field, critical, TransitionMappingConfig())[0]
+
+    figure, axes = plot_transition_diagnostics(field, transition)
+    try:
+        labels = [text.get_text() for text in axes[1].get_legend().get_texts()]
+        assert "equal-height contact between samples" in labels
+    finally:
+        plt.close(figure)
