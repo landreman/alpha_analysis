@@ -645,6 +645,97 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
     return figure, axes
 
 
+def plot_cut_surface(before, cut, *, output_path=None, metadata=None):
+    """Plot the mesh before and after transition duplication (DESIGN.md §17.5).
+
+    The pre-cut view is colored by the supplied action, the post-cut view by
+    cell-located sheet ID, and every duplicated cut edge is overlaid in red.
+    Unresolved transition IDs are printed in the title rather than omitted.
+    Logical coordinates are dimensionless except for zeta in radians.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d.art3d import Line3DCollection
+
+    figure = plt.figure(figsize=(12, 5), constrained_layout=True)
+    axes = (
+        figure.add_subplot(1, 2, 1, projection="3d"),
+        figure.add_subplot(1, 2, 2, projection="3d"),
+    )
+
+    def edge_segments(surface):
+        segments = []
+        for triangle in surface.triangles:
+            vertices = surface.points[triangle].copy()
+            vertices[1:, 2] -= surface.period * np.round(
+                (vertices[1:, 2] - vertices[0, 2]) / surface.period
+            )
+            segments.extend((vertices[[0, 1]], vertices[[1, 2]], vertices[[2, 0]]))
+        return segments
+
+    before_segments = edge_segments(before.surface)
+    after_segments = edge_segments(cut.surface)
+    axes[0].add_collection3d(
+        Line3DCollection(before_segments, colors="0.65", linewidths=0.6)
+    )
+    finite = np.isfinite(before.action_values)
+    axes[0].scatter(
+        *before.surface.points[finite].T,
+        c=before.action_values[finite],
+        cmap="viridis",
+        s=18,
+        depthshade=False,
+    )
+    if np.any(~finite):
+        axes[0].scatter(
+            *before.surface.points[~finite].T,
+            color="magenta",
+            marker="x",
+            s=36,
+            label="unresolved action",
+        )
+        axes[0].legend(fontsize="small")
+    axes[0].set_title("Before constrained cut: action A")
+
+    axes[1].add_collection3d(
+        Line3DCollection(after_segments, colors="0.78", linewidths=0.45)
+    )
+    centers = np.mean(cut.surface.points[cut.surface.triangles], axis=1)
+    axes[1].scatter(
+        *centers.T,
+        c=cut.sheet_ids,
+        cmap="tab20",
+        s=18,
+        depthshade=False,
+    )
+    if len(cut.cut_edges):
+        axes[1].add_collection3d(
+            Line3DCollection(
+                cut.surface.points[cut.cut_edges],
+                colors="red",
+                linewidths=2.2,
+                label="duplicated transition edge",
+            )
+        )
+        axes[1].legend(fontsize="small")
+    axes[1].set_title("After cut: sheet IDs and duplicated edges")
+    for axis in axes:
+        axis.set_xlabel("x")
+        axis.set_ylabel("y")
+        axis.set_zlabel(r"$\zeta$ [rad]")
+        axis.autoscale_view()
+    unresolved = cut.unresolved_transition_ids.tolist()
+    context = ""
+    if metadata:
+        context = ", " + ", ".join(f"{key}={value}" for key, value in metadata.items())
+    figure.suptitle(
+        f"Constrained transition cut, b={cut.surface.level:.8g}, "
+        f"unresolved transitions={unresolved}{context}"
+    )
+    if output_path is not None:
+        figure.savefig(output_path, dpi=160)
+    return figure, axes
+
+
 def _periodic_plot_triangles(surface):
     triangles = []
     for triangle in surface.triangles:

@@ -41,6 +41,15 @@ from .denominator import (
     find_global_B_bounds,
 )
 from .field import BoozerFieldLike
+from .mesh_cut import (
+    ConstrainedCutConfig,
+    ConstrainedCutError,
+    CutSurface,
+    CutTransitionPort,
+    cut_surface_at_transitions,
+    load_cut_surface,
+    save_cut_surface,
+)
 from .surface_extract import (
     MarchingTetrahedraExtractor,
     PyVistaSurfaceExtractor,
@@ -97,6 +106,10 @@ __all__ = [
     "BackgroundMesh",
     "BackgroundMeshConfig",
     "ConnectivityConfig",
+    "ConstrainedCutConfig",
+    "ConstrainedCutError",
+    "CutSurface",
+    "CutTransitionPort",
     "CriticalCurveConfig",
     "CriticalCurveError",
     "CriticalCurveReport",
@@ -146,18 +159,21 @@ __all__ = [
     "WellProfile",
     "UniformSourceProfile",
     "compute_denominator",
+    "cut_surface_at_transitions",
     "downsample_surface",
     "evaluate_surface_data",
     "extract_critical_curves",
     "denominator_convergence",
     "find_global_B_bounds",
     "itineraries_are_continuous",
+    "load_cut_surface",
     "refine_surface_data",
     "optional_import",
     "signed_tetrahedron_volumes",
     "surface_flux",
     "tetrahedron_quality",
     "sample_well_profile",
+    "save_cut_surface",
     "trace_regular_well",
     "map_transitions",
 ]
