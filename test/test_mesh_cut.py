@@ -96,7 +96,7 @@ def _port(role, points, action):
         role=role,
         points=np.asarray(points, dtype=float),
         zeta_unwrapped=np.zeros(n),
-        action_values=np.full(n, action),
+        action_values=np.broadcast_to(np.asarray(action, dtype=float), (n,)).copy(),
         quadrature_error=np.zeros(n),
         source_vertex_ids=np.full(n, -1, dtype=np.int64),
     )
@@ -112,9 +112,9 @@ def _transition():
         u=u,
         total_u_length=0.4,
         ports=(
-            _port("parent", companion, 3.0),
-            _port("child_1", companion, 1.0),
-            _port("child_3", marginal, 2.0),
+            _port("parent", companion, [3.0, 3.1, 3.2]),
+            _port("child_1", companion, [1.0, 1.05, 1.1]),
+            _port("child_3", marginal, [2.0, 2.05, 2.1]),
         ),
         marginal_points=marginal,
         field_line_identity=np.column_stack((np.full(3, 0.5), u)),
@@ -165,15 +165,20 @@ def test_constrained_cut_duplicates_branch_actions_and_assigns_three_sheets():
         cut.sheet_ids, _triangle_components(cut.surface.triangles)
     )
     by_role = {port.role: port for port in cut.ports}
+    expected_by_role = {port.role: port for port in transition.ports}
     assert set(by_role) == {"parent", "child_1", "child_3"}
     assert len({port.sheet_id for port in cut.ports}) == 3
-    for role, expected_action in (("parent", 3.0), ("child_1", 1.0), ("child_3", 2.0)):
+    for role, expected_port in expected_by_role.items():
         port = by_role[role]
         assert port.sheet_id >= 0
         assert np.all(port.polyline_vertex_ids >= 0)
         np.testing.assert_allclose(
-            cut.action_values[port.polyline_vertex_ids], expected_action
+            cut.action_values[port.polyline_vertex_ids], expected_port.action_values
         )
+    np.testing.assert_allclose(
+        by_role["parent"].action_values,
+        by_role["child_1"].action_values + by_role["child_3"].action_values,
+    )
 
     # Parent and child-1 occupy the same geometric T but have distinct mesh
     # IDs, and no triangle is allowed to interpolate across those two values.
@@ -185,9 +190,16 @@ def test_constrained_cut_duplicates_branch_actions_and_assigns_three_sheets():
         atol=1.0e-14,
     )
     assert not np.any(parent.polyline_vertex_ids == child.polyline_vertex_ids)
-    for triangle in cut.surface.triangles:
-        values = cut.action_values[triangle]
-        assert not (np.any(np.isclose(values, 1.0)) and np.any(np.isclose(values, 3.0)))
+    branch_gap = np.min(parent.action_values - child.action_values)
+    triangle_actions = cut.action_values[cut.surface.triangles]
+    finite_ranges = np.array(
+        [
+            np.ptp(finite)
+            for values in triangle_actions
+            if len(finite := values[np.isfinite(values)])
+        ]
+    )
+    assert np.all(finite_ranges < 0.5 * branch_gap)
 
 
 def test_cut_topology_survives_pickle_free_npz_round_trip(tmp_path):
