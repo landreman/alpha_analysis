@@ -40,8 +40,8 @@ All 100 cases completed without an exception in 1,024.6 seconds. They produced
 | Critical-curve status | 70 regular, 22 degenerate, 8 unresolved |
 | Transition-curve status | 6 regular, 57 multiway, 92 unresolved, 9 max-periods |
 | Pickle-free topology round trips | 100 / 100 exact |
-| Invalid port-to-sheet incidences | 0 |
-| Triangles spanning a duplicated parent/child action jump | 0 |
+| Invalid port-to-sheet incidences | n/a (no valid real ports) |
+| Triangles spanning a duplicated parent/child action jump | n/a (no valid real ports) |
 | Unhandled exceptions | 0 |
 
 The 158 nongeneric or failed curves retained three unresolved ports with

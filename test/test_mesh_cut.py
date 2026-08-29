@@ -219,7 +219,7 @@ def test_cut_topology_survives_pickle_free_npz_round_trip(tmp_path):
         np.testing.assert_array_equal(restored_port.action_values, port.action_values)
 
 
-def test_nongeneric_contact_remains_explicitly_unresolved():
+def test_nongeneric_contact_remains_explicitly_unresolved(tmp_path):
     surface, action = _surface_and_action()
     transition = replace(
         _transition(),
@@ -239,6 +239,19 @@ def test_nongeneric_contact_remains_explicitly_unresolved():
     # No invented cut means the two original connected components remain two,
     # while the unresolved hyperedge is still present in the port table.
     assert len(np.unique(cut.sheet_ids)) == 2
+
+    path = tmp_path / "unresolved-cut-surface.npz"
+    save_cut_surface(path, cut)
+    restored = load_cut_surface(path)
+    np.testing.assert_array_equal(
+        restored.unresolved_transition_ids, cut.unresolved_transition_ids
+    )
+    assert restored.unresolved_transition_reasons == cut.unresolved_transition_reasons
+    for restored_port, port in zip(restored.ports, cut.ports):
+        np.testing.assert_array_equal(
+            restored_port.polyline_vertex_ids, port.polyline_vertex_ids
+        )
+        np.testing.assert_array_equal(restored_port.action_values, port.action_values)
 
 
 def test_underresolved_T_to_edge_strip_is_not_cut():
@@ -352,6 +365,12 @@ def test_production_synthetic_surface_has_no_uncut_action_jump():
         cut.sheet_ids, _triangle_components(cut.surface.triangles)
     )
     assert len({port.sheet_id for port in cut.ports}) == 3
+    by_role = {port.role: port for port in cut.ports}
+    branch_gap = np.min(
+        np.abs(by_role["parent"].action_values - by_role["child_1"].action_values)
+    )
+    triangle_actions = cut.action_values[cut.surface.triangles]
+    assert np.all(np.ptp(triangle_actions, axis=1) < 0.5 * branch_gap)
     for port in cut.ports:
         np.testing.assert_allclose(
             cut.action_values[port.polyline_vertex_ids],
@@ -359,6 +378,9 @@ def test_production_synthetic_surface_has_no_uncut_action_jump():
             rtol=0.0,
             atol=1.0e-12,
         )
+        for vertex_id in np.unique(port.polyline_vertex_ids):
+            incident = np.any(cut.surface.triangles == vertex_id, axis=1)
+            assert np.any(cut.sheet_ids[incident] == port.sheet_id)
     points = cut.surface.points
     s = np.sum(points[:, :2] ** 2, axis=1)
     theta = np.arctan2(points[:, 1], points[:, 0])
