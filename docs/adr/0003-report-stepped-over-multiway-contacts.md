@@ -108,6 +108,17 @@ either way.
   field whose barrier height crosses \(b\) strictly between two sampled `GAMMA_MAX`
   vertices, with the interior-maximum counts verified independently by direct
   sampling of \(B\) inside the test.
+- Real equilibria make this the common case, not a corner case. With
+  `max_curve_samples=10` on a 6x24x12 structured background, every mapped curve on
+  `boozmn_20260402-01-038_Ax_PCA_...` (lambda_n = 0.5 and 0.9) and on
+  `boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc` (lambda_n = 0.5) brackets between three
+  and six contacts, with parent wells holding up to 103 interior maxima; every
+  additivity residual stays at 1e-14 to 1e-12. Coarse sampling of a long curve steps
+  over many contacts, so `MULTIWAY` will be the usual pre-cut status until milestone
+  10 subdivides. Callers must therefore branch on `contact_sample_pairs` and
+  `sample_status`, not on `status is REGULAR`, and the useful question for a
+  convergence report is how the bracket count behaves as the critical-curve sampling
+  is refined.
 - `docs/STATUS.md`'s note deferring "neighbor-itinerary jump detection" to milestone
   10 is narrowed: the parent-well count change is detected now; what milestone 10 still
   owns is locating the contact and cutting there.
