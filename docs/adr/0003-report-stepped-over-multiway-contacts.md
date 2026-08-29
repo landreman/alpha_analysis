@@ -88,7 +88,11 @@ return a plausible, wrong connectivity (§21.2).
    a bracket, and a missed barrier that is not the highest one moves the count without
    moving `barrier_margin`, so the fold/contact discriminator is blind to that case.
    A count change that straddles a non-regular sample is not bracketed at all (both
-   endpoints must be `REGULAR`) — there the sample's own status is the only signal. Because that spacing comes from the surface mesh and the
+   endpoints must be `REGULAR`) — there the sample's own status is the only signal. On
+   a closed curve with only two samples the wrap arc is not compared separately,
+   because `(1,0)` would repeat the comparison `(0,1)` already makes; a count change is
+   then attributed to `[u[0], u[1]]` even when the event lies in the wrap arc, so
+   detection still fires but the reported location can be the wrong arc. Because that spacing comes from the surface mesh and the
    extractor, the bracket count is backend- and extractor-dependent even though the
    field-line trace behind it is not.
 3. **Detect, then bisect along the polyline to localize each contact and split the

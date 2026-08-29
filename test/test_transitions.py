@@ -57,12 +57,13 @@ def _critical_circles(
     s: float,
     zeta_values: tuple[float, ...],
     count: int = 8,
+    theta_offset: float = 0.0,
 ):
     points = []
     segments = []
     for zeta in zeta_values:
         offset = len(points)
-        theta = np.linspace(0.0, 2.0 * np.pi, count, endpoint=False)
+        theta = np.linspace(0.0, 2.0 * np.pi, count, endpoint=False) + theta_offset
         points.extend(
             np.column_stack(
                 (
@@ -711,6 +712,52 @@ def test_interior_maximum_data_reports_the_highest_barrier_inside_the_well():
         extrema_B_minus_b=np.array([-2.0]),
     )
     assert _interior_maximum_data(empty, config) == (0, np.inf)
+
+
+def test_a_closed_curve_brackets_a_contact_in_its_wraparound_arc():
+    # A closed GAMMA_MAX polyline has one more arc than it has vertex pairs:
+    # the one from the last sample back to the first.  A contact there must be
+    # bracketed as (n-1, 0), or the curve reports REGULAR while its port
+    # actions jump across it (§21.2).  delta(theta) is even about theta = 0,
+    # so an unrotated circle always agrees at its first and last sample;
+    # rotating the sampled circle puts the count change in the wrap arc.
+    field = _stepped_over_contact_field(delta_0=0.0501, delta_1=0.0045)
+    critical = _critical_circles(
+        field,
+        s=0.5,
+        zeta_values=(0.0,),
+        count=8,
+        theta_offset=np.deg2rad(20.0),
+    )
+    assert critical.polylines[0].closed
+
+    transition = map_transitions(field, critical, TransitionMappingConfig())[0]
+
+    theta = np.arctan2(
+        transition.marginal_points[:, 1], transition.marginal_points[:, 0]
+    )
+    np.testing.assert_array_equal(
+        transition.interior_maximum_count,
+        [_sampled_interior_maxima(field, 1.6, 0.5, float(value))[0] for value in theta],
+    )
+    assert transition.status is TransitionStatus.MULTIWAY
+    pairs = transition.contact_sample_pairs.tolist()
+    assert [7, 0] in pairs, pairs
+    np.testing.assert_array_equal(pairs, [[0, 1], [2, 3], [4, 5], [7, 0]])
+
+    # The same bracket drives the diagnostic, so the wraparound shading is
+    # exercised against a row the detector emitted rather than an injected
+    # one: the tail span is drawn and the complement is not.
+    figure, axes = plot_transition_diagnostics(field, transition)
+    try:
+        spans = _shaded_spans(axes[1])
+        u, total = transition.u, transition.total_u_length
+        assert len(spans) == 5
+        assert (pytest.approx(u[7]), pytest.approx(total)) in spans
+        assert (pytest.approx(u[0]), pytest.approx(u[0])) in spans
+        assert all(not (span[0] <= u[1] and span[1] >= u[6]) for span in spans), spans
+    finally:
+        plt.close(figure)
 
 
 def test_a_bracket_never_outranks_a_sample_level_failure():
