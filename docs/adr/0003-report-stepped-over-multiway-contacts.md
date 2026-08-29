@@ -1,6 +1,6 @@
 # ADR 0003: Report equal-height contacts that fall between transition samples
 
-- **Status:** Proposed
+- **Status:** Decided
 - **Date:** 2026-08-29
 - **Milestone:** 9 (follow-up on branch `fix/multiway-contacts-between-samples`)
 - **Design sections:** §5.4 (multiway and degenerate transitions), §10.2 and §10.4
@@ -83,9 +83,7 @@ return a plausible, wrong connectivity (§21.2).
 
 ## Decision
 
-Left blank until the researcher decides. Option 2 is implemented on this branch so
-the evidence and the test are concrete; option 3 remains the milestone 10 follow-up
-either way.
+Option 2 approved.
 
 ## Consequences
 
