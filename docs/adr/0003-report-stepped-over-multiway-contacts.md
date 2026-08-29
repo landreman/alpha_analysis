@@ -37,7 +37,12 @@ far below \(b\). The first is §5.4's second bullet and makes \(A_W\) jump; the 
 its first bullet and does not. Both must be reported, and the recorded margin separates
 them: at all four brackets above the barrier is within \(1.4\times10^{-3}\) of \(b\)
 while the sampled part of the curve runs out to \(3.8\times10^{-3}\), so these are
-equal-height contacts, not folds. The same signature appears at \(b=2.8319871\) with a
+equal-height contacts, not folds. The margin is that of the *highest* barrier while
+the bracket is emitted by a change in the count, which any barrier can cause, so it
+discriminates the two only when the count change belongs to that highest barrier. It
+does here — only 13 of the 65 samples have a second maximum at all, so the counted
+barrier is the one that moves — but not in a well holding dozens of them, where the
+highest barrier sits near \(b\) regardless. The same signature appears at \(b=2.8319871\) with a
 margin of \(1.0\times10^{-4}\).
 
 §5.4 requires that the code "must refine or report an unresolved nongeneric event"

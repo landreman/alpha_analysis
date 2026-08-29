@@ -616,6 +616,39 @@ def test_equal_height_contact_between_samples_is_multiway_not_regular():
     steps = np.abs(np.diff(parent.action_values))
     assert steps[1] > 10.0 * np.median(steps)
 
+    # Negating delta mirrors the bump in zeta, moving the barrier from the
+    # backward (child-1) half of the parent well to the forward (child-3)
+    # half.  The two halves are summed, so the mirrored curve must report the
+    # same counts, brackets and margins; without the sum a stepped-over
+    # contact on the child-3 side would be invisible and the curve would read
+    # REGULAR while its port actions jump (§21.2).
+    mirrored_field = _stepped_over_contact_field(delta_0=-0.0530, delta_1=-0.0045)
+    mirrored = map_transitions(
+        mirrored_field,
+        _critical_circles(mirrored_field, s=0.5, zeta_values=(0.0,), count=8),
+        TransitionMappingConfig(),
+    )[0]
+    assert mirrored.status is TransitionStatus.MULTIWAY
+    mirrored_theta = np.arctan2(
+        mirrored.marginal_points[:, 1], mirrored.marginal_points[:, 0]
+    )
+    np.testing.assert_array_equal(
+        mirrored.interior_maximum_count,
+        [
+            _sampled_interior_maxima(mirrored_field, b, s, float(value))[0]
+            for value in mirrored_theta
+        ],
+    )
+    np.testing.assert_array_equal(
+        mirrored.interior_maximum_count, transition.interior_maximum_count
+    )
+    np.testing.assert_array_equal(
+        mirrored.contact_sample_pairs, transition.contact_sample_pairs
+    )
+    np.testing.assert_allclose(
+        mirrored.barrier_margin, transition.barrier_margin, atol=1.0e-12
+    )
+
     # A curve whose barrier never crosses b over the same sampling is still
     # regular: the detector does not fire on ordinary variation.
     quiet = map_transitions(
