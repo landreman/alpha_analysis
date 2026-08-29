@@ -24,6 +24,7 @@ from alpha_analysis.j_connectivity import (
     MarchingTetrahedraExtractor,
     save_cut_surface,
 )
+from alpha_analysis.j_connectivity.mesh_cut import _interpolate_port_action
 from alpha_analysis.j_connectivity.synthetic_fields import SyntheticFourierField
 from alpha_analysis.j_connectivity.visualization import plot_cut_surface
 
@@ -180,6 +181,33 @@ def test_constrained_cut_duplicates_branch_actions_and_assigns_three_sheets():
         by_role["child_1"].action_values + by_role["child_3"].action_values,
     )
 
+    # Pin the common-u correspondence at every vertex inserted between mapped
+    # samples, not only at the three authoritative port samples.
+    points = cut.surface.points
+    on_companion = (
+        np.isclose(points[:, 0], 0.1)
+        & (points[:, 1] >= -0.2)
+        & (points[:, 1] <= 0.2)
+        & np.isclose(points[:, 2], 0.0)
+    )
+    for role, intercept, slope in (
+        ("parent", 3.0, 0.5),
+        ("child_1", 1.0, 0.25),
+    ):
+        port = by_role[role]
+        sheet_vertices = np.unique(
+            cut.surface.triangles[cut.sheet_ids == port.sheet_id]
+        )
+        inserted = sheet_vertices[on_companion[sheet_vertices]]
+        assert len(inserted) > len(transition.u)
+        inserted_u = points[inserted, 1] + 0.2
+        np.testing.assert_allclose(
+            cut.action_values[inserted],
+            intercept + slope * inserted_u,
+            rtol=0.0,
+            atol=1.0e-12,
+        )
+
     # Parent and child-1 occupy the same geometric T but have distinct mesh
     # IDs, and no triangle is allowed to interpolate across those two values.
     parent = by_role["parent"]
@@ -200,6 +228,20 @@ def test_constrained_cut_duplicates_branch_actions_and_assigns_three_sheets():
         ]
     )
     assert np.all(finite_ranges < 0.5 * branch_gap)
+
+
+def test_closed_transition_interpolates_the_wraparound_action_segment():
+    transition = replace(_transition(), total_u_length=0.6)
+    parameter = 0.5
+
+    for port in transition.ports:
+        expected = 0.5 * (port.action_values[-1] + port.action_values[0])
+        np.testing.assert_allclose(
+            _interpolate_port_action(transition, port, parameter),
+            expected,
+            rtol=0.0,
+            atol=1.0e-14,
+        )
 
 
 def test_cut_topology_survives_pickle_free_npz_round_trip(tmp_path):
