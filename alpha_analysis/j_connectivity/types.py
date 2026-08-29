@@ -44,6 +44,7 @@ class TransitionStatus(Enum):
     MULTIWAY = auto()
     TANGENT = auto()
     MATCH_FAILURE = auto()
+    MAX_PERIODS = auto()
     UNRESOLVED = auto()
 
 
