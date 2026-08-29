@@ -176,10 +176,14 @@ class TransitionCurve:
     sample's parent well and is ``-1`` where no well was traced;
     ``barrier_margin`` is ``b`` minus the highest of them in field units, and
     is ``inf`` when the well has none. ``contact_sample_pairs`` holds the
-    adjacent sample indices that bracket an equal-height contact the sampling
-    stepped over (DESIGN.md §5.4); such a curve is ``MULTIWAY`` even when
-    every sample is regular, because the port actions are discontinuous in
-    ``u`` between those samples.
+    adjacent sample indices that bracket a nongeneric event the sampling
+    stepped over (DESIGN.md §5.4) -- a barrier crossing ``b``, which makes the
+    port actions discontinuous in ``u``, or a fold in which a barrier
+    annihilates with its minimum, which does not; a small ``barrier_margin``
+    at the bracket distinguishes the first. Such a curve is ``MULTIWAY`` even
+    when every sample is regular. Rows are in sample order and are not
+    sorted: a closed curve's wraparound row is ``(n_samples - 1, 0)``, whose
+    ``u`` values decrease.
     """
 
     transition_id: int
@@ -739,13 +743,14 @@ def _aggregate_status(
 
 
 def _interior_maximum_data(
-    trace: _DirectionalTrace, b: float, config: TransitionMappingConfig
+    trace: _DirectionalTrace, config: TransitionMappingConfig
 ) -> tuple[int, float]:
     """Count interior maxima of one half-well and return their margin to ``b``.
 
     An extremum recorded by the scan is a barrier when its curvature is
     negative; ``b - B`` at the highest such barrier is the margin, in field
-    units, by which that second maximum stays below the marginal height.
+    units, by which that second maximum stays below the marginal height
+    (the scan stores ``B - b`` at each extremum, so no ``b`` is needed here).
     Extrema at or beyond the crossing are not interior to the well.
     """
     distances = np.asarray(trace.extrema_distances, dtype=float)
@@ -763,14 +768,25 @@ def _between_sample_contacts(
     sample_status: list[TransitionStatus],
     closed: bool,
 ) -> IntArray:
-    """Bracket equal-height contacts that fall between adjacent samples.
+    """Bracket nongeneric events that fall between adjacent samples.
 
-    Moving along ``Gamma_max``, a barrier can only leave the interior of the
-    parent well by rising through ``b``, which is a second maximum of the
-    marginal height: a nongeneric multiway event (DESIGN.md §5.4). Adjacent
-    regular samples whose interior-maximum counts differ therefore bracket
-    such a contact, and returning the bracket keeps it explicit instead of
-    letting the port actions jump inside a nominally regular hyperedge.
+    Moving along ``Gamma_max``, the interior-maximum count of the parent well
+    changes in two ways, and DESIGN.md §5.4 requires reporting both. A barrier
+    rising through ``b`` is a second maximum of the marginal height, and the
+    port actions jump across it; a barrier annihilating with its neighboring
+    minimum in a fold (``D_parallel^2 B -> 0``) changes the count at a height
+    that can be far below ``b``, with no jump in ``A_W``. The recorded
+    ``barrier_margin`` separates the two: it approaches zero at an
+    equal-height contact and stays finite at a fold.
+
+    Adjacent regular samples whose counts differ therefore bracket one of
+    these events, and returning the bracket keeps it explicit instead of
+    letting the port actions jump inside a nominally regular hyperedge. A
+    count change straddling a non-regular sample is not bracketed: that
+    sample's own status already carries the failure.
+
+    Rows follow the sample order and are not sorted; a closed curve's
+    wraparound row is ``(n_samples - 1, 0)``, whose ``u`` values decrease.
     """
     n_samples = len(interior_maximum_count)
     pairs = [(index, index + 1) for index in range(n_samples - 1)]
@@ -907,12 +923,8 @@ def _map_polyline(
             sample_failure_reason[index] = f"forward_{forward.status.name.lower()}"
             continue
 
-        backward_maxima, backward_margin = _interior_maximum_data(
-            backward, critical.b, config
-        )
-        forward_maxima, forward_margin = _interior_maximum_data(
-            forward, critical.b, config
-        )
+        backward_maxima, backward_margin = _interior_maximum_data(backward, config)
+        forward_maxima, forward_margin = _interior_maximum_data(forward, config)
         interior_maximum_count[index] = backward_maxima + forward_maxima
         barrier_margin[index] = min(backward_margin, forward_margin)
 
@@ -1078,10 +1090,11 @@ def map_transitions(
     ports share the same lifted field-line identity and common ``u`` index.
     A second equal-height maximum encountered before a regular crossing is a
     ``MULTIWAY`` event, never an arbitrarily decomposed binary transition.
-    An equal-height contact that falls *between* two adjacent samples is
-    detected from the change in each parent well's interior-maximum count and
-    reported the same way (§5.4), with the bracketing samples recorded in
-    ``contact_sample_pairs``.
+    A nongeneric event that falls *between* two adjacent samples is detected
+    from the change in each parent well's interior-maximum count and reported
+    the same way (§5.4), with the bracketing samples recorded in
+    ``contact_sample_pairs`` and the height of the barrier involved in
+    ``barrier_margin``.
     """
     cfg = TransitionMappingConfig() if config is None else config
     maxima = [

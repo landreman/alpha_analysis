@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 from dataclasses import replace
 from scipy.integrate import quad
 from scipy.optimize import brentq
@@ -632,16 +633,93 @@ def test_equal_height_contact_between_samples_is_multiway_not_regular():
     assert np.all(quiet.interior_maximum_count == 1)
 
 
-def test_contact_bracket_is_shaded_in_the_transition_diagnostic():
+def _shaded_spans(axis):
+    """Return the x-extents of the axvspan patches on one axis, ordered."""
+    spans = [
+        (float(patch.get_x()), float(patch.get_x() + patch.get_width()))
+        for patch in axis.patches
+    ]
+    return sorted(spans)
+
+
+def test_interior_maximum_data_reports_the_highest_barrier_inside_the_well():
+    # The margin is b minus the *highest* interior barrier, minima are not
+    # barriers, and an extremum recorded at or beyond the crossing is outside
+    # the well.  On real equilibria a parent well holds dozens of barriers, so
+    # the reduction over them has to be the maximum height, not the first or
+    # the lowest.
+    from alpha_analysis.j_connectivity.transitions import (
+        _DirectionalTrace,
+        _interior_maximum_data,
+    )
+
+    config = TransitionMappingConfig()
+    trace = _DirectionalTrace(
+        status=TransitionStatus.REGULAR,
+        distance=4.0,
+        zeta=4.0,
+        extrema_distances=np.array([0.5, 1.0, 1.5, 2.0, 4.5]),
+        extrema_curvatures=np.array([-1.0, +2.0, -0.5, -3.0, -1.0]),
+        extrema_B_minus_b=np.array([-0.7, -2.0, -0.2, -0.9, -0.001]),
+    )
+
+    count, margin = _interior_maximum_data(trace, config)
+
+    # Three interior maxima (the positive curvature is a minimum, and the
+    # extremum at 4.5 lies beyond the crossing at 4.0); the highest sits
+    # 0.2 below b.
+    assert count == 3
+    assert margin == pytest.approx(0.2)
+
+    empty = replace(
+        trace,
+        extrema_distances=np.array([1.0]),
+        extrema_curvatures=np.array([+2.0]),
+        extrema_B_minus_b=np.array([-2.0]),
+    )
+    assert _interior_maximum_data(empty, config) == (0, np.inf)
+
+
+def test_contact_bracket_is_shaded_where_the_contact_actually_lies():
     # DESIGN.md §17.5: a stepped-over contact must be visible in the plot, not
     # only in the status, so a jump in A_p(u) is not read as a steep slope.
+    # The shaded band must be the bracket itself -- for a closed curve's
+    # wraparound bracket, the two spans it really occupies, never the
+    # complement between them (§24: a plausible-looking wrong picture).
     field = _stepped_over_contact_field()
     critical = _critical_circles(field, s=0.5, zeta_values=(0.0,), count=8)
     transition = map_transitions(field, critical, TransitionMappingConfig())[0]
+    pairs = transition.contact_sample_pairs
+    assert len(pairs) and np.all(pairs[:, 0] < pairs[:, 1])
 
     figure, axes = plot_transition_diagnostics(field, transition)
     try:
         labels = [text.get_text() for text in axes[1].get_legend().get_texts()]
-        assert "equal-height contact between samples" in labels
+        assert labels.count("equal-height contact between samples") == 1
+        np.testing.assert_allclose(
+            _shaded_spans(axes[1]),
+            sorted(tuple(transition.u[pair]) for pair in pairs),
+            atol=1.0e-12,
+        )
+    finally:
+        plt.close(figure)
+
+    # The wraparound bracket of a closed curve decreases in u.  It covers
+    # [u[-1], total_u_length] and [u[0], u[1]], and nothing in between.
+    wrapped = replace(
+        transition,
+        contact_sample_pairs=np.array([[len(transition.u) - 1, 1]]),
+    )
+    figure, axes = plot_transition_diagnostics(field, wrapped)
+    try:
+        np.testing.assert_allclose(
+            _shaded_spans(axes[1]),
+            [
+                (transition.u[0], transition.u[1]),
+                (transition.u[-1], transition.total_u_length),
+            ],
+            atol=1.0e-12,
+        )
+        assert transition.u[1] < transition.u[-1]
     finally:
         plt.close(figure)

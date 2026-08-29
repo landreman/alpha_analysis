@@ -30,11 +30,15 @@ u 1.3005 -> 1.3340 : dA_W = 1.744, barrier margin 1.3e-3 -> inf
 u 0.4650 -> 0.4939 : dA_W = 1.736, barrier margin inf -> 1.4e-3
 ```
 
-A barrier can only leave the interior of the parent well by rising through \(b\), at
-which point the field-line crossing lands on it instead. Each of those four brackets
-therefore contains a second maximum of exactly the marginal height: the nongeneric
-multiway event of §5.4, stepped over by the sampling. The same signature appears at
-\(b=2.8319871\) with a margin of \(1.0\times10^{-4}\).
+A barrier leaves the interior of the parent well in one of two ways: by rising through
+\(b\), at which point the field-line crossing lands on it instead, or by annihilating
+with its neighboring minimum in a fold (\(D_\parallel^2 B\to0\)) at a height that can be
+far below \(b\). The first is §5.4's second bullet and makes \(A_W\) jump; the second is
+its first bullet and does not. Both must be reported, and the recorded margin separates
+them: at all four brackets above the barrier is within \(1.4\times10^{-3}\) of \(b\)
+while the sampled part of the curve runs out to \(3.8\times10^{-3}\), so these are
+equal-height contacts, not folds. The same signature appears at \(b=2.8319871\) with a
+margin of \(1.0\times10^{-4}\).
 
 §5.4 requires that the code "must refine or report an unresolved nongeneric event"
 when it detects "a jump in itinerary larger than the generic one-maximum change", and
@@ -71,7 +75,11 @@ return a plausible, wrong connectivity (§21.2).
    although every sample and action they need is still present and marked regular.
    Detection resolution is the critical-curve vertex spacing; no transition-side
    control refines it, so a contact between two vertices that share a barrier count
-   is still missed.
+   is still missed, and a count change that straddles a non-regular sample is not
+   bracketed at all (both endpoints must be `REGULAR`) — there the sample's own status
+   is the only signal. Because that spacing comes from the surface mesh and the
+   extractor, the bracket count is backend- and extractor-dependent even though the
+   field-line trace behind it is not.
 3. **Detect, then bisect along the polyline to localize each contact and split the
    hyperedge** — the honest end state, and what §10.4's interval transfer wants. It
    needs a new sample inserted at a located contact, which is the constrained-cut
@@ -100,18 +108,26 @@ Option 2 approved.
   than treat the bracket as an ordinary monotone segment; until it does, a caller that
   needs the actions should read `sample_status`, not `status`.
 - `plot_transition_diagnostics` shades each bracketed \(u\) band on the action panel,
-  so a jump is not read as a steep regular slope (§17.5).
+  so a jump is not read as a steep regular slope (§17.5). A closed curve's wraparound
+  bracket runs from the last sample through `total_u_length` to the first, so it is
+  drawn as the two spans it occupies; shading between its endpoints would shade the
+  complement.
 - New tests: `test_equal_height_contact_between_samples_is_multiway_not_regular` and
-  `test_contact_bracket_is_shaded_in_the_transition_diagnostic`, both on a synthetic
+  `test_contact_bracket_is_shaded_where_the_contact_actually_lies`, both on a synthetic
   field whose barrier height crosses \(b\) strictly between two sampled `GAMMA_MAX`
   vertices, with the interior-maximum counts verified independently by direct
-  sampling of \(B\) inside the test.
+  sampling of \(B\) inside the test; the plot test asserts the shaded x-extents against
+  `u[contact_sample_pairs]`, wraparound included, not a legend string.
+  `test_interior_maximum_data_reports_the_highest_barrier_inside_the_well` pins the
+  reduction over several barriers and the exclusion of minima and of extrema beyond
+  the crossing, which the field-based test alone does not reach.
 - Real equilibria make this the common case, not a corner case. With
-  `max_curve_samples=10` on a 6x24x12 structured background, every mapped curve on
-  `boozmn_20260402-01-038_Ax_PCA_...` (lambda_n = 0.5 and 0.9) and on
-  `boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc` (lambda_n = 0.5) brackets between three
-  and six contacts, with parent wells holding up to 103 interior maxima; every
-  additivity residual stays at 1e-14 to 1e-12. Coarse sampling of a long curve steps
+  `max_curve_samples=10` on a 6x24x12 structured background and marching tetrahedra,
+  all 16 mapped curves across `boozmn_20260402-01-038_Ax_PCA_...`,
+  `boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc`, and
+  `boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc`, each at lambda_n = 0.5 and 0.9, bracket
+  between two and seven events, with parent wells holding up to 103 interior maxima;
+  every additivity residual stays between 1e-14 and 1e-12. Coarse sampling of a long curve steps
   over many contacts, so `MULTIWAY` will be the usual pre-cut status until milestone
   10 subdivides. Callers must therefore branch on `contact_sample_pairs` and
   `sample_status`, not on `status is REGULAR`, and the useful question for a

@@ -508,7 +508,9 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
     units; all angular coordinates are radians. Non-regular transitions are
     labeled explicitly rather than omitted, and every ``u`` band that brackets
     an equal-height contact the sampling stepped over is shaded on the action
-    panel so a jump in ``A_p(u)`` is never read as a steep regular slope.
+    panel so a jump in ``A_p(u)`` is never read as a steep regular slope. A
+    closed curve's wraparound bracket is drawn as the two spans it really
+    occupies, never as the complement between them.
     """
     import matplotlib.pyplot as plt
 
@@ -562,15 +564,26 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
         ),
         dtype=np.int64,
     ).reshape(-1, 2)
-    for order, pair in enumerate(contacts):
+    label = "equal-height contact between samples"
+    for pair in contacts:
         first, second = transition.u[pair[0]], transition.u[pair[1]]
-        action_axis.axvspan(
-            min(first, second),
-            max(first, second),
-            color="magenta",
-            alpha=0.18,
-            label="equal-height contact between samples" if order == 0 else None,
+        # A closed curve brackets its wraparound contact as (n-1, 0), which
+        # runs from the last sample through u = total_u_length back to the
+        # first: two spans, not the complement of one.
+        spans = (
+            ((first, second),)
+            if first <= second
+            else ((first, transition.total_u_length), (transition.u[0], second))
         )
+        for span in spans:
+            action_axis.axvspan(
+                span[0],
+                span[1],
+                color="magenta",
+                alpha=0.18,
+                label=label,
+            )
+            label = None
     action_axis.set_xlabel(r"common curve parameter $u$")
     action_axis.set_ylabel(r"action length $A$ [length]")
     action_axis.legend(fontsize="small")
