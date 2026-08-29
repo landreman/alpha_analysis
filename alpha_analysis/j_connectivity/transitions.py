@@ -174,12 +174,14 @@ class TransitionCurve:
 
     ``interior_maximum_count`` is the number of other maxima the root scan
     detected inside each sample's parent well -- a resolution-dependent count,
-    §21.3 dimension 5 -- and is ``-1`` where no well was traced;
-    ``barrier_margin`` is ``b`` minus the *highest* of them in field units, is
-    ``inf`` when the well has none, and is ``NaN`` where no well was traced;
-    it therefore discriminates a fold from
-    an equal-height contact only when the bracket's count change belongs to
-    that highest barrier, which is not so in a well holding many of them. ``contact_sample_pairs`` holds the
+    §21.3 dimension 5 -- and is ``-1`` where no well was traced or where the
+    whole curve was later discarded as a duplicate companion, which
+    ``sample_failure_reason`` tells apart. ``barrier_margin`` is ``b`` minus
+    the *highest* of them in field units, is ``inf`` when the well has none,
+    and is ``NaN`` in both cases that give the count ``-1``; it therefore
+    discriminates a fold from an equal-height contact only when the bracket's
+    count change belongs to that highest barrier, which is not so in a well
+    holding many of them. ``contact_sample_pairs`` holds the
     adjacent sample indices that bracket a nongeneric event the sampling
     stepped over (DESIGN.md §5.4) -- a barrier crossing ``b``, which makes the
     port actions discontinuous in ``u``, or a fold in which a barrier

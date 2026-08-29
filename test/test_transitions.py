@@ -738,6 +738,26 @@ def test_interior_maximum_data_reports_the_highest_barrier_inside_the_well():
     assert _interior_maximum_data(empty, config) == (0, np.inf)
 
 
+def test_only_a_closed_polyline_compares_its_wraparound_arc():
+    # An open GAMMA_MAX polyline has no arc from its last vertex back to its
+    # first, so (n-1, 0) there would bracket the whole curve and invent a
+    # subdivision point on an arc that does not exist.
+    from alpha_analysis.j_connectivity.transitions import _between_sample_contacts
+
+    # counts[0] and counts[-1] differ, so only the wrap arc separates them.
+    counts = np.array([0, 1, 1, 1], dtype=np.int64)
+    regular = [TransitionStatus.REGULAR] * 4
+
+    np.testing.assert_array_equal(
+        _between_sample_contacts(counts, regular, closed=False),
+        np.array([[0, 1]]),
+    )
+    np.testing.assert_array_equal(
+        _between_sample_contacts(counts, regular, closed=True),
+        np.array([[0, 1], [3, 0]]),
+    )
+
+
 def test_a_closed_curve_brackets_a_contact_in_its_wraparound_arc():
     # A closed GAMMA_MAX polyline has one more arc than it has vertex pairs:
     # the one from the last sample back to the first.  A contact there must be
