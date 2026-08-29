@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 from dataclasses import replace
 from scipy.integrate import quad
 from scipy.optimize import brentq
@@ -56,12 +57,13 @@ def _critical_circles(
     s: float,
     zeta_values: tuple[float, ...],
     count: int = 8,
+    theta_offset: float = 0.0,
 ):
     points = []
     segments = []
     for zeta in zeta_values:
         offset = len(points)
-        theta = np.linspace(0.0, 2.0 * np.pi, count, endpoint=False)
+        theta = np.linspace(0.0, 2.0 * np.pi, count, endpoint=False) + theta_offset
         points.extend(
             np.column_stack(
                 (
@@ -453,6 +455,30 @@ def test_equal_height_multiway_event_is_explicit_and_never_gets_actions():
         for item in partially_degenerate_duplicates
     )
 
+    # A curve demoted whole as a duplicate companion keeps no brackets: every
+    # sample is non-regular with NaN actions, so no bracket between two
+    # regular samples survives, and milestone 10 is not handed subdivision
+    # points on a curve it must not subdivide.  The barrier field would
+    # otherwise have brackets here -- the same field brackets twice on a
+    # single circle.
+    stepped_field = _stepped_over_contact_field()
+    single = map_transitions(
+        stepped_field,
+        _critical_circles(stepped_field, s=0.5, zeta_values=(0.0,), count=8),
+    )[0]
+    assert len(single.contact_sample_pairs) == 2
+    coincident = map_transitions(
+        stepped_field,
+        _critical_circles(stepped_field, s=0.5, zeta_values=(0.0, 0.0), count=8),
+    )
+    assert len(coincident) == 2
+    for item in coincident:
+        assert item.status is TransitionStatus.MULTIWAY
+        assert set(item.sample_failure_reason) == {"duplicate_companion"}
+        assert len(item.contact_sample_pairs) == 0
+        assert np.all(item.interior_maximum_count == -1)
+        assert np.all(np.isnan(item.barrier_margin))
+
 
 def test_transition_trace_cap_has_a_distinct_explicit_status():
     # Along each lifted line B=2-cos(theta), theta=alpha+0.2*zeta. Starting
@@ -497,3 +523,379 @@ def test_transition_trace_cap_has_a_distinct_explicit_status():
     assert transitions[0].status is TransitionStatus.MAX_PERIODS
     assert transitions[0].controls.max_field_periods == 1
     assert all(np.isnan(port.action_values).all() for port in transitions[0].ports)
+
+
+def _stepped_over_contact_field(delta_0: float = 0.0530, delta_1: float = 0.0045):
+    """Return a field whose barrier crosses ``b`` between critical samples.
+
+    Along a field line (``iota=0``, so ``theta`` is constant) the profile is
+
+        B = 2 - cos(zeta) + (0.5 + 0.2 s) cos(2 zeta)
+            + delta(theta) [sin(6 zeta) - 6 sin(zeta)],
+        delta(theta) = delta_0 + delta_1 cos(theta).
+
+    The bump vanishes with its first and second derivatives at ``zeta=0``, so
+    ``zeta=0, s=0.5`` is a marginal maximum at ``b=1.6`` with curvature
+    ``-1.4`` for every ``theta``: the whole circle is ``Gamma_max``.  The
+    backward half of the parent well contains one further maximum whose height
+    passes through ``b`` at ``delta = 0.054276...``, between the eight sampled
+    ``theta`` values.  That contact is a second equal-height maximum: a
+    nongeneric multiway event (DESIGN.md §5.4) which no sample lands on.
+    """
+    m = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1])
+    n = np.array([0, 1, 2, 1, 6, -1, 1, -6, 6])
+    cosine = np.zeros((len(m), 2))
+    cosine[0, 0] = 2.0
+    cosine[1, 0] = -1.0
+    cosine[2] = (0.5, 0.2)
+    sine = np.zeros((len(m), 2))
+    sine[3, 0] = 6.0 * delta_0
+    sine[4, 0] = -delta_0
+    sine[5, 0] = -3.0 * delta_1
+    sine[6, 0] = 3.0 * delta_1
+    sine[7, 0] = 0.5 * delta_1
+    sine[8, 0] = -0.5 * delta_1
+    return SyntheticFourierField(
+        nfp=1,
+        m=m,
+        n=n,
+        cosine_coefficients=cosine,
+        sine_coefficients=sine,
+        iota_coefficients=np.array([0.0]),
+        G_coefficients=np.array([3.0]),
+        I_coefficients=np.array([0.0]),
+    )
+
+
+def _sampled_interior_maxima(field, b, s, theta, half_width=6.0, n_samples=240001):
+    """Count the parent well's other maxima by direct sampling of ``B``."""
+    zeta = np.linspace(-half_width, half_width, n_samples)
+    B = np.asarray(field.B(s, theta, zeta), dtype=float)
+    center = np.argmin(np.abs(zeta))
+    forward = np.flatnonzero(B[center + 1 :] >= b) + center + 1
+    backward = np.flatnonzero(B[:center] >= b)
+    assert len(forward) and len(backward), "the sampled well must be bounded"
+    inside = (zeta > zeta[backward[-1]]) & (zeta < zeta[forward[0]])
+    B_inside, zeta_inside = B[inside], zeta[inside]
+    peaks = (
+        np.flatnonzero(
+            (B_inside[1:-1] > B_inside[:-2]) & (B_inside[1:-1] >= B_inside[2:])
+        )
+        + 1
+    )
+    peaks = peaks[np.abs(zeta_inside[peaks]) > 1.0e-2]
+    return len(peaks), (b - np.max(B_inside[peaks]) if len(peaks) else np.inf)
+
+
+def test_equal_height_contact_between_samples_is_multiway_not_regular():
+    # DESIGN.md §5.4: a jump in itinerary larger than the generic one-maximum
+    # change must be reported, not mapped as a generic three-port event.  Here
+    # every sample is regular and additive to round-off, yet a second maximum
+    # of the marginal height sits between two adjacent Gamma_max samples, so
+    # the port actions are discontinuous in u inside the hyperedge.
+    field = _stepped_over_contact_field()
+    s, b = 0.5, 1.6
+    critical = _critical_circles(field, s=s, zeta_values=(0.0,), count=8)
+    assert {polyline.kind for polyline in critical.polylines} == {
+        CriticalKind.GAMMA_MAX
+    }
+
+    transition = map_transitions(field, critical, TransitionMappingConfig())[0]
+
+    # Independent physics: the interior-maximum count really does change, and
+    # only between samples 1-2 and 6-7.
+    theta = np.arctan2(
+        transition.marginal_points[:, 1], transition.marginal_points[:, 0]
+    )
+    sampled = np.array(
+        [_sampled_interior_maxima(field, b, s, float(value))[0] for value in theta]
+    )
+    np.testing.assert_array_equal(sampled, np.array([0, 0, 1, 1, 1, 1, 1, 0]))
+    np.testing.assert_array_equal(transition.interior_maximum_count, sampled)
+    np.testing.assert_array_equal(
+        transition.contact_sample_pairs, np.array([[1, 2], [6, 7]])
+    )
+
+    # The samples themselves are regular and the actions remain usable: the
+    # curve is not discarded, it is labeled.
+    assert transition.status is TransitionStatus.MULTIWAY
+    assert all(
+        status is TransitionStatus.REGULAR for status in transition.sample_status
+    )
+    assert np.max(np.abs(transition.additivity_residual)) < 1.0e-12
+    assert all(np.all(np.isfinite(port.action_values)) for port in transition.ports)
+
+    # The recorded barrier margin shrinks toward the contact and is infinite
+    # where the parent well has no other maximum at all.
+    assert np.all(np.isinf(transition.barrier_margin[[0, 1, 7]]))
+    assert 0.0 < transition.barrier_margin[2] < transition.barrier_margin[4]
+    np.testing.assert_allclose(
+        transition.barrier_margin[[2, 3, 4]],
+        [_sampled_interior_maxima(field, b, s, float(theta[i]))[1] for i in (2, 3, 4)],
+        atol=2.0e-6,
+    )
+
+    # The jump the contact produces is far larger than the generic variation
+    # of A_W along the rest of the curve.
+    parent = _port(transition, "parent")
+    steps = np.abs(np.diff(parent.action_values))
+    assert steps[1] > 10.0 * np.median(steps)
+
+    # Negating delta mirrors the bump in zeta, moving the barrier from the
+    # backward (child-1) half of the parent well to the forward (child-3)
+    # half.  The two halves are summed, so the mirrored curve must report the
+    # same counts, brackets and margins; without the sum a stepped-over
+    # contact on the child-3 side would be invisible and the curve would read
+    # REGULAR while its port actions jump (§21.2).
+    mirrored_field = _stepped_over_contact_field(delta_0=-0.0530, delta_1=-0.0045)
+    mirrored = map_transitions(
+        mirrored_field,
+        _critical_circles(mirrored_field, s=0.5, zeta_values=(0.0,), count=8),
+        TransitionMappingConfig(),
+    )[0]
+    assert mirrored.status is TransitionStatus.MULTIWAY
+    mirrored_theta = np.arctan2(
+        mirrored.marginal_points[:, 1], mirrored.marginal_points[:, 0]
+    )
+    np.testing.assert_array_equal(
+        mirrored.interior_maximum_count,
+        [
+            _sampled_interior_maxima(mirrored_field, b, s, float(value))[0]
+            for value in mirrored_theta
+        ],
+    )
+    np.testing.assert_array_equal(
+        mirrored.interior_maximum_count, transition.interior_maximum_count
+    )
+    np.testing.assert_array_equal(
+        mirrored.contact_sample_pairs, transition.contact_sample_pairs
+    )
+    np.testing.assert_allclose(
+        mirrored.barrier_margin, transition.barrier_margin, atol=1.0e-12
+    )
+
+    # A curve whose barrier never crosses b over the same sampling is still
+    # regular: the detector does not fire on ordinary variation.
+    quiet = map_transitions(
+        _stepped_over_contact_field(delta_0=0.050, delta_1=0.0015),
+        _critical_circles(
+            _stepped_over_contact_field(delta_0=0.050, delta_1=0.0015),
+            s=s,
+            zeta_values=(0.0,),
+            count=8,
+        ),
+        TransitionMappingConfig(),
+    )[0]
+    assert quiet.status is TransitionStatus.REGULAR
+    assert len(quiet.contact_sample_pairs) == 0
+    assert np.all(quiet.interior_maximum_count == 1)
+
+
+def _shaded_spans(axis):
+    """Return the x-extents of the axvspan patches on one axis, ordered."""
+    spans = []
+    for patch in axis.patches:
+        interval = patch.get_path().get_extents(patch.get_patch_transform()).intervalx
+        spans.append((float(interval[0]), float(interval[1])))
+    return sorted(spans)
+
+
+def test_interior_maximum_data_reports_the_highest_barrier_inside_the_well():
+    # The margin is b minus the *highest* interior barrier, minima are not
+    # barriers, and an extremum recorded at or beyond the crossing is outside
+    # the well.  On real equilibria a parent well holds dozens of barriers, so
+    # the reduction over them has to be the maximum height, not the first or
+    # the lowest.
+    from alpha_analysis.j_connectivity.transitions import (
+        _DirectionalTrace,
+        _interior_maximum_data,
+    )
+
+    config = TransitionMappingConfig()
+    trace = _DirectionalTrace(
+        status=TransitionStatus.REGULAR,
+        distance=4.0,
+        zeta=4.0,
+        extrema_distances=np.array([0.5, 1.0, 1.5, 2.0, 4.5]),
+        extrema_curvatures=np.array([-1.0, +2.0, -0.5, -3.0, -1.0]),
+        extrema_B_minus_b=np.array([-0.7, -2.0, -0.2, -0.9, -0.001]),
+    )
+
+    count, margin = _interior_maximum_data(trace, config)
+
+    # Three interior maxima (the positive curvature is a minimum, and the
+    # extremum at 4.5 lies beyond the crossing at 4.0); the highest sits
+    # 0.2 below b.
+    assert count == 3
+    assert margin == pytest.approx(0.2)
+
+    empty = replace(
+        trace,
+        extrema_distances=np.array([1.0]),
+        extrema_curvatures=np.array([+2.0]),
+        extrema_B_minus_b=np.array([-2.0]),
+    )
+    assert _interior_maximum_data(empty, config) == (0, np.inf)
+
+
+def test_only_a_closed_polyline_compares_its_wraparound_arc():
+    # An open GAMMA_MAX polyline has no arc from its last vertex back to its
+    # first, so (n-1, 0) there would bracket the whole curve and invent a
+    # subdivision point on an arc that does not exist.
+    from alpha_analysis.j_connectivity.transitions import _between_sample_contacts
+
+    # counts[0] and counts[-1] differ, so only the wrap arc separates them.
+    counts = np.array([0, 1, 1, 1], dtype=np.int64)
+    regular = [TransitionStatus.REGULAR] * 4
+
+    np.testing.assert_array_equal(
+        _between_sample_contacts(counts, regular, closed=False),
+        np.array([[0, 1]]),
+    )
+    np.testing.assert_array_equal(
+        _between_sample_contacts(counts, regular, closed=True),
+        np.array([[0, 1], [3, 0]]),
+    )
+
+
+def test_a_closed_curve_brackets_a_contact_in_its_wraparound_arc():
+    # A closed GAMMA_MAX polyline has one more arc than it has vertex pairs:
+    # the one from the last sample back to the first.  A contact there must be
+    # bracketed as (n-1, 0), or the curve reports REGULAR while its port
+    # actions jump across it (§21.2).  delta(theta) is even about theta = 0,
+    # so an unrotated circle always agrees at its first and last sample;
+    # rotating the sampled circle puts the count change in the wrap arc.
+    field = _stepped_over_contact_field(delta_0=0.0501, delta_1=0.0045)
+    critical = _critical_circles(
+        field,
+        s=0.5,
+        zeta_values=(0.0,),
+        count=8,
+        theta_offset=np.deg2rad(20.0),
+    )
+    assert critical.polylines[0].closed
+
+    transition = map_transitions(field, critical, TransitionMappingConfig())[0]
+
+    theta = np.arctan2(
+        transition.marginal_points[:, 1], transition.marginal_points[:, 0]
+    )
+    np.testing.assert_array_equal(
+        transition.interior_maximum_count,
+        [_sampled_interior_maxima(field, 1.6, 0.5, float(value))[0] for value in theta],
+    )
+    assert transition.status is TransitionStatus.MULTIWAY
+    pairs = transition.contact_sample_pairs.tolist()
+    assert [7, 0] in pairs, pairs
+    np.testing.assert_array_equal(pairs, [[0, 1], [2, 3], [4, 5], [7, 0]])
+
+    # The same bracket drives the diagnostic, so the wraparound shading is
+    # exercised against a row the detector emitted rather than an injected
+    # one: the tail span is drawn and the complement is not.
+    figure, axes = plot_transition_diagnostics(field, transition)
+    try:
+        spans = _shaded_spans(axes[1])
+        u, total = transition.u, transition.total_u_length
+        assert len(spans) == 5
+        assert (pytest.approx(u[7]), pytest.approx(total)) in spans
+        assert (pytest.approx(u[0]), pytest.approx(u[0])) in spans
+        assert all(not (span[0] <= u[1] and span[1] >= u[6]) for span in spans), spans
+    finally:
+        plt.close(figure)
+
+
+def test_a_bracket_never_outranks_a_sample_level_failure():
+    # docs/STATUS.md: "Cap exhaustion is distinct TransitionStatus.MAX_PERIODS".
+    # A stepped-over event is recorded in contact_sample_pairs regardless, so
+    # it may only lift a curve that is otherwise fully regular; relabeling a
+    # capped or failed curve MULTIWAY would hide why it is unusable (§21.2).
+    from alpha_analysis.j_connectivity.transitions import _curve_status
+
+    regular = (TransitionStatus.REGULAR,) * 3
+    assert _curve_status(regular, 0) is TransitionStatus.REGULAR
+    assert _curve_status(regular, 1) is TransitionStatus.MULTIWAY
+    for failure in (
+        TransitionStatus.MAX_PERIODS,
+        TransitionStatus.UNRESOLVED,
+        TransitionStatus.MATCH_FAILURE,
+        TransitionStatus.TANGENT,
+    ):
+        mixed = (TransitionStatus.REGULAR, failure, TransitionStatus.REGULAR)
+        assert _curve_status(mixed, 0) is failure
+        assert _curve_status(mixed, 2) is failure
+    # A sample that is itself a multiway event still aggregates to MULTIWAY.
+    sampled = (TransitionStatus.REGULAR, TransitionStatus.MULTIWAY)
+    assert _curve_status(sampled, 0) is TransitionStatus.MULTIWAY
+
+    # The same rule on the production path: one degenerate source vertex on a
+    # curve that also brackets two stepped-over events. The brackets survive,
+    # and the curve still reports why it is unusable rather than MULTIWAY.
+    field = _stepped_over_contact_field()
+    critical = _critical_circles(field, s=0.5, zeta_values=(0.0,), count=8)
+    point_kind = np.array(critical.point_kind, dtype=np.int64)
+    point_kind[critical.polylines[0].vertex_ids[4]] = CriticalKind.DEGENERATE.value
+    damaged = replace(
+        critical,
+        point_kind=point_kind,
+        status=CriticalCurveStatus.DEGENERATE,
+    )
+
+    transition = map_transitions(field, damaged, TransitionMappingConfig())[0]
+
+    np.testing.assert_array_equal(
+        transition.interior_maximum_count, [0, 0, 1, 1, -1, 1, 1, 0]
+    )
+    np.testing.assert_array_equal(
+        transition.contact_sample_pairs, np.array([[1, 2], [6, 7]])
+    )
+    assert transition.sample_status[4] is TransitionStatus.UNRESOLVED
+    assert transition.status is TransitionStatus.UNRESOLVED
+
+
+def test_contact_bracket_is_shaded_where_the_contact_actually_lies():
+    # DESIGN.md §17.5: a stepped-over contact must be visible in the plot, not
+    # only in the status, so a jump in A_p(u) is not read as a steep slope.
+    # The shaded band must be the bracket itself -- for a closed curve's
+    # wraparound bracket, the two spans it really occupies, never the
+    # complement between them (§24: a plausible-looking wrong picture).
+    field = _stepped_over_contact_field()
+    critical = _critical_circles(field, s=0.5, zeta_values=(0.0,), count=8)
+    transition = map_transitions(field, critical, TransitionMappingConfig())[0]
+    pairs = transition.contact_sample_pairs
+    assert len(pairs) and np.all(pairs[:, 0] < pairs[:, 1])
+
+    figure, axes = plot_transition_diagnostics(field, transition)
+    try:
+        labels = [text.get_text() for text in axes[1].get_legend().get_texts()]
+        assert labels.count("equal-height contact between samples") == 1
+        np.testing.assert_allclose(
+            _shaded_spans(axes[1]),
+            sorted(tuple(transition.u[pair]) for pair in pairs),
+            atol=1.0e-12,
+        )
+    finally:
+        plt.close(figure)
+
+    # The wraparound bracket of a closed curve decreases in u.  It covers
+    # [u[-1], total_u_length] and [u[0], u[second]], and nothing in between.
+    for second, expected_head in ((1, transition.u[1]), (0, transition.u[0])):
+        wrapped = replace(
+            transition,
+            contact_sample_pairs=np.array([[len(transition.u) - 1, second]]),
+        )
+        figure, axes = plot_transition_diagnostics(field, wrapped)
+        try:
+            np.testing.assert_allclose(
+                _shaded_spans(axes[1]),
+                [
+                    (transition.u[0], expected_head),
+                    (transition.u[-1], transition.total_u_length),
+                ],
+                atol=1.0e-12,
+            )
+        finally:
+            plt.close(figure)
+    # (n-1, 0) is the row _between_sample_contacts actually emits; its second
+    # span is empty because u[0] is zero, and the bracket is the tail.
+    assert transition.u[0] == 0.0
+    assert transition.u[1] < transition.u[-1] < transition.total_u_length

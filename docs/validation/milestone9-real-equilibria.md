@@ -47,13 +47,24 @@ transition curves and 1,017 sampled transition points.
 | --- | ---: |
 | Surface extraction status | 94 regular, 6 unresolved |
 | Critical-curve status | 70 regular, 22 degenerate, 8 unresolved |
-| Transition-curve status | 59 regular, 92 unresolved, 9 max-periods, 4 multiway |
+| Transition-curve status | 6 regular, 92 unresolved, 9 max-periods, 57 multiway |
 | Transition-sample status | 840 regular, 156 unresolved, 13 max-periods, 8 multiway |
 | Nonregular sample reasons | 156 source classification, 13 period cap, 8 duplicate companion |
 | Largest additivity residual / tolerance | 7.83e-5 |
 | Largest quadrature error / tolerance | 0.924 |
 | Largest port radial-identity error | 2.23e-16 |
 | Largest port alpha-identity error | 1.43e-14 rad |
+
+The curve-status row was regenerated after the between-sample contact detector
+of ADR 0003 landed; every other row in this table is unchanged from the
+original sweep.  53 of the 59 previously regular curves are now `MULTIWAY`
+because their sampling steps over a nongeneric event: at 8 samples per curve
+the parent well's interior-maximum count changes somewhere along nearly every
+curve, and only 6 of the 164 curves are free of one.  The four originally
+`MULTIWAY` curves are the duplicate-companion cases and are still counted here.
+`UNRESOLVED` and `MAX_PERIODS` totals, all 1,017 sample statuses, and every
+failure reason are identical to the original run: a bracket lifts only a curve
+that is otherwise fully regular, so cap exhaustion remains distinct.
 
 There were no action-quadrature or additivity failures after the fixes below.
 The 156 classification failures are samples on critical curves whose source
@@ -128,6 +139,12 @@ about `8.3e-4` relative.  Total critical-curve length differences were about
 4. Real-equilibrium validation previously required ad hoc commands.  The new
    checkpointed driver makes the complete matrix, targeted resolution sweeps,
    cap sweeps, and common-`u` sampling sweeps reproducible.
+5. A curve whose sampling stepped over an equal-height contact was reported
+   `REGULAR` while its port actions jumped across the stepped-over event.  The
+   parent well's interior-maximum count and the highest barrier's margin to `b`
+   are now recorded per sample, adjacent regular samples whose counts differ are
+   bracketed in `contact_sample_pairs`, and such a curve is `MULTIWAY` (ADR
+   0003).  The bracket never displaces a sample-level failure.
 
 No tolerance was loosened and no failed trace was assigned zero action or zero
 weight.  The remaining unresolved results are retained as convergence data.

@@ -171,6 +171,27 @@ class TransitionCurve:
     discarding valid samples elsewhere on the same critical polyline;
     ``sample_failure_reason`` identifies the failed stage for convergence
     diagnostics.
+
+    ``interior_maximum_count`` is the number of other maxima the root scan
+    detected inside each sample's parent well -- a resolution-dependent count,
+    §21.3 dimension 5 -- and is ``-1`` where no well was traced or where the
+    whole curve was later discarded as a duplicate companion, which
+    ``sample_failure_reason`` tells apart. ``barrier_margin`` is ``b`` minus
+    the *highest* of them in field units, is ``inf`` when the well has none,
+    and is ``NaN`` in both cases that give the count ``-1``; it therefore
+    discriminates a fold from an equal-height contact only when the bracket's
+    count change belongs to that highest barrier, which is not so in a well
+    holding many of them. ``contact_sample_pairs`` holds the
+    adjacent sample indices that bracket a nongeneric event the sampling
+    stepped over (DESIGN.md §5.4) -- a barrier crossing ``b``, which makes the
+    port actions discontinuous in ``u``, or a fold in which a barrier
+    annihilates with its minimum, which does not; a small ``barrier_margin``
+    at the bracket distinguishes the first. Such a curve is ``MULTIWAY`` even
+    when every sample is regular, but never in place of a sample-level
+    failure: a capped or failed sample keeps its own curve status and the
+    bracket is still recorded. Rows are in sample order and are not sorted: a
+    closed curve's wraparound row is ``(n_samples - 1, 0)``, whose ``u``
+    values decrease.
     """
 
     transition_id: int
@@ -187,6 +208,9 @@ class TransitionCurve:
     controls: TransitionMappingConfig
     sample_status: tuple[TransitionStatus, ...] = dataclass_field(default_factory=tuple)
     sample_failure_reason: tuple[str, ...] = dataclass_field(default_factory=tuple)
+    interior_maximum_count: IntArray | None = None
+    barrier_margin: FloatArray | None = None
+    contact_sample_pairs: IntArray | None = None
 
     def __post_init__(self) -> None:
         u = np.asarray(self.u, dtype=np.float64)
@@ -197,6 +221,21 @@ class TransitionCurve:
         sample_status = tuple(self.sample_status)
         sample_failure_reason = tuple(self.sample_failure_reason)
         n_samples = len(u)
+        interior_maximum_count = (
+            np.full(n_samples, -1, dtype=np.int64)
+            if self.interior_maximum_count is None
+            else np.asarray(self.interior_maximum_count, dtype=np.int64)
+        )
+        barrier_margin = (
+            np.full(n_samples, np.nan)
+            if self.barrier_margin is None
+            else np.asarray(self.barrier_margin, dtype=np.float64)
+        )
+        contact_sample_pairs = (
+            np.empty((0, 2), dtype=np.int64)
+            if self.contact_sample_pairs is None
+            else np.asarray(self.contact_sample_pairs, dtype=np.int64).reshape(-1, 2)
+        )
         if not sample_status:
             sample_status = (self.status,) * n_samples
         if not sample_failure_reason:
@@ -243,6 +282,17 @@ class TransitionCurve:
             raise ValueError("source_critical_status must be a CriticalCurveStatus")
         if not isinstance(self.controls, TransitionMappingConfig):
             raise ValueError("controls must be a TransitionMappingConfig")
+        if interior_maximum_count.shape != (n_samples,):
+            raise ValueError("interior_maximum_count must have one value per sample")
+        if barrier_margin.shape != (n_samples,):
+            raise ValueError("barrier_margin must have one value per sample")
+        if len(contact_sample_pairs) and (
+            contact_sample_pairs.min() < 0 or contact_sample_pairs.max() >= n_samples
+        ):
+            raise ValueError("contact_sample_pairs must index the sample axis")
+        object.__setattr__(self, "interior_maximum_count", interior_maximum_count)
+        object.__setattr__(self, "barrier_margin", barrier_margin)
+        object.__setattr__(self, "contact_sample_pairs", contact_sample_pairs)
         object.__setattr__(self, "sample_status", sample_status)
         object.__setattr__(self, "sample_failure_reason", sample_failure_reason)
         for name, values in (
@@ -288,6 +338,8 @@ class _DirectionalTrace:
     distance: float
     zeta: float
     extrema_distances: FloatArray
+    extrema_curvatures: FloatArray
+    extrema_B_minus_b: FloatArray
 
 
 def _scalar(value) -> float:
@@ -351,6 +403,8 @@ def _directional_crossing(
     step = _scan_step(field, iota, period, config)
     cell_count = int(np.ceil(config.max_field_periods * period / step))
     extrema_distances: list[float] = []
+    extrema_curvatures: list[float] = []
+    extrema_values: list[float] = []
 
     def result(
         status: TransitionStatus, distance: float = np.nan, zeta: float = np.nan
@@ -360,6 +414,8 @@ def _directional_crossing(
             distance,
             zeta,
             np.asarray(extrema_distances, dtype=np.float64),
+            np.asarray(extrema_curvatures, dtype=np.float64),
+            np.asarray(extrema_values, dtype=np.float64),
         )
 
     left = 0.0
@@ -407,6 +463,8 @@ def _directional_crossing(
                     return result(TransitionStatus.MULTIWAY, extremum, zeta_extremum)
                 subdivision.append(extremum)
                 extrema_distances.append(float(extremum))
+                extrema_curvatures.append(float(curvature))
+                extrema_values.append(float(extremum_value))
         subdivision.append(right)
 
         for first, second in zip(subdivision[:-1], subdivision[1:]):
@@ -692,6 +750,91 @@ def _aggregate_status(
     return TransitionStatus.UNRESOLVED
 
 
+def _interior_maximum_data(
+    trace: _DirectionalTrace, config: TransitionMappingConfig
+) -> tuple[int, float]:
+    """Count the scan's interior maxima and return their margin to ``b``.
+
+    An extremum recorded by the scan is a barrier when its curvature is
+    negative; ``b - B`` at the highest such barrier is the margin, in field
+    units, by which that second maximum stays below the marginal height
+    (the scan stores ``B - b`` at each extremum, so no ``b`` is needed here).
+    Extrema at or beyond the crossing are not interior to the well.
+
+    The count is of the maxima ``_directional_crossing`` *detected*: it takes
+    one extremum per scan cell that brackets a sign change of ``dB/dl``, so a
+    maximum and minimum inside one cell are both missed. The count therefore
+    depends on ``samples_per_field_period`` and ``samples_per_wavelength``
+    (§21.3 dimension 5) as well as on the geometry, and a missed barrier that
+    is not the highest one changes the count without changing the margin.
+    """
+    distances = np.asarray(trace.extrema_distances, dtype=float)
+    curvatures = np.asarray(trace.extrema_curvatures, dtype=float)
+    values = np.asarray(trace.extrema_B_minus_b, dtype=float)
+    interior = distances < trace.distance - config.root_atol_zeta
+    maxima = interior & (curvatures < -config.D2_tolerance)
+    if not np.any(maxima):
+        return 0, np.inf
+    return int(np.count_nonzero(maxima)), float(np.min(-values[maxima]))
+
+
+def _between_sample_contacts(
+    interior_maximum_count: IntArray,
+    sample_status: list[TransitionStatus],
+    closed: bool,
+) -> IntArray:
+    """Bracket nongeneric events that fall between adjacent samples.
+
+    Moving along ``Gamma_max``, the interior-maximum count of the parent well
+    changes in two ways, and DESIGN.md §5.4 requires reporting both. A barrier
+    rising through ``b`` is a second maximum of the marginal height, and the
+    port actions jump across it; a barrier annihilating with its neighboring
+    minimum in a fold (``D_parallel^2 B -> 0``) changes the count at a height
+    that can be far below ``b``, with no jump in ``A_W``. The recorded
+    ``barrier_margin`` separates the two: it approaches zero at an
+    equal-height contact and stays finite at a fold.
+
+    Adjacent regular samples whose counts differ therefore bracket one of
+    these events, and returning the bracket keeps it explicit instead of
+    letting the port actions jump inside a nominally regular hyperedge. A
+    count change straddling a non-regular sample is not bracketed: that
+    sample's own status already carries the failure. A curve later demoted
+    whole -- a duplicate companion component -- keeps no brackets, so every
+    row a caller sees still names two regular samples.
+
+    Rows follow the sample order and are not sorted; a closed curve's
+    wraparound row is ``(n_samples - 1, 0)``, whose ``u`` values decrease.
+    """
+    n_samples = len(interior_maximum_count)
+    pairs = [(index, index + 1) for index in range(n_samples - 1)]
+    if closed and n_samples > 2:
+        pairs.append((n_samples - 1, 0))
+    brackets = [
+        pair
+        for pair in pairs
+        if sample_status[pair[0]] is TransitionStatus.REGULAR
+        and sample_status[pair[1]] is TransitionStatus.REGULAR
+        and interior_maximum_count[pair[0]] != interior_maximum_count[pair[1]]
+    ]
+    return np.asarray(brackets, dtype=np.int64).reshape(-1, 2)
+
+
+def _curve_status(
+    sample_status: tuple[TransitionStatus, ...], n_contacts: int
+) -> TransitionStatus:
+    """Lift an otherwise regular curve to ``MULTIWAY`` for a stepped-over event.
+
+    A bracket found between two regular samples never outranks a sample-level
+    failure: a capped scan stays ``MAX_PERIODS`` and a failed action stays
+    ``UNRESOLVED``, because those name why the curve is unusable, while the
+    bracket is recorded in ``contact_sample_pairs`` either way.
+    """
+    status = _aggregate_status(sample_status)
+    if status is TransitionStatus.REGULAR and n_contacts:
+        return TransitionStatus.MULTIWAY
+    return status
+
+
 def _curve_sample_indices(polyline, max_samples: int | None) -> IntArray:
     """Select deterministic, ordered samples without changing the PL curve."""
     count = len(polyline.vertex_ids)
@@ -754,6 +897,8 @@ def _map_polyline(
     child_3_error = np.full(n_samples, np.nan)
     sample_status = [TransitionStatus.UNRESOLVED] * n_samples
     sample_failure_reason = ["source_classification"] * n_samples
+    interior_maximum_count = np.full(n_samples, -1, dtype=np.int64)
+    barrier_margin = np.full(n_samples, np.nan)
     event_zeta[:, 1] = zeta_m
     for index in range(n_samples):
         if point_kinds[index] != CriticalKind.GAMMA_MAX.value:
@@ -810,6 +955,11 @@ def _map_polyline(
             sample_status[index] = forward.status
             sample_failure_reason[index] = f"forward_{forward.status.name.lower()}"
             continue
+
+        backward_maxima, backward_margin = _interior_maximum_data(backward, config)
+        forward_maxima, forward_margin = _interior_maximum_data(forward, config)
+        interior_maximum_count[index] = backward_maxima + forward_maxima
+        barrier_margin[index] = min(backward_margin, forward_margin)
 
         zeta_a = float(backward.zeta)
         zeta_d = float(forward.zeta)
@@ -905,9 +1055,12 @@ def _map_polyline(
     for index in np.flatnonzero(additivity_failure):
         sample_status[index] = TransitionStatus.UNRESOLVED
         sample_failure_reason[index] = "additivity"
+    contact_sample_pairs = _between_sample_contacts(
+        interior_maximum_count, sample_status, bool(polyline.closed)
+    )
     sample_status_tuple = tuple(sample_status)
     sample_failure_reason_tuple = tuple(sample_failure_reason)
-    status = _aggregate_status(sample_status_tuple)
+    status = _curve_status(sample_status_tuple, len(contact_sample_pairs))
     unknown = np.full(n_samples, -1, dtype=np.int64)
     ports = (
         TransitionPort(
@@ -950,6 +1103,9 @@ def _map_polyline(
         config,
         sample_status_tuple,
         sample_failure_reason_tuple,
+        interior_maximum_count,
+        barrier_margin,
+        contact_sample_pairs,
     )
 
 
@@ -965,6 +1121,11 @@ def map_transitions(
     ports share the same lifted field-line identity and common ``u`` index.
     A second equal-height maximum encountered before a regular crossing is a
     ``MULTIWAY`` event, never an arbitrarily decomposed binary transition.
+    A nongeneric event that falls *between* two adjacent samples is detected
+    from the change in each parent well's interior-maximum count and reported
+    the same way (§5.4), with the bracketing samples recorded in
+    ``contact_sample_pairs`` and the height of the barrier involved in
+    ``barrier_margin``.
     """
     cfg = TransitionMappingConfig() if config is None else config
     maxima = [
@@ -1030,5 +1191,11 @@ def map_transitions(
             status=TransitionStatus.MULTIWAY,
             sample_status=(TransitionStatus.MULTIWAY,) * len(transition.u),
             sample_failure_reason=("duplicate_companion",) * len(transition.u),
+            # No sample is regular any more, so no bracket between two of them
+            # survives: this curve is a duplicate companion, not a curve with
+            # subdivision points for milestone 10.
+            contact_sample_pairs=np.empty((0, 2), dtype=np.int64),
+            barrier_margin=np.full(len(transition.u), np.nan),
+            interior_maximum_count=np.full(len(transition.u), -1, dtype=np.int64),
         )
     return tuple(transitions)
