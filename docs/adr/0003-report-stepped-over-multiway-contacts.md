@@ -73,11 +73,17 @@ return a plausible, wrong connectivity (§21.2).
    \(b=2.7781394\), the one curve on the reference equilibrium. Callers that gate on
    `status is REGULAR` see fewer usable curves until milestone 10 subdivides them,
    although every sample and action they need is still present and marked regular.
-   Detection resolution is the critical-curve vertex spacing; no transition-side
-   control refines it, so a contact between two vertices that share a barrier count
-   is still missed, and a count change that straddles a non-regular sample is not
-   bracketed at all (both endpoints must be `REGULAR`) — there the sample's own status
-   is the only signal. Because that spacing comes from the surface mesh and the
+   Detection has two resolution limits. Along the curve it is the critical-curve
+   vertex spacing, which no transition-side control refines, so a contact between two
+   vertices that share a barrier count is still missed. Along the field line it is the
+   root-scan step (§21.3 dimension 5, `samples_per_field_period` and
+   `samples_per_wavelength`): the scan records one extremum per cell that brackets a
+   sign change of `dB/dl`, so a maximum and minimum inside one cell are both missed,
+   and the count can change where no event occurred. The bias is toward over-reporting
+   a bracket, and a missed barrier that is not the highest one moves the count without
+   moving `barrier_margin`, so the fold/contact discriminator is blind to that case.
+   A count change that straddles a non-regular sample is not bracketed at all (both
+   endpoints must be `REGULAR`) — there the sample's own status is the only signal. Because that spacing comes from the surface mesh and the
    extractor, the bracket count is backend- and extractor-dependent even though the
    field-line trace behind it is not.
 3. **Detect, then bisect along the polyline to localize each contact and split the

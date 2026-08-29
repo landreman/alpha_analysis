@@ -635,10 +635,10 @@ def test_equal_height_contact_between_samples_is_multiway_not_regular():
 
 def _shaded_spans(axis):
     """Return the x-extents of the axvspan patches on one axis, ordered."""
-    spans = [
-        (float(patch.get_x()), float(patch.get_x() + patch.get_width()))
-        for patch in axis.patches
-    ]
+    spans = []
+    for patch in axis.patches:
+        interval = patch.get_path().get_extents(patch.get_patch_transform()).intervalx
+        spans.append((float(interval[0]), float(interval[1])))
     return sorted(spans)
 
 
@@ -703,6 +703,30 @@ def test_a_bracket_never_outranks_a_sample_level_failure():
     sampled = (TransitionStatus.REGULAR, TransitionStatus.MULTIWAY)
     assert _curve_status(sampled, 0) is TransitionStatus.MULTIWAY
 
+    # The same rule on the production path: one degenerate source vertex on a
+    # curve that also brackets two stepped-over events. The brackets survive,
+    # and the curve still reports why it is unusable rather than MULTIWAY.
+    field = _stepped_over_contact_field()
+    critical = _critical_circles(field, s=0.5, zeta_values=(0.0,), count=8)
+    point_kind = np.array(critical.point_kind, dtype=np.int64)
+    point_kind[critical.polylines[0].vertex_ids[4]] = CriticalKind.DEGENERATE.value
+    damaged = replace(
+        critical,
+        point_kind=point_kind,
+        status=CriticalCurveStatus.DEGENERATE,
+    )
+
+    transition = map_transitions(field, damaged, TransitionMappingConfig())[0]
+
+    np.testing.assert_array_equal(
+        transition.interior_maximum_count, [0, 0, 1, 1, -1, 1, 1, 0]
+    )
+    np.testing.assert_array_equal(
+        transition.contact_sample_pairs, np.array([[1, 2], [6, 7]])
+    )
+    assert transition.sample_status[4] is TransitionStatus.UNRESOLVED
+    assert transition.status is TransitionStatus.UNRESOLVED
+
 
 def test_contact_bracket_is_shaded_where_the_contact_actually_lies():
     # DESIGN.md §17.5: a stepped-over contact must be visible in the plot, not
@@ -729,21 +753,25 @@ def test_contact_bracket_is_shaded_where_the_contact_actually_lies():
         plt.close(figure)
 
     # The wraparound bracket of a closed curve decreases in u.  It covers
-    # [u[-1], total_u_length] and [u[0], u[1]], and nothing in between.
-    wrapped = replace(
-        transition,
-        contact_sample_pairs=np.array([[len(transition.u) - 1, 1]]),
-    )
-    figure, axes = plot_transition_diagnostics(field, wrapped)
-    try:
-        np.testing.assert_allclose(
-            _shaded_spans(axes[1]),
-            [
-                (transition.u[0], transition.u[1]),
-                (transition.u[-1], transition.total_u_length),
-            ],
-            atol=1.0e-12,
+    # [u[-1], total_u_length] and [u[0], u[second]], and nothing in between.
+    for second, expected_head in ((1, transition.u[1]), (0, transition.u[0])):
+        wrapped = replace(
+            transition,
+            contact_sample_pairs=np.array([[len(transition.u) - 1, second]]),
         )
-        assert transition.u[1] < transition.u[-1]
-    finally:
-        plt.close(figure)
+        figure, axes = plot_transition_diagnostics(field, wrapped)
+        try:
+            np.testing.assert_allclose(
+                _shaded_spans(axes[1]),
+                [
+                    (transition.u[0], expected_head),
+                    (transition.u[-1], transition.total_u_length),
+                ],
+                atol=1.0e-12,
+            )
+        finally:
+            plt.close(figure)
+    # (n-1, 0) is the row _between_sample_contacts actually emits; its second
+    # span is empty because u[0] is zero, and the bracket is the tail.
+    assert transition.u[0] == 0.0
+    assert transition.u[1] < transition.u[-1] < transition.total_u_length

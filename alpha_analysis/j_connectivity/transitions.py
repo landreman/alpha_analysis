@@ -172,8 +172,9 @@ class TransitionCurve:
     ``sample_failure_reason`` identifies the failed stage for convergence
     diagnostics.
 
-    ``interior_maximum_count`` is the number of other maxima inside each
-    sample's parent well and is ``-1`` where no well was traced;
+    ``interior_maximum_count`` is the number of other maxima the root scan
+    detected inside each sample's parent well -- a resolution-dependent count,
+    §21.3 dimension 5 -- and is ``-1`` where no well was traced;
     ``barrier_margin`` is ``b`` minus the highest of them in field units, and
     is ``inf`` when the well has none. ``contact_sample_pairs`` holds the
     adjacent sample indices that bracket a nongeneric event the sampling
@@ -747,13 +748,20 @@ def _aggregate_status(
 def _interior_maximum_data(
     trace: _DirectionalTrace, config: TransitionMappingConfig
 ) -> tuple[int, float]:
-    """Count interior maxima of one half-well and return their margin to ``b``.
+    """Count the scan's interior maxima and return their margin to ``b``.
 
     An extremum recorded by the scan is a barrier when its curvature is
     negative; ``b - B`` at the highest such barrier is the margin, in field
     units, by which that second maximum stays below the marginal height
     (the scan stores ``B - b`` at each extremum, so no ``b`` is needed here).
     Extrema at or beyond the crossing are not interior to the well.
+
+    The count is of the maxima ``_directional_crossing`` *detected*: it takes
+    one extremum per scan cell that brackets a sign change of ``dB/dl``, so a
+    maximum and minimum inside one cell are both missed. The count therefore
+    depends on ``samples_per_field_period`` and ``samples_per_wavelength``
+    (§21.3 dimension 5) as well as on the geometry, and a missed barrier that
+    is not the highest one changes the count without changing the margin.
     """
     distances = np.asarray(trace.extrema_distances, dtype=float)
     curvatures = np.asarray(trace.extrema_curvatures, dtype=float)
