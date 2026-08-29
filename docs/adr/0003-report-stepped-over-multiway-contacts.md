@@ -113,8 +113,11 @@ Option 2 approved.
 - `TransitionCurve` gains three optional arrays, appended after the existing fields so
   positional construction stays valid (covered by the existing
   `legacy_positional_curve` assertion): `interior_maximum_count` (`-1` where no well
-  was traced), `barrier_margin` (`inf` where the well has no other maximum), and
-  `contact_sample_pairs` (shape `(n, 2)`).
+  was traced), `barrier_margin` (`inf` where the well has no other maximum and `NaN`
+  where no well was traced, so a caller filtering on `np.isfinite` can tell the two
+  apart), and `contact_sample_pairs` (shape `(n, 2)`). A curve demoted whole after
+  mapping — a duplicate companion component — has all three cleared, so every bracket a
+  caller sees still names two regular samples.
 - `_DirectionalTrace` carries the curvature and \(B-b\) of every recorded extremum.
   These were already evaluated inside the scan's tangent test; nothing new is
   computed, and no extra field evaluations are made.
@@ -136,15 +139,21 @@ Option 2 approved.
   bracket runs from the last sample through `total_u_length` to the first, so it is
   drawn as the two spans it occupies; shading between its endpoints would shade the
   complement.
-- New tests: `test_equal_height_contact_between_samples_is_multiway_not_regular` and
-  `test_contact_bracket_is_shaded_where_the_contact_actually_lies`, both on a synthetic
-  field whose barrier height crosses \(b\) strictly between two sampled `GAMMA_MAX`
-  vertices, with the interior-maximum counts verified independently by direct
-  sampling of \(B\) inside the test; the plot test asserts the shaded x-extents against
-  `u[contact_sample_pairs]`, wraparound included, not a legend string.
-  `test_interior_maximum_data_reports_the_highest_barrier_inside_the_well` pins the
-  reduction over several barriers and the exclusion of minima and of extrema beyond
-  the crossing, which the field-based test alone does not reach.
+- New tests, all on a synthetic field whose barrier height crosses \(b\) strictly
+  between two sampled `GAMMA_MAX` vertices, with the interior-maximum counts verified
+  independently by direct sampling of \(B\) inside the test:
+  `test_equal_height_contact_between_samples_is_multiway_not_regular` (both halves of
+  the parent well, via a mirrored field, plus a control field whose barrier never
+  crosses \(b\));
+  `test_contact_bracket_is_shaded_where_the_contact_actually_lies`, which asserts the
+  shaded x-extents against `u[contact_sample_pairs]`, wraparound included, not a legend
+  string; `test_a_closed_curve_brackets_a_contact_in_its_wraparound_arc`, which puts
+  the count change in the arc from the last sample back to the first and drives the
+  plot from the emitted row; `test_a_bracket_never_outranks_a_sample_level_failure`,
+  which pins the precedence at the helper and on the production path; and
+  `test_interior_maximum_data_reports_the_highest_barrier_inside_the_well`, which pins
+  the reduction over several barriers and the exclusion of minima and of extrema beyond
+  the crossing, which the field-based tests do not reach.
 - Real equilibria make this the common case, not a corner case. Regenerating the
   milestone-9 sweep (`examples/validate_transition_equilibria.py`: five equilibria,
   five levels, structured and gmsh backends, both extractors, 8 samples per curve)

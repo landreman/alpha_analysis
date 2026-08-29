@@ -455,6 +455,30 @@ def test_equal_height_multiway_event_is_explicit_and_never_gets_actions():
         for item in partially_degenerate_duplicates
     )
 
+    # A curve demoted whole as a duplicate companion keeps no brackets: every
+    # sample is non-regular with NaN actions, so no bracket between two
+    # regular samples survives, and milestone 10 is not handed subdivision
+    # points on a curve it must not subdivide.  The barrier field would
+    # otherwise have brackets here -- the same field brackets twice on a
+    # single circle.
+    stepped_field = _stepped_over_contact_field()
+    single = map_transitions(
+        stepped_field,
+        _critical_circles(stepped_field, s=0.5, zeta_values=(0.0,), count=8),
+    )[0]
+    assert len(single.contact_sample_pairs) == 2
+    coincident = map_transitions(
+        stepped_field,
+        _critical_circles(stepped_field, s=0.5, zeta_values=(0.0, 0.0), count=8),
+    )
+    assert len(coincident) == 2
+    for item in coincident:
+        assert item.status is TransitionStatus.MULTIWAY
+        assert set(item.sample_failure_reason) == {"duplicate_companion"}
+        assert len(item.contact_sample_pairs) == 0
+        assert np.all(item.interior_maximum_count == -1)
+        assert np.all(np.isnan(item.barrier_margin))
+
 
 def test_transition_trace_cap_has_a_distinct_explicit_status():
     # Along each lifted line B=2-cos(theta), theta=alpha+0.2*zeta. Starting

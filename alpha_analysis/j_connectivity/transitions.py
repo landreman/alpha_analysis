@@ -796,7 +796,9 @@ def _between_sample_contacts(
     these events, and returning the bracket keeps it explicit instead of
     letting the port actions jump inside a nominally regular hyperedge. A
     count change straddling a non-regular sample is not bracketed: that
-    sample's own status already carries the failure.
+    sample's own status already carries the failure. A curve later demoted
+    whole -- a duplicate companion component -- keeps no brackets, so every
+    row a caller sees still names two regular samples.
 
     Rows follow the sample order and are not sorted; a closed curve's
     wraparound row is ``(n_samples - 1, 0)``, whose ``u`` values decrease.
@@ -1187,5 +1189,11 @@ def map_transitions(
             status=TransitionStatus.MULTIWAY,
             sample_status=(TransitionStatus.MULTIWAY,) * len(transition.u),
             sample_failure_reason=("duplicate_companion",) * len(transition.u),
+            # No sample is regular any more, so no bracket between two of them
+            # survives: this curve is a duplicate companion, not a curve with
+            # subdivision points for milestone 10.
+            contact_sample_pairs=np.empty((0, 2), dtype=np.int64),
+            barrier_margin=np.full(len(transition.u), np.nan),
+            interior_maximum_count=np.full(len(transition.u), -1, dtype=np.int64),
         )
     return tuple(transitions)
