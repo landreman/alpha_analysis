@@ -749,17 +749,19 @@ class _MutableMesh:
         # create the desired constrained chain without requiring a convex
         # four-vertex edge-flip neighborhood.
         crossings = []
+        # This pass does not mutate triangles until all crossings are found.
+        # Index component membership once, rather than scanning every face
+        # again for every edge (quadratic work at full curve sampling).
+        component_edges = {
+            tuple(sorted((triangle[local], triangle[(local + 1) % 3])))
+            for index, triangle in enumerate(self.triangles)
+            if self.component_ids[index] == target_component
+            for local in range(3)
+        }
         for edge in self.edges():
             if first in edge or second in edge:
                 continue
-            owners = [
-                index
-                for index, triangle in enumerate(self.triangles)
-                if edge[0] in triangle and edge[1] in triangle
-            ]
-            if not any(
-                self.component_ids[index] == target_component for index in owners
-            ):
+            if edge not in component_edges:
                 continue
             first_point, second_point = project(edge[0]), project(edge[1])
             denominator = first_point[1] - second_point[1]
