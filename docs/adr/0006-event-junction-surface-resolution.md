@@ -1,6 +1,6 @@
 # ADR 0006: Set the surface-resolution prerequisite for event-junction cuts
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-30
 - **Milestone:** 10.2
 - **Design sections:** §5.4, §§8.3–8.4, §§10.2–10.5, §21.2, §21.3, and §23 milestones 10.2–10.3
@@ -97,12 +97,72 @@ at the accidental branch vertex. Milestone 10.2 remains unchecked.
 
 ## Decision
 
+**Option 1, scoped by a discriminating resolution sweep run on 2026-08-30.**
+The six-sheet test and the no-dangling-cut criterion stay exactly as written,
+and milestone 10.2 is not complete until they pass. The prerequisite work
+stays inside 10.2. Milestone 10.3 remains the coordinator that automates
+remedies across the matrix; it does not inherit the missing capability.
+
+The sweep reran the identical pipeline — same field, extractor, localizer,
+arc builder, and cutter, all unchanged — on six structured backgrounds:
+`(4,16,36)` (baseline), `(4,16,48)`, `(4,24,36)`, `(4,24,54)`, `(6,24,54)`,
+and `(4,16,45)`. Per grid, it counted minority-orientation triangles in each
+incoming component's `(x,y)` chart and recorded the cut outcome with its
+machine-readable unresolved reasons:
+
+| grid | folded triangles | sheets | unresolved arcs | reason class |
+|---|---|---|---|---|
+| 4,16,36 | 13 | 5 | 3 | branches away from authorized endpoint |
+| 4,16,48 | 19 | 3 | 0,1,2,3 | endpoint / side-count / indecisive assignment |
+| 4,24,36 | 4 | 5 | 3 | incident-side count not two |
+| 4,24,54 | 10 | 3 | 0,1,2,3 | endpoint / side-count / indecisive assignment |
+| 6,24,54 | 9 | 5 | 2 | incident-side count not two |
+| 4,16,45 | 15 | 5 | 3 | branches away from authorized endpoint |
+
+Three facts discriminate between the hypotheses left open in Context:
+
+1. **Folds are persistent, not a coarse-grid artifact.** Every resolution
+   produces folded chart triangles (4–19); their doubled areas shrink but the
+   count does not go to zero. No affordable global refinement yields the
+   fold-free input that would have exonerated the cutter.
+2. **Fold count does not predict cutting failure.** The 4-fold mesh still
+   fails, and the two grids with intermediate fold counts fail on all four
+   arcs — strictly worse than the baseline.
+3. **The failure is not stable under refinement.** Which arc fails, and which
+   of three distinct rejection reasons fires (constrained path branching at a
+   non-event vertex, a companion cut with the wrong incident-triangle-side
+   count, an indecisive parent/child side assignment), both change with the
+   grid. Two of the three signatures are insertion-geometry rejections that a
+   robust cutter must handle on meshes of this quality.
+
+Conclusion: global background refinement is demonstrably not sufficient, and
+mesh folding is not the proximate cause. The blocked capability is
+**robust constrained insertion at event junctions on charts that fold** —
+cutter-side work. Milestone 10.2 therefore proceeds by making the insertion
+and side-assignment machinery correct on the meshes the extractor actually
+produces: certified handling of folded chart regions during companion-curve
+insertion, deterministic incident-side recovery, and a decisive or explicitly
+unresolved side assignment — with bounded *local* repair used only where a
+certified insertion needs it, carrying provenance and unresolved-area
+accounting. §23's milestone 10.3 text is unchanged; its "local surface
+refinement near thin transition strips" remains a matrix-level remedy, not
+the missing prerequisite here.
+
+If this work reveals that the synthetic case genuinely requires an open-ended
+remeshing capability rather than bounded insertion robustness, that finding
+reopens this ADR in favor of option 3 with a properly scoped prerequisite
+milestone; it must not silently expand inside 10.2.
+
 ## Consequences
 
-The researcher must settle the prerequisite and acceptance scope before the
-implementation proceeds. The draft contains investigation code and a live failing
-topology test, not a completed milestone. `docs/DESIGN.md` and the milestone row
-must not be revised to imply acceptance before that decision.
+Milestone 10.2 continues with its acceptance criteria unweakened; the
+six-sheet test stays a live, honestly failing gate until the cutter-side work
+above makes it pass. The draft still contains investigation code and that
+failing topology test, not a completed milestone. `docs/DESIGN.md` and the
+milestone row must not be revised to imply acceptance before the test is
+green. The experimental refinement/retriangulation paths already tried are
+not part of the decided scope and should not merge unless the insertion work
+independently justifies them.
 
 The final local `make check` also exposes a regression in the existing
 `test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit`: the
