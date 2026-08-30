@@ -148,3 +148,22 @@ about `8.3e-4` relative.  Total critical-curve length differences were about
 
 No tolerance was loosened and no failed trace was assigned zero action or zero
 weight.  The remaining unresolved results are retained as convergence data.
+
+## 2026-08-30 regeneration after ADR 0005
+
+ADR 0005's certified reversal repair reorders critical polylines where the
+mesh-edge chain doubled back at sub-resolution scale, which changes `u`,
+`total_u_length`, and hence the deterministic uniform sample subsets on the
+affected curves (14 certified repairs across the structured half of this
+matrix, all on curves whose repairs left every status unchanged).  The full
+100-case sweep was re-run with identical controls.  Every row of the primary
+results table above reproduced exactly — surface 94/6, critical 70/22/8,
+curves 6/57/92/9, samples 840/156/13/8, the same failure-reason census,
+additivity ratio 7.83e-5, and identity errors at machine precision — except
+the largest quadrature error / tolerance ratio, which moved from 0.924 to
+0.974: repaired ordering re-selects which authoritative vertices the 8-sample
+subsets map on the repaired curves, so their port quadrature-error maxima
+shift within tolerance.  Per-curve `u` and `total_u_length` recorded before
+this date supersede to the repaired values wherever
+`CriticalCurveReport.reversal_repaired_count` is nonzero (the pre-repair
+lengths carried phantom back-and-forth arc length).

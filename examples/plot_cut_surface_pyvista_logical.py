@@ -55,8 +55,11 @@ A transition the cut refused still gets its wells and its mapped ``T`` and
 and the mesh's inability to represent the cut does not retract it -- but with
 no seam and no child-1 vertex, so the duplication that did not happen is
 visibly absent rather than merely unmentioned. On a real equilibrium this is
-the usual outcome: the coarse matrix in
-``docs/validation/milestone10-real-equilibria.md`` resolves no cut at all.
+still the usual outcome -- the coarse matrix in
+``docs/validation/milestone10-real-equilibria.md`` resolves no cut inside its
+grid -- but no longer the only one: after ADR 0005's certified reversal
+repair, the DMercFail nfp=4 equilibrium at ``--lambda-n 0.8`` cuts end to end
+at the default sampling on both backends and both extractors.
 
 Everything the cut left explicit is printed rather than hidden: unresolved
 transitions with the reason the cut refused them, per-sample transition
@@ -189,11 +192,12 @@ def parse_arguments() -> argparse.Namespace:
         help="use the analytic generic-split field of "
         "test_production_synthetic_surface_has_no_uncut_action_jump instead "
         "of a boozmn equilibrium. The coarse real matrix in "
-        "docs/validation/milestone10-real-equilibria.md resolves no cut at "
-        "all -- every real transition there stays an explicit unresolved "
-        "hyperedge -- so this is the case in which the duplication, the "
-        "three sheets and the branch actions are actually visible. It "
-        "defaults to b = 1.4 and a (4, 16, 12) structured background",
+        "docs/validation/milestone10-real-equilibria.md resolves no cut "
+        "inside its grid, so this remains the simplest case in which the "
+        "duplication, the three sheets and the branch actions are visible; "
+        "the DMercFail equilibrium at --lambda-n 0.8 is the real cut "
+        "demonstration since ADR 0005. It defaults to b = 1.4 and a "
+        "(4, 16, 12) structured background",
     )
     parser.add_argument(
         "--backend", choices=("structured", "gmsh"), default="structured"
