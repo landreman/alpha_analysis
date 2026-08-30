@@ -2256,6 +2256,63 @@ results; periodic resolution convergence is demonstrated.
 
 **Acceptance:** No triangle spans an action jump; each port has a valid sheet; topology survives serialization.
 
+### Milestone 10.1: Sampling-robust cut geometry
+
+Inserted 2026-08-30 after the milestone-10 real-equilibrium matrix resolved no cut:
+the transition-mapping sample subset (`max_curve_samples`) directly becomes the
+inserted cut polyline, so the sample budget silently changes cut geometry and, on
+under-sampled curves, whether the cut resolves at all — the §21.3 dimension-9
+fragility ADR 0005 documented.
+
+**Goal:** Make the sheet graph invariant to the transition-mapping sample budget, or explicitly budget-limited — never silently budget-dependent.
+
+**Changes:**
+
+- `max_curve_samples` becomes a work budget: the sample subset densifies adaptively from the authoritative critical-curve vertices where a mapped midpoint disagrees with interpolation from its neighbors (geometric deviation, action deviation, itinerary change, EDGE proximity, near self-contact);
+- an explicit budget-insufficient transition status/reason when certification is not reached within budget, instead of cutting a different, coarser curve;
+- budget-invariance acceptance checks: identical sheet graphs across budgets (8, 10, 16, full) or an explicit budget report;
+- documentation no longer describes the subset as "bounding cost without coarsening geometry".
+
+**Acceptance:** A named test demonstrates sheet-graph invariance across sample budgets on the production synthetic field and on the DMercFail reference equilibrium, and a named test demonstrates the explicit budget-insufficient path; no cut resolves or changes topology as a silent function of the budget.
+
+### Milestone 10.2: Contact localization and segment-level cutting
+
+Inserted 2026-08-30: after ADR 0003, 57 of the 164 real-matrix transition curves are
+`MULTIWAY` because coarse sampling steps over an interior-maximum count change
+somewhere along the curve — only 6 of 164 are free of one — and the all-or-nothing
+resolvability gate then vetoes the entire curve, so real equilibria essentially never
+cut at any affordable sampling.
+
+**Goal:** Cut the resolved arcs of a transition curve whose nongeneric events are localized, keeping every event an explicit §5.4 hyperedge.
+
+**Changes:**
+
+- bisection in \(u\) of ADR 0003 contact brackets (each bracketed event is localized to a tight interval or dissolved as a sampling artifact by a few extra traces);
+- subdivision of transition curves at localized events and at nongeneric samples;
+- explicit event nodes with arbitrary port count (§5.4) at subdivision points, including the sheet-graph treatment of a cut terminating at an interior event junction;
+- per-arc resolvability and cutting, replacing the whole-curve gate, with the nongeneric arcs retained as explicit unresolved or event hyperedges.
+
+**Acceptance:** A curve with one bracketed contact cuts its regular arcs and carries an explicit event hyperedge at the localized contact — never an arbitrary binary decomposition; the W7-X reference curve with four contacts yields cut arcs plus explicit events; no dangling cut terminates in a surface interior without an event node.
+
+### Milestone 10.3: Failure-directed refinement and matrix convergence
+
+Inserted 2026-08-30: the remaining real-matrix failures are resolution effects with
+machine-readable reasons (unresolved surfaces and critical curves, thin
+\(T\)-to-`EDGE` strips, off-component projections, `MAX_PERIODS` caps), each with a
+demonstrated targeted remedy from the milestone-9/10 convergence probes — but today
+each remedy requires manual per-case tuning.
+
+**Goal:** Make the five-equilibrium matrix converge unattended: every failure class triggers its targeted remediation, bounded, and what remains unresolved is physics or an explicit budget, not a default knob.
+
+**Changes:**
+
+- a coordinator that dispatches on the recorded unresolved reason: background refinement for unresolved extractions/critical curves, \(u\)-refinement for contact brackets, per-sample period-cap escalation for `MAX_PERIODS`, component-provenance enforcement for off-surface projections, and local surface refinement near thin transition strips;
+- local (not global) surface refinement around companion curves whose strip width fails the resolution requirement;
+- bounded escalation with every retry recorded (§21.3);
+- regeneration of the real-equilibrium validation matrix with budget-invariance checks.
+
+**Acceptance:** The 100-case matrix report shows every case either resolves or terminates with a physically meaningful reason (a genuinely unrepresentable strip at the refinement bound, a genuine cap ceiling) with counts per failure class; no case needs manual per-case tuning to resolve.
+
 ### Milestone 11: Direct contour tracer
 
 **Goal:** Build the correctness oracle.
