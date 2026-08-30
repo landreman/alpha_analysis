@@ -59,7 +59,10 @@ still the usual outcome -- the coarse matrix in
 ``docs/validation/milestone10-real-equilibria.md`` resolves no cut inside its
 grid -- but no longer the only one: after ADR 0005's certified reversal
 repair, the DMercFail nfp=4 equilibrium at ``--lambda-n 0.8`` cuts end to end
-at the default sampling on both backends and both extractors.
+with a sufficient sampling budget. The default budget is 16; the old
+10-sample default cannot certify this reference's structured-mesh cut under
+milestone 10.1's adaptive sampling checks. Explicitly smaller budgets still
+report any uncertified cut rather than silently increasing the requested work.
 
 Everything the cut left explicit is printed rather than hidden: unresolved
 transitions with the reason the cut refused them, per-sample transition
@@ -230,10 +233,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--max-curve-samples",
         type=int,
-        default=10,
+        default=16,
         help="adaptive mapping work budget per GAMMA_MAX polyline; an "
-        "uncertified curve remains explicitly budget-insufficient. 0 maps "
-        "every authoritative critical-curve vertex",
+        "uncertified curve remains explicitly budget-insufficient. Default: "
+        "16 (certifies the DMercFail lambda_n=0.8 reference); 0 maps every "
+        "authoritative critical-curve vertex",
     )
     parser.add_argument(
         "--downsample-reduction",

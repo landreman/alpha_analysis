@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -203,11 +205,25 @@ def test_nearest_cut_location_matches_exhaustive_periodic_search():
 
     surface, action = _surface_and_action()
     mesh = _MutableMesh(surface, action, None, ConstrainedCutConfig())
+    # Off-face queries must include cases where the nearest face does not
+    # contain the nearest vertex. A per-triangle vertex distance is an
+    # invalid lower bound and would otherwise survive the on-face checks.
+    rng = np.random.default_rng(0)
+    radius = np.sqrt(rng.random(128))
+    theta = rng.uniform(0.0, 2.0 * np.pi, len(radius))
+    off_face = np.column_stack(
+        (
+            radius * np.cos(theta),
+            radius * np.sin(theta),
+            rng.uniform(-2.0 * surface.period, 3.0 * surface.period, len(radius)),
+        )
+    )
     queries = np.vstack(
         (
             surface.points,
             np.mean(surface.points[surface.triangles], axis=1),
             [[0.1, 0.1, surface.period - 0.01], [0.0, 0.5, 0.03]],
+            off_face,
         )
     )
     for point in queries:
@@ -845,23 +861,40 @@ def test_indecisive_side_assignment_is_demoted_not_guessed(
     )
 
 
-def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit():
+def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit(monkeypatch):
     # ADR 0005 acceptance on the reference equilibrium: the GAMMA_MAX
     # mesh-edge chain doubles back on itself at sub-triangle scale, the
     # certified upstream reordering repairs it, and the constrained cut then
-    # resolves end to end at the default sampling -- no tuned
-    # max_curve_samples. Also pins that a sample vertex crossed by another
+    # resolves end to end at the plotting example's default work budget.
+    # Also pins that a sample vertex crossed by another
     # samples' tagged path keeps its authoritative u (port actions exact).
-    field = BoozerField.from_boozmn(
-        os.path.join(
-            DATA_DIR,
-            "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_"
-            "aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
-        )
+    # Exercise the plotting command's actual default, not just a separately
+    # chosen successful budget. Its old default of 10 must fail this check.
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "examples"))
+    from plot_cut_surface_pyvista_logical import parse_arguments
+
+    boozmn = os.path.join(
+        DATA_DIR,
+        "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_"
+        "aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
     )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "plot_cut_surface_pyvista_logical.py",
+            "--boozmn",
+            boozmn,
+            "--lambda-n",
+            "0.8",
+        ],
+    )
+    args = parse_arguments()
+    default_budget = args.max_curve_samples if args.max_curve_samples > 0 else None
+    field = BoozerField.from_boozmn(args.boozmn)
     # Radially global refined bounds from docs/validation/milestone9-real-
     # equilibria.md; lambda_n = 0.8.
-    b = 5.040465893072380 + 0.8 * (12.05034354020445 - 5.040465893072380)
+    b = 5.040465893072380 + args.lambda_n * (12.05034354020445 - 5.040465893072380)
     background = StructuredPrismMeshBackend(BackgroundMeshConfig(6, 24, 12)).build(
         field
     )
@@ -875,7 +908,7 @@ def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit():
     resolved_signatures = []
     explicit_budget_reports = 0
     adaptive_successes = 0
-    budgets = (8, 10, 12, 16, None)
+    budgets = tuple(dict.fromkeys((8, 10, 12, 16, None, default_budget)))
     sweep = map_transitions_budget_sweep(
         field,
         critical,
@@ -898,6 +931,12 @@ def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit():
                 field=field,
             )
         cut = cut_cache[key]
+        if budget == default_budget:
+            assert transition.status is TransitionStatus.REGULAR, (
+                "the plotting command's default must certify the DMercFail cut: "
+                + transition.sampling_reason
+            )
+            assert cut.unresolved_transition_ids.size == 0
         if transition.status is TransitionStatus.BUDGET_INSUFFICIENT:
             explicit_budget_reports += 1
             assert not transition.sampling_certified

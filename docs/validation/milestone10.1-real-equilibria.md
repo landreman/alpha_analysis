@@ -48,6 +48,9 @@ the JSON summaries label that scope explicitly.
   Those last two use the same full-mapping path. Budget 12 supplies a genuinely
   adaptive 12/16 success, whose different cut polyline must reproduce the full
   sheet graph; the test explicitly requires at least one adaptive success.
+  It also parses the cut-plotting example's actual CLI defaults and requires
+  that budget to resolve the reference: the old default of 10 was observed
+  failing with two uncertified intervals before it was increased to 16.
 - `test_transition_sampling_budget_is_explicit_when_certification_cannot_finish`
   gives a 16-vertex analytic circle only two mapped vertices, then checks
   `BUDGET_INSUFFICIENT`, retained sample count, explicit intervals/reason, and
@@ -90,6 +93,31 @@ polyline would necessarily produce the wrong sheet graph.
 The additional structured/marching budget-12 run certifies 12/16 vertices and
 has 188 cut edges, versus 232 at full mapping, with the same two-sheet graph.
 The example script includes this additional budget as well as the required four.
+
+The user-facing `plot_cut_surface_pyvista_logical.py` default is now 16, so
+the DMercFail `--lambda-n 0.8` demonstration continues to resolve without an
+extra sampling flag. Its previous default of 10 was insufficient under the new
+certification contract even though the old uniform subset could produce two
+sheets. This changes the example's allowed work, not the certification rules,
+mesh, tolerances, or explicit handling of failure. Explicitly requesting
+`--max-curve-samples 10` still returns `BUDGET_INSUFFICIENT`; no automatic budget
+increase hides that result.
+
+The user's command was run with full surface-wide actions, adding only
+`--screenshot` and `--window-size` for off-screen verification. It produces a
+REGULAR 16-sample transition, two sheets, 232 duplicated cut edges, and all
+three ports incident to valid sheets. Port actions agree exactly, no triangle
+joins duplicated parent/child port vertices, and the serialization round trip
+passes. The PNG was visually inspected. Mapping took 2.1 s, surface tracing
+15.5 s, and cutting 2.2 s.
+
+The example's separate coarse action-range warning is **not resolved** by this
+sampling work: the largest triangle range is `11.0978`, versus the smallest
+parent/child jump `11.0705`. Running the original command on pre-PR `main`
+(`6ce1f91`, default 10 uniform samples) reproduces exactly those warning values
+and the same two-sheet incidence. The warning remains printed; neither the
+sheet graph nor exact port actions certify convergence of the coarse
+surface-wide action field.
 
 Every resolved run has the same role incidence: parent on one sheet,
 child-1 and child-3 on the other. Every port action equals the value at its
@@ -183,6 +211,14 @@ Both mutations were reverted and both tests re-run green. No tolerance was
 loosened, no check was removed, no test was marked slow/skip/xfail, and no new
 dependency was added.
 
+The locator guard was also strengthened after review with 128 seeded off-face
+queries in the logical disc over five field periods. Replacing the box-distance
+lower bound with the minimum distance to a triangle's vertices (an invalid
+lower bound that survived the original on-face queries) now makes
+`test_nearest_cut_location_matches_exhaustive_periodic_search` fail on the
+wrong nearest triangle. The mutation was reverted; the correct locator agrees
+exactly with exhaustive search, including closest points and barycentric weights.
+
 Review follow-up extends the existing source-failure and between-sample-contact
 tests with bounded runs. Both must retain uncertified intervals and their
 physical/event statuses rather than being relabeled budget failures. The source
@@ -202,7 +238,8 @@ The locator also uses conservative triangle-box lower bounds and a
 nearest-vertex distance upper bound to skip impossible nearest-face
 candidates. Exact closest-point tests and original tie ordering are unchanged;
 `test_nearest_cut_location_matches_exhaustive_periodic_search` checks equality
-with exhaustive search at vertices, face interiors, and the periodic seam.
+with exhaustive search at vertices, face interiors, the periodic seam, and
+seeded off-face points whose nearest face need not contain the nearest vertex.
 CI bounds numerical library thread pools to one thread per pytest worker,
 bringing all fast tiers below two minutes before the final locator speedup.
 
