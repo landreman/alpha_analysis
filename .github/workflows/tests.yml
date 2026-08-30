@@ -4,6 +4,13 @@ on:
   push:
   pull_request:
 
+# pytest already runs three worker processes. Keep numerical libraries from
+# starting competing thread pools inside each worker on the shared runner.
+env:
+  OPENBLAS_NUM_THREADS: "1"
+  OMP_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+
 jobs:
   lint:
     runs-on: ubuntu-latest
