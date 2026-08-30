@@ -51,6 +51,9 @@ the JSON summaries label that scope explicitly.
   It also parses the cut-plotting example's actual CLI defaults and requires
   that budget to resolve the reference: the old default of 10 was observed
   failing with two uncertified intervals before it was increased to 16.
+  The same seam-crossing reference now checks the lifted marginal event
+  against the unwrapped critical curve and all three port lifts against
+  their corresponding events, without any additional tracing.
 - `test_transition_sampling_budget_is_explicit_when_certification_cannot_finish`
   gives a 16-vertex analytic circle only two mapped vertices, then checks
   `BUDGET_INSUFFICIENT`, retained sample count, explicit intervals/reason, and
@@ -218,6 +221,14 @@ lower bound that survived the original on-face queries) now makes
 `test_nearest_cut_location_matches_exhaustive_periodic_search` fail on the
 wrong nearest triangle. The mutation was reverted; the correct locator agrees
 exactly with exhaustive search, including closest points and barycentric weights.
+
+Zeroing the singleton-cache `zeta_shift` also makes the DMercFail reference
+test fail: marginal events differ from their required unwrapped branch by one
+field period (`pi/2`). The original analytic circle had constant zeta and did
+not exercise that shift. The real-reference check explicitly requires a
+nontrivial seam crossing and checks both event and port lifts; the mutation
+was reverted before the final gate. This guards lifted companion comparisons,
+not just plot annotations.
 
 Review follow-up extends the existing source-failure and between-sample-contact
 tests with bounded runs. Both must retain uncertified intervals and their

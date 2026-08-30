@@ -922,6 +922,23 @@ def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit(monkeypatch
     for budget, transitions in zip(budgets, sweep):
         assert len(transitions) == 1
         transition = transitions[0]
+        # This reference crosses the periodic seam: singleton traces must
+        # share the assembled marginal curve's lift (DESIGN.md §§3.1, 10.2).
+        zeta_m = np.unwrap(transition.marginal_points[:, 2], period=critical.period)
+        assert np.any(
+            np.abs(zeta_m - transition.marginal_points[:, 2]) > 0.5 * critical.period
+        )
+        np.testing.assert_allclose(
+            transition.event_zeta_unwrapped[:, 1], zeta_m, rtol=0.0, atol=1.0e-14
+        )
+        for port in transition.ports:
+            event_index = 1 if port.role == "child_3" else 0
+            np.testing.assert_allclose(
+                port.zeta_unwrapped,
+                transition.event_zeta_unwrapped[:, event_index],
+                rtol=0.0,
+                atol=1.0e-14,
+            )
         key = _transition_sample_key(transition)
         if key not in cut_cache:
             cut_cache[key] = cut_surface_at_transitions(
