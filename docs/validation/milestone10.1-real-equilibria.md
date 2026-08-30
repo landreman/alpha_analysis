@@ -174,9 +174,19 @@ membership scan: every candidate edge rescanned every triangle. A per-pass
 edge-membership set preserves the same component filter without those
 repeated scans. No mesh resolution, tolerance, or assertion changed.
 
-After this optimization, in the clean Python 3.10.5 venv with three pytest
-workers, `make check` passed all 165 tests and formatting in 47.55 seconds
-wall (`make test-full`'s pytest portion: 45.88 s). Standalone `make test`
-passed in 46.65 seconds wall (slowest individual test 16.35 s). The full-budget
-synthetic test fell from 17.11 to 6.90 s. The full durations tails and CI
-timings are recorded in the PR body.
+The locator also uses conservative triangle-box lower bounds and a
+nearest-vertex distance upper bound to skip impossible nearest-face
+candidates. Exact closest-point tests and original tie ordering are unchanged;
+`test_nearest_cut_location_matches_exhaustive_periodic_search` checks equality
+with exhaustive search at vertices, face interiors, and the periodic seam.
+CI bounds numerical library thread pools to one thread per pytest worker,
+bringing all fast tiers below two minutes before the final locator speedup.
+
+In the final clean Python 3.10.5 venv runs with three pytest workers,
+`make check` passed all 166 tests and formatting in 46.97 seconds wall.
+Standalone `make test` passed in 45.08 seconds wall (slowest 17.94 s), and
+`make test-full` passed in 43.47 seconds wall (slowest 15.15 s). The full-budget
+synthetic test fell from 17.11 to 4.86 s. The four-backend/extractor DMercFail
+sweep was repeated after these optimizations with identical results, including
+all cut-edge counts. The full durations tails and CI timings are recorded in
+the PR body.

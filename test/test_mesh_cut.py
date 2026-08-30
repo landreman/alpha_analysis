@@ -194,6 +194,37 @@ def _transition_sample_key(transition):
     )
 
 
+def test_nearest_cut_location_matches_exhaustive_periodic_search():
+    """Broad-phase culling must retain the nearest face and shared-edge ties."""
+    from alpha_analysis.j_connectivity.mesh_cut import (
+        _closest_point_triangle,
+        _MutableMesh,
+    )
+
+    surface, action = _surface_and_action()
+    mesh = _MutableMesh(surface, action, None, ConstrainedCutConfig())
+    queries = np.vstack(
+        (
+            surface.points,
+            np.mean(surface.points[surface.triangles], axis=1),
+            [[0.1, 0.1, surface.period - 0.01], [0.0, 0.5, 0.03]],
+        )
+    )
+    for point in queries:
+        exhaustive = []
+        for triangle_id in range(len(mesh.triangles)):
+            _, vertices = mesh._unwrapped_triangle(triangle_id, point)
+            closest, barycentric = _closest_point_triangle(point, *vertices)
+            exhaustive.append(
+                (np.linalg.norm(closest - point), triangle_id, closest, barycentric)
+            )
+        expected = min(exhaustive, key=lambda row: (row[0], row[1]))
+        actual = mesh._nearest_location(point)
+        assert actual[:2] == expected[:2]
+        np.testing.assert_array_equal(actual[3], expected[2])
+        np.testing.assert_array_equal(actual[4], expected[3])
+
+
 def test_constrained_cut_duplicates_branch_actions_and_assigns_three_sheets():
     surface, action = _surface_and_action()
     transition = _transition()

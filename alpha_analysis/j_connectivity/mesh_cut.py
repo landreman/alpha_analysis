@@ -301,8 +301,30 @@ class _MutableMesh:
         return ids, vertices
 
     def _nearest_location(self, point):
+        if not self.triangles:
+            raise ConstrainedCutError("cannot insert a curve into an empty surface")
+        vertices = np.asarray(self.points, dtype=float)[
+            np.asarray(self.triangles, dtype=np.int64)
+        ]
+        vertices[:, :, 2] += self.period * np.round(
+            (float(point[2]) - vertices[:, :, 2]) / self.period
+        )
+        # A vertex gives an upper bound on nearest-triangle distance; a
+        # triangle's axis-aligned box gives a lower bound. Only cull boxes
+        # beyond that upper bound, with padding to retain roundoff ties.
+        # The exact closest-point test and original triangle ordering below
+        # are unchanged, including deterministic selection at shared edges.
+        upper_bound = float(np.min(np.linalg.norm(vertices - point, axis=2)))
+        box_delta = np.maximum(
+            np.maximum(vertices.min(axis=1) - point, point - vertices.max(axis=1)),
+            0.0,
+        )
+        candidates = np.flatnonzero(
+            np.linalg.norm(box_delta, axis=1)
+            <= upper_bound + self.config.snap_tolerance
+        )
         best = None
-        for triangle_id in range(len(self.triangles)):
+        for triangle_id in candidates:
             ids, vertices = self._unwrapped_triangle(triangle_id, point)
             closest, barycentric = _closest_point_triangle(point, *vertices)
             distance = float(np.linalg.norm(closest - point))
