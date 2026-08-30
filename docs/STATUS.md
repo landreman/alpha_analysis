@@ -25,7 +25,7 @@ lowest-numbered unchecked row.
 | 8 | Critical curves | Robustly extract and classify \(\Gamma_{\min}\), \(\Gamma_{\max}\), and degenerate portions | [x] | #13 |
 | 9 | Transition mapping and action additivity | Construct \(T\) and matched parent/child ports without yet cutting the full mesh | [x] | #14 |
 | 10 | Constrained cuts and sheet IDs | Insert \(T\), duplicate vertices, and make \(A\) continuous on each sheet | [x] | #19 |
-| 10.1 | Sampling-robust cut geometry | Make the sheet graph invariant to the transition sample budget, or explicitly budget-limited | [ ] | |
+| 10.1 | Sampling-robust cut geometry | Make the sheet graph invariant to the transition sample budget, or explicitly budget-limited | [x] | #21 |
 | 10.2 | Contact localization and segment-level cutting | Cut the resolved arcs of curves with localized §5.4 events instead of vetoing whole curves | [ ] | |
 | 10.3 | Failure-directed refinement and matrix convergence | Converge the five-equilibrium matrix unattended via per-failure-class remediation | [ ] | |
 | 11 | Direct contour tracer | Build the correctness oracle | [ ] | |

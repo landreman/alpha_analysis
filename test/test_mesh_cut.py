@@ -886,6 +886,7 @@ def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit():
     )
     cut_cache = {}
     for budget, transitions in zip(budgets, sweep):
+        assert len(transitions) == 1
         transition = transitions[0]
         key = _transition_sample_key(transition)
         if key not in cut_cache:
