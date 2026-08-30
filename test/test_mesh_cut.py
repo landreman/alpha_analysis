@@ -8,6 +8,7 @@ from dataclasses import replace
 
 from alpha_analysis.j_connectivity import (
     BackgroundMeshConfig,
+    ConstrainedCutConfig,
     CriticalCurveStatus,
     SurfaceMesh,
     StructuredPrismMeshBackend,
@@ -309,9 +310,11 @@ def test_nongeneric_contact_remains_explicitly_unresolved(tmp_path):
 
 
 def test_underresolved_T_to_edge_strip_is_not_cut():
+    # The endpoints terminate on EDGE as an open T must; the interior sample
+    # leaves a strip thinner than the local resolution requirement.
     surface, action = _surface_and_action()
     transition = _transition()
-    companion = np.column_stack(([-0.4, 0.0, 0.4], np.full(3, 0.19), np.zeros(3)))
+    companion = np.column_stack(([-0.4, 0.0, 0.4], [-0.2, 0.19, 0.2], np.zeros(3)))
     ports = tuple(
         replace(port, points=companion) if port.role in {"parent", "child_1"} else port
         for port in transition.ports
@@ -324,6 +327,151 @@ def test_underresolved_T_to_edge_strip_is_not_cut():
     assert "T-to-EDGE strip width" in cut.unresolved_transition_reasons[0]
     assert len(cut.cut_edges) == 0
     assert all(port.sheet_id == -1 for port in cut.ports)
+
+
+def test_open_T_endpoint_beyond_snap_tolerance_is_not_cut():
+    # An open companion curve terminates on the domain boundary, but a coarse
+    # PL surface can leave its endpoint strictly interior. Beyond the local
+    # snap allowance (ADR 0004) the terminal segment is genuinely unresolved:
+    # cutting along the dangling polyline would not separate the parent and
+    # child sides, so the transition must become an explicit
+    # geometry-unresolved hyperedge rather than a crash or a wrong sheet graph.
+    # The synthetic grid's edges are coarse enough that the default allowance
+    # covers the whole interior, so tighten the ratio to reach this branch.
+    surface, action = _surface_and_action()
+    transition = _transition()
+    companion = np.column_stack((np.full(3, 0.1), [-0.2, 0.0, 0.15], np.zeros(3)))
+    ports = tuple(
+        replace(port, points=companion) if port.role in {"parent", "child_1"} else port
+        for port in transition.ports
+    )
+    transition = replace(transition, ports=ports)
+
+    cut = cut_surface_at_transitions(
+        surface,
+        action,
+        [transition],
+        config=ConstrainedCutConfig(max_surface_distance_ratio=0.05),
+    )
+
+    np.testing.assert_array_equal(cut.unresolved_transition_ids, [7])
+    assert "open companion T endpoint" in cut.unresolved_transition_reasons[0]
+    assert "snap tolerance" in cut.unresolved_transition_reasons[0]
+    assert len(cut.cut_edges) == 0
+    assert all(port.sheet_id == -1 for port in cut.ports)
+    # No invented cut: the two original components remain the only sheets.
+    assert len(np.unique(cut.sheet_ids)) == 2
+
+
+def test_open_T_endpoint_within_tolerance_is_snapped_to_edge():
+    # Within the snap allowance the cut is extended to the nearest EDGE
+    # boundary edge, which is split so the cut terminates on the surface edge
+    # (ADR 0004). The authoritative samples keep their positions and actions;
+    # every vertex on the extension takes the endpoint sample's clamped action.
+    surface, action = _surface_and_action()
+    transition = _transition()
+    companion = np.column_stack((np.full(3, 0.1), [-0.2, 0.0, 0.15], np.zeros(3)))
+    ports = tuple(
+        replace(port, points=companion) if port.role in {"parent", "child_1"} else port
+        for port in transition.ports
+    )
+    transition = replace(transition, ports=ports)
+
+    cut = cut_surface_at_transitions(surface, action, [transition])
+
+    assert cut.unresolved_transition_ids.size == 0
+    assert set(cut.sheet_ids) == {0, 1, 2}
+    np.testing.assert_array_equal(
+        cut.sheet_ids, _triangle_components(cut.surface.triangles)
+    )
+    by_role = {port.role: port for port in cut.ports}
+    assert len({port.sheet_id for port in cut.ports}) == 3
+    for role in ("parent", "child_1"):
+        port = by_role[role]
+        np.testing.assert_allclose(
+            cut.surface.points[port.polyline_vertex_ids], companion, atol=1.0e-14
+        )
+        np.testing.assert_allclose(
+            cut.action_values[port.polyline_vertex_ids], port.action_values
+        )
+    # The extension reaches the EDGE boundary: the split terminus (0.1, 0.2, 0)
+    # exists once per side, tagged EDGE, and carries the clamped endpoint
+    # actions (parent 3.2, child-1 1.1) rather than an interpolated blend.
+    points = cut.surface.points
+    terminus = np.flatnonzero(
+        np.isclose(points[:, 0], 0.1)
+        & np.isclose(points[:, 1], 0.2)
+        & np.isclose(points[:, 2], 0.0)
+    )
+    assert len(terminus) == 2
+    assert np.all((cut.surface.boundary_tags[terminus] & SurfaceMesh.EDGE) != 0)
+    assert sorted(cut.action_values[terminus]) == [1.1, 3.2]
+    on_extension = (
+        np.isclose(points[:, 0], 0.1)
+        & (points[:, 1] > 0.15 + 1.0e-12)
+        & (points[:, 1] <= 0.2)
+        & np.isclose(points[:, 2], 0.0)
+    )
+    assert set(np.round(cut.action_values[on_extension], 12)) <= {1.1, 3.2}
+
+
+def test_sub_resolution_double_back_is_not_cut():
+    # A companion polyline can inherit a sub-triangle-scale zigzag from the
+    # GAMMA_MAX mesh-edge chain: two nearly coincident anti-parallel strands.
+    # Inserting it would overlap its own constrained chain and branch the cut
+    # graph, so the transition must become an explicit geometry-unresolved
+    # hyperedge rather than a crash or a wrong sheet graph (ADR 0005).
+    surface, action = _surface_and_action()
+    transition = _transition()
+    companion = np.column_stack((np.full(3, 0.1), [-0.2, 0.1, 0.05], np.zeros(3)))
+    ports = tuple(
+        replace(port, points=companion) if port.role in {"parent", "child_1"} else port
+        for port in transition.ports
+    )
+    transition = replace(transition, ports=ports)
+
+    cut = cut_surface_at_transitions(surface, action, [transition])
+
+    np.testing.assert_array_equal(cut.unresolved_transition_ids, [7])
+    assert "doubles back" in cut.unresolved_transition_reasons[0]
+    assert len(cut.cut_edges) == 0
+    assert all(port.sheet_id == -1 for port in cut.ports)
+    assert len(np.unique(cut.sheet_ids)) == 2
+
+
+def test_inserted_cut_chains_survive_later_constraints():
+    # A later constrained segment must neither flip nor split away an edge an
+    # earlier chain claimed: the recorded cut path would silently reference a
+    # destroyed edge and the cut would dangle. The later segment routes
+    # around the existing chain instead.
+    from alpha_analysis.j_connectivity.mesh_cut import (
+        ConstrainedCutConfig,
+        _MutableMesh,
+    )
+
+    surface, action = _surface_and_action()
+    mesh = _MutableMesh(surface, action, None, ConstrainedCutConfig())
+    first = mesh.insert_point(np.array([0.1, -0.15, 0.0]))
+    second = mesh.insert_point(np.array([0.1, 0.15, 0.0]))
+    chain = mesh.constrain_edge(first, second)
+    chain_edges = {
+        tuple(sorted((int(a), int(b)))) for a, b in zip(chain[:-1], chain[1:])
+    }
+    mesh.constrained_edges.update(chain_edges)
+
+    # y = 0.06 crosses the first chain strictly inside one of its edges (the
+    # chain's vertices sit near y = -0.15, 0, 0.025, 0.15), so the crossing
+    # cannot sneak through a shared chain vertex.
+    third = mesh.insert_point(np.array([-0.2, 0.06, 0.0]))
+    fourth = mesh.insert_point(np.array([0.4, 0.06, 0.0]))
+    crossing = mesh.constrain_edge(third, fourth)
+
+    surviving = mesh.edges()
+    assert all(edge in surviving for edge in chain_edges)
+    assert all(
+        tuple(sorted((int(a), int(b)))) in surviving
+        for a, b in zip(crossing[:-1], crossing[1:])
+    )
 
 
 def test_refined_gamma_samples_stay_on_the_provenance_boundary():

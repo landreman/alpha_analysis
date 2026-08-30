@@ -89,3 +89,4 @@ Design decisions taken during implementation that differ from `docs/DESIGN.md` l
 `docs/adr/` and are listed here with one line each.
 
 - ADR 0003 — a `GAMMA_MAX` curve whose sampling steps over a nongeneric event is `MULTIWAY` even when every sample is `REGULAR`, and keeps its finite port actions for Milestone 10 to subdivide. (ADRs 0001 and 0002 predate this list and are not repeated here.)
+- ADR 0004 — an open companion-cut endpoint within the local surface-distance allowance (`max_surface_distance_ratio` × local edge scale) is extended to the nearest `EDGE` boundary edge, splitting it, with the extension's `u`/action clamped to the endpoint sample; beyond that allowance the transition stays an explicit geometry-unresolved hyperedge.

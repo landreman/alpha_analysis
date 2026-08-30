@@ -23,6 +23,7 @@ from .surface_extract import (
 )
 from .transitions import TransitionCurve
 from .types import FloatArray, IntArray, TransitionStatus
+from .well_trace import WellTraceConfig, trace_regular_well
 
 
 class ConstrainedCutError(RuntimeError):
@@ -260,6 +261,10 @@ class _MutableMesh:
         self.action = list(map(float, action_values))
         self.field = field
         self.config = config
+        # Edges already claimed by an inserted constrained chain. A later
+        # constraint must not flip one away: the recorded cut path would then
+        # reference a destroyed edge and the cut would silently dangle.
+        self.constrained_edges: set[tuple[int, int]] = set()
 
     def _unwrapped_triangle(self, triangle_id, point):
         ids = self.triangles[triangle_id]
@@ -514,6 +519,10 @@ class _MutableMesh:
             length = float(np.linalg.norm(edge_second - edge_first))
             normalized = distance / max(segment_length, self.config.snap_tolerance)
             weight = length * (1.0 + 100.0 * normalized * normalized)
+            if tuple(sorted(map(int, edge))) in self.constrained_edges:
+                # Overlapping an existing cut chain would branch the cut
+                # graph; route around it unless there is no other way.
+                weight *= 1.0e6
             adjacency.setdefault(edge[0], []).append((edge[1], weight))
             adjacency.setdefault(edge[1], []).append((edge[0], weight))
         queue = [(0.0, int(first))]
@@ -586,6 +595,8 @@ class _MutableMesh:
 
     def _flip_crossing_edge(self, edge, project):
         first, second = edge
+        if tuple(sorted((int(first), int(second)))) in self.constrained_edges:
+            return False
         owners = [
             index
             for index, triangle in enumerate(self.triangles)
@@ -718,6 +729,12 @@ class _MutableMesh:
                 crossings.append((crossing_x, edge, fraction))
         chain = [int(first)]
         for _, edge, fraction in sorted(crossings):
+            if tuple(sorted(map(int, edge))) in self.constrained_edges:
+                # Splitting an already inserted cut edge would destroy it and
+                # leave the recorded cut dangling. Leave it whole; the chain
+                # check below then fails and the Dijkstra fallback routes
+                # around the existing chain instead.
+                continue
             edge_first = np.asarray(self.points[edge[0]], dtype=float)
             point = edge_first + fraction * _periodic_delta(
                 edge_first, self.points[edge[1]], self.period
@@ -845,7 +862,9 @@ def _curve_is_closed(transition):
     )
 
 
-def _insert_curve(mesh, points, u, total_length, closed, *, tagged=False):
+def _insert_curve(
+    mesh, points, u, total_length, closed, *, tagged=False, snap_open_ends=False
+):
     tag = SurfaceMesh.G_ZERO if tagged else 0
     sample_ids = np.array(
         [
@@ -901,6 +920,10 @@ def _insert_curve(mesh, points, u, total_length, closed, *, tagged=False):
                         f"{first_index}->{second_index}, anchor {anchor_number} "
                         f"could not be constrained: {error}"
                     ) from error
+                mesh.constrained_edges.update(
+                    tuple(sorted((int(a), int(b))))
+                    for a, b in zip(section[:-1], section[1:])
+                )
                 chain.extend(section[1:])
             # Adjacent local constraints can briefly choose overlapping
             # triangle corridors. Erase the resulting closed detour before
@@ -933,9 +956,43 @@ def _insert_curve(mesh, points, u, total_length, closed, *, tagged=False):
             values = start_u + (end_u - start_u) * cumulative / cumulative[-1]
             for vertex, value in zip(chain[1:-1], values[1:-1]):
                 vertex_u[int(vertex)] = float(value)
-        path_edges.update(
+        segment_edges = {
             tuple(sorted((int(a), int(b)))) for a, b in zip(chain[:-1], chain[1:])
-        )
+        }
+        path_edges.update(segment_edges)
+        mesh.constrained_edges.update(segment_edges)
+    if snap_open_ends and not closed:
+        # An open T terminates on the EDGE boundary, but its PL endpoint
+        # generically stops a fraction of one edge short of the boundary
+        # polyline. Extend the cut to the nearest EDGE boundary edge, splitting
+        # it so the cut terminates on the surface edge; the extension carries
+        # the endpoint's clamped parameter (ADR 0004).
+        for endpoint_index in (0, len(sample_ids) - 1):
+            endpoint_id = int(sample_ids[endpoint_index])
+            if (mesh.tags[endpoint_id] & SurfaceMesh.EDGE) != 0:
+                continue
+            _, snapped = _nearest_edge_boundary_point(mesh, mesh.points[endpoint_id])
+            if snapped is None:
+                raise ConstrainedCutError(
+                    "surface has no EDGE boundary to terminate an open companion T"
+                )
+            boundary_id = mesh.insert_point(snapped, preserve=True)
+            if boundary_id == endpoint_id:
+                continue
+            try:
+                chain = mesh.constrain_edge(endpoint_id, boundary_id)
+            except ConstrainedCutError as error:
+                raise ConstrainedCutError(
+                    f"open T endpoint {endpoint_index} could not be extended "
+                    f"to the EDGE boundary: {error}"
+                ) from error
+            for vertex in chain[1:]:
+                vertex_u[int(vertex)] = float(u[endpoint_index])
+            extension_edges = {
+                tuple(sorted((int(a), int(b)))) for a, b in zip(chain[:-1], chain[1:])
+            }
+            path_edges.update(extension_edges)
+            mesh.constrained_edges.update(extension_edges)
     return sample_ids, path_edges, vertex_u
 
 
@@ -963,6 +1020,56 @@ def _incident_components(triangles, labels, vertex):
             if int(vertex) in triangle
         }
     )
+
+
+def _traced_side_action(mesh, component, triangle_labels, sample_ids):
+    """Trace one well just inside ``component`` next to the inserted cut.
+
+    Returns ``(sample_index, action)`` from the first adjacent triangle whose
+    projected centroid yields a regular trace, or ``None``. This generates the
+    same half-bounce action that ``evaluate_surface_data`` would have put on
+    the surface, so side assignment stays data-driven even when the caller
+    skipped the surface-wide traces (ADR 0004).
+    """
+    if mesh.field is None:
+        return None
+    for sample_index, vertex in enumerate(sample_ids):
+        for triangle_id, triangle in enumerate(mesh.triangles):
+            if triangle_labels[triangle_id] != component or vertex not in triangle:
+                continue
+            origin = np.asarray(mesh.points[int(vertex)], dtype=float)
+            corners = np.asarray(
+                [
+                    origin + _periodic_delta(origin, mesh.points[item], mesh.period)
+                    for item in triangle
+                ]
+            )
+            edge_scale = max(
+                float(np.linalg.norm(corners[i] - corners[(i + 1) % 3]))
+                for i in range(3)
+            )
+            probe = corners.mean(axis=0)
+            probe[2] %= mesh.period
+            projected = _project_to_level_near(
+                probe,
+                mesh.field,
+                mesh.level,
+                SurfaceExtractionConfig(B_tolerance=mesh.config.B_tolerance),
+                mesh.config.max_surface_distance_ratio * edge_scale,
+            )
+            if projected is None:
+                continue
+            s = float(projected[0] ** 2 + projected[1] ** 2)
+            theta = float(np.arctan2(projected[1], projected[0])) if s > 0.0 else 0.0
+            trace = trace_regular_well(
+                mesh.field,
+                mesh.level,
+                np.array([s, theta, float(projected[2])]),
+                WellTraceConfig(),
+            )
+            if np.isfinite(trace.action_length):
+                return sample_index, float(trace.action_length)
+    return None
 
 
 def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
@@ -1002,9 +1109,20 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
                 parent_errors.append(abs(value - parent.action_values[sample_index]))
                 child_errors.append(abs(value - child.action_values[sample_index]))
         if not parent_errors:
-            raise ConstrainedCutError(
-                "a cut side has no finite neighboring action data"
+            # No finite pre-cut action neighbors this side (e.g. the caller
+            # skipped the surface-wide traces). Generate one datum by tracing
+            # a well just inside the side instead of guessing (ADR 0004).
+            traced = _traced_side_action(
+                mesh, component, triangle_labels, inserted.sample_ids
             )
+            if traced is None:
+                raise ConstrainedCutError(
+                    "a cut side has no finite neighboring action data and no "
+                    "traceable probe point"
+                )
+            sample_index, value = traced
+            parent_errors.append(abs(value - parent.action_values[sample_index]))
+            child_errors.append(abs(value - child.action_values[sample_index]))
         costs[component_index] = (np.mean(parent_errors), np.mean(child_errors))
     direct = costs[0, 0] + costs[1, 1]
     swapped = costs[0, 1] + costs[1, 0]
@@ -1039,10 +1157,35 @@ def _is_resolvable(transition):
     )
 
 
+def _nearest_edge_boundary_point(mesh, point):
+    """Return the distance to the PL ``EDGE`` boundary and its closest point."""
+    best_distance = np.inf
+    best_point = None
+    for edge in mesh.edges():
+        if not all((mesh.tags[vertex] & SurfaceMesh.EDGE) != 0 for vertex in edge):
+            continue
+        first = np.asarray(mesh.points[edge[0]], dtype=float)
+        delta = _periodic_delta(first, mesh.points[edge[1]], mesh.period)
+        query = first + _periodic_delta(first, point, mesh.period)
+        denominator = float(np.dot(delta, delta))
+        fraction = (
+            0.0
+            if denominator == 0.0
+            else float(np.clip(np.dot(query - first, delta) / denominator, 0.0, 1.0))
+        )
+        closest = first + fraction * delta
+        distance = float(np.linalg.norm(query - closest))
+        if distance < best_distance:
+            best_distance = distance
+            best_point = closest
+    return best_distance, best_point
+
+
 def _geometry_resolution_issue(mesh, transition):
     """Return why the current surface cannot represent ``T``, or ``None``."""
     parent = next(port for port in transition.ports if port.role == "parent")
     closed = _curve_is_closed(transition)
+    edge_scales = []
     for index, point in enumerate(parent.points):
         distance, _, ids, _, barycentric, edge_scale = mesh._nearest_location(point)
         allowed = mesh.config.max_surface_distance_ratio * max(
@@ -1080,34 +1223,66 @@ def _geometry_resolution_issue(mesh, transition):
                 "companion T collapses onto the EDGE boundary at an interior "
                 "sample; refine the background mesh to resolve the intervening sheet"
             )
+        if endpoint and not on_edge_boundary:
+            # An open T terminates on the domain boundary (its endpoints share
+            # the marginal endpoints' flux surface), but a PL endpoint
+            # generically lands a fraction of one edge short of the PL EDGE
+            # polyline. Within the local surface-distance allowance the
+            # insertion extends the cut to the boundary (ADR 0004); beyond it
+            # the terminal segment is genuinely unresolved.
+            gap, _ = _nearest_edge_boundary_point(mesh, point)
+            if gap > allowed:
+                return (
+                    f"an open companion T endpoint is {gap:.3e} from the EDGE "
+                    f"boundary (snap tolerance {allowed:.3e}), so its cut "
+                    "cannot terminate on the surface edge; refine the "
+                    "background mesh until the endpoint reaches EDGE"
+                )
         if not endpoint:
-            boundary_distance = np.inf
-            for edge in mesh.edges():
-                if not all(
-                    (mesh.tags[vertex] & SurfaceMesh.EDGE) != 0 for vertex in edge
-                ):
-                    continue
-                first = np.asarray(mesh.points[edge[0]], dtype=float)
-                delta = _periodic_delta(first, mesh.points[edge[1]], mesh.period)
-                query = first + _periodic_delta(first, point, mesh.period)
-                denominator = float(np.dot(delta, delta))
-                fraction = (
-                    0.0
-                    if denominator == 0.0
-                    else float(
-                        np.clip(np.dot(query - first, delta) / denominator, 0.0, 1.0)
-                    )
-                )
-                boundary_distance = min(
-                    boundary_distance,
-                    float(np.linalg.norm(query - (first + fraction * delta))),
-                )
+            boundary_distance, _ = _nearest_edge_boundary_point(mesh, point)
             required = mesh.config.min_transition_strip_edge_ratio * edge_scale
             if boundary_distance < required:
                 return (
                     f"companion T-to-EDGE strip width {boundary_distance:.3e} is "
                     f"below the local resolution requirement {required:.3e}"
                 )
+        edge_scales.append(edge_scale)
+    # A polyline that doubles back on itself with sub-resolution strand
+    # separation bounds a strip the mesh cannot represent; inserting it would
+    # overlap its own constrained chain and branch the cut graph. Real
+    # GAMMA_MAX mesh-edge chains do this where the extracted curve zigzags at
+    # sub-triangle scale, and the companion inherits it (ADR 0005).
+    count = len(parent.points)
+    triples = [(i - 1, i, i + 1) for i in range(1, count - 1)]
+    if closed and count >= 3:
+        triples += [(count - 2, count - 1, 0), (count - 1, 0, 1)]
+    for before, middle, after in triples:
+        first = np.asarray(parent.points[before], dtype=float)
+        second = first + _periodic_delta(first, parent.points[middle], mesh.period)
+        third = second + _periodic_delta(
+            parent.points[middle], parent.points[after], mesh.period
+        )
+        incoming = second - first
+        outgoing = third - second
+        if float(np.dot(incoming, outgoing)) >= 0.0:
+            continue
+        incoming_length = float(np.linalg.norm(incoming))
+        if incoming_length <= 0.0:
+            continue
+        direction = incoming / incoming_length
+        offset = third - first
+        separation = float(
+            np.linalg.norm(offset - np.dot(offset, direction) * direction)
+        )
+        required = mesh.config.min_transition_strip_edge_ratio * edge_scales[middle]
+        if separation < required:
+            return (
+                f"companion T doubles back on itself at samples "
+                f"{before}->{middle}->{after} with strand separation "
+                f"{separation:.3e}, below the local resolution requirement "
+                f"{required:.3e}; the strip between the strands cannot be "
+                "represented at this sampling"
+            )
     return None
 
 
@@ -1190,6 +1365,7 @@ def cut_surface_at_transitions(
             transition.u,
             transition.total_u_length,
             closed,
+            snap_open_ends=True,
         )
         gamma_ids, _, gamma_vertex_u = _insert_curve(
             mesh,
@@ -1211,6 +1387,15 @@ def cut_surface_at_transitions(
         )
         blocked_edges.update(path_edges)
 
+    surviving_edges = mesh.edges()
+    destroyed = [edge for edge in blocked_edges if edge not in surviving_edges]
+    if destroyed:
+        # A stale blocked edge would leave a silent gap in the cut and a
+        # plausible, wrong sheet graph (§21.2). Fail loudly instead.
+        raise ConstrainedCutError(
+            f"{len(destroyed)} constrained cut edges were destroyed by later "
+            "insertions; the cut cannot be trusted"
+        )
     pre_duplicate_labels = _triangle_components(mesh.triangles, blocked_edges)
     all_cut_vertices = {vertex for edge in blocked_edges for vertex in edge}
     branch_components = {
