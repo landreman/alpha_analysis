@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,6 +28,7 @@ from alpha_analysis.j_connectivity import (
     extract_critical_curves,
     load_cut_surface,
     map_transitions,
+    map_transitions_budget_sweep,
     MarchingTetrahedraExtractor,
     save_cut_surface,
 )
@@ -157,6 +160,85 @@ def _triangle_components(triangles):
                     labels[neighbor] = labels[seed]
                     stack.append(neighbor)
     return labels
+
+
+def _sheet_graph_signature(cut):
+    """Label-independent sheet/transition incidence used by §23.10.1 tests."""
+    roles = {port.role: port.sheet_id for port in cut.ports}
+    role_names = tuple(sorted(roles))
+    same_sheet = tuple(
+        (first, second, roles[first] == roles[second])
+        for index, first in enumerate(role_names)
+        for second in role_names[index + 1 :]
+    )
+    touches_edge = {}
+    for sheet_id in np.unique(cut.sheet_ids):
+        vertices = np.unique(cut.surface.triangles[cut.sheet_ids == sheet_id])
+        touches_edge[int(sheet_id)] = bool(
+            np.any((cut.surface.boundary_tags[vertices] & SurfaceMesh.EDGE) != 0)
+        )
+    return (
+        len(np.unique(cut.sheet_ids)),
+        tuple(sorted(roles)),
+        same_sheet,
+        bool(len(cut.unresolved_transition_ids)),
+        tuple((role, touches_edge.get(roles[role], False)) for role in role_names),
+    )
+
+
+def _transition_sample_key(transition):
+    """Exact deterministic mapped input key for avoiding duplicate test cuts."""
+    return (
+        transition.status,
+        transition.u.tobytes(),
+        tuple(port.points.tobytes() for port in transition.ports),
+        tuple(port.action_values.tobytes() for port in transition.ports),
+    )
+
+
+def test_nearest_cut_location_matches_exhaustive_periodic_search():
+    """Broad-phase culling must retain the nearest face and shared-edge ties."""
+    from alpha_analysis.j_connectivity.mesh_cut import (
+        _closest_point_triangle,
+        _MutableMesh,
+    )
+
+    surface, action = _surface_and_action()
+    mesh = _MutableMesh(surface, action, None, ConstrainedCutConfig())
+    # Off-face queries must include cases where the nearest face does not
+    # contain the nearest vertex. A per-triangle vertex distance is an
+    # invalid lower bound and would otherwise survive the on-face checks.
+    rng = np.random.default_rng(0)
+    radius = np.sqrt(rng.random(128))
+    theta = rng.uniform(0.0, 2.0 * np.pi, len(radius))
+    off_face = np.column_stack(
+        (
+            radius * np.cos(theta),
+            radius * np.sin(theta),
+            rng.uniform(-2.0 * surface.period, 3.0 * surface.period, len(radius)),
+        )
+    )
+    queries = np.vstack(
+        (
+            surface.points,
+            np.mean(surface.points[surface.triangles], axis=1),
+            [[0.1, 0.1, surface.period - 0.01], [0.0, 0.5, 0.03]],
+            off_face,
+        )
+    )
+    for point in queries:
+        exhaustive = []
+        for triangle_id in range(len(mesh.triangles)):
+            _, vertices = mesh._unwrapped_triangle(triangle_id, point)
+            closest, barycentric = _closest_point_triangle(point, *vertices)
+            exhaustive.append(
+                (np.linalg.norm(closest - point), triangle_id, closest, barycentric)
+            )
+        expected = min(exhaustive, key=lambda row: (row[0], row[1]))
+        actual = mesh._nearest_location(point)
+        assert actual[:2] == expected[:2]
+        np.testing.assert_array_equal(actual[3], expected[2])
+        np.testing.assert_array_equal(actual[4], expected[3])
 
 
 def test_constrained_cut_duplicates_branch_actions_and_assigns_three_sheets():
@@ -561,6 +643,18 @@ def production_synthetic_pipeline():
     )
     extraction = MarchingTetrahedraExtractor().extract(background, field, 1.4)
     critical = extract_critical_curves(extraction, field, 1.4)
+    trace_config = WellTraceConfig(samples_per_field_period=96)
+    data = evaluate_surface_data(extraction.incoming, field, trace_config)
+    return field, extraction, critical, data, trace_config
+
+
+def test_production_synthetic_surface_has_no_uncut_action_jump(
+    production_synthetic_pipeline,
+):
+    # Analytic generic split from test_transitions, now taken through the
+    # production background mesh, B=b extraction, well traces, critical
+    # curves, transition map, local projection, closed cut, and sheet graph.
+    field, extraction, critical, data, _ = production_synthetic_pipeline
     transitions = map_transitions(
         field,
         critical,
@@ -570,18 +664,6 @@ def production_synthetic_pipeline():
             max_action_quadrature_order=48,
         ),
     )
-    trace_config = WellTraceConfig(samples_per_field_period=96)
-    data = evaluate_surface_data(extraction.incoming, field, trace_config)
-    return field, extraction, transitions, data, trace_config
-
-
-def test_production_synthetic_surface_has_no_uncut_action_jump(
-    production_synthetic_pipeline,
-):
-    # Analytic generic split from test_transitions, now taken through the
-    # production background mesh, B=b extraction, well traces, critical
-    # curves, transition map, local projection, closed cut, and sheet graph.
-    field, extraction, transitions, data, _ = production_synthetic_pipeline
 
     cut = cut_surface_at_transitions(
         extraction.incoming, data.action_length, transitions, field=field
@@ -619,6 +701,54 @@ def test_production_synthetic_surface_has_no_uncut_action_jump(
     )
 
 
+@pytest.mark.parametrize("budget", (8, 10, 16, None), ids=("8", "10", "16", "full"))
+def test_production_synthetic_sheet_graph_is_invariant_across_sample_budgets(
+    production_synthetic_pipeline,
+    budget,
+):
+    """The production split has one certified graph at 8, 10, 16, and full."""
+    field, extraction, critical, data, _ = production_synthetic_pipeline
+    transition = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(
+            max_curve_samples=budget,
+            action_quadrature_order=24,
+            max_action_quadrature_order=48,
+        ),
+    )[0]
+    assert transition.status is TransitionStatus.REGULAR
+    assert transition.sampling_certified
+    if budget is not None:
+        assert transition.sampling_samples_used <= budget
+    else:
+        assert transition.sampling_samples_used == critical.polylines[0].vertex_ids.size
+    cut = cut_surface_at_transitions(
+        extraction.incoming,
+        data.action_length,
+        [transition],
+        field=field,
+    )
+    assert cut.unresolved_transition_ids.size == 0
+    # The analytic merged parent lives at s<0.5 and does not touch EDGE;
+    # both independent child sheets extend from s=0.5 to s=1. Every budget
+    # must match this same graph, not merely agree with another computed run.
+    assert _sheet_graph_signature(cut) == (
+        3,
+        ("child_1", "child_3", "parent"),
+        (
+            ("child_1", "child_3", False),
+            ("child_1", "parent", False),
+            ("child_3", "parent", False),
+        ),
+        False,
+        (("child_1", True), ("child_3", True), ("parent", False)),
+    )
+    by_role = {port.role: port for port in cut.ports}
+    gap = np.min(by_role["parent"].action_values - by_role["child_1"].action_values)
+    assert np.all(np.ptp(cut.action_values[cut.surface.triangles], axis=1) < 0.5 * gap)
+
+
 def test_nan_action_side_assignment_traces_probes_and_matches_finite_run(
     production_synthetic_pipeline,
 ):
@@ -626,7 +756,16 @@ def test_nan_action_side_assignment_traces_probes_and_matches_finite_run(
     # must trace one probe well per side and reach the same parent/child
     # sheets as the finite-action run -- the §10.3 step-6 decision is made by
     # data either way, never by a coin flip (docs/STATUS.md hardening item).
-    field, extraction, transitions, data, trace_config = production_synthetic_pipeline
+    field, extraction, critical, data, trace_config = production_synthetic_pipeline
+    transitions = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(
+            max_curve_samples=8,
+            action_quadrature_order=24,
+            max_action_quadrature_order=48,
+        ),
+    )
 
     finite_cut = cut_surface_at_transitions(
         extraction.incoming, data.action_length, transitions, field=field
@@ -690,7 +829,16 @@ def test_indecisive_side_assignment_is_demoted_not_guessed(
     # must become an explicit unresolved hyperedge -- a coin-flip comparison
     # a single bad probe could decide is not a side assignment. The probe
     # costs here differ by about twice the jump, so a ratio of five demotes.
-    field, extraction, transitions, _, trace_config = production_synthetic_pipeline
+    field, extraction, critical, _, trace_config = production_synthetic_pipeline
+    transitions = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(
+            max_curve_samples=8,
+            action_quadrature_order=24,
+            max_action_quadrature_order=48,
+        ),
+    )
 
     cut = cut_surface_at_transitions(
         extraction.incoming,
@@ -713,23 +861,40 @@ def test_indecisive_side_assignment_is_demoted_not_guessed(
     )
 
 
-def test_dmerc_reference_zigzag_curve_cuts_at_default_sampling():
+def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit(monkeypatch):
     # ADR 0005 acceptance on the reference equilibrium: the GAMMA_MAX
     # mesh-edge chain doubles back on itself at sub-triangle scale, the
     # certified upstream reordering repairs it, and the constrained cut then
-    # resolves end to end at the default sampling -- no tuned
-    # max_curve_samples. Also pins that a sample vertex crossed by another
+    # resolves end to end at the plotting example's default work budget.
+    # Also pins that a sample vertex crossed by another
     # samples' tagged path keeps its authoritative u (port actions exact).
-    field = BoozerField.from_boozmn(
-        os.path.join(
-            DATA_DIR,
-            "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_"
-            "aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
-        )
+    # Exercise the plotting command's actual default, not just a separately
+    # chosen successful budget. Its old default of 10 must fail this check.
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "examples"))
+    from plot_cut_surface_pyvista_logical import parse_arguments
+
+    boozmn = os.path.join(
+        DATA_DIR,
+        "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_"
+        "aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
     )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "plot_cut_surface_pyvista_logical.py",
+            "--boozmn",
+            boozmn,
+            "--lambda-n",
+            "0.8",
+        ],
+    )
+    args = parse_arguments()
+    default_budget = args.max_curve_samples if args.max_curve_samples > 0 else None
+    field = BoozerField.from_boozmn(args.boozmn)
     # Radially global refined bounds from docs/validation/milestone9-real-
     # equilibria.md; lambda_n = 0.8.
-    b = 5.040465893072380 + 0.8 * (12.05034354020445 - 5.040465893072380)
+    b = 5.040465893072380 + args.lambda_n * (12.05034354020445 - 5.040465893072380)
     background = StructuredPrismMeshBackend(BackgroundMeshConfig(6, 24, 12)).build(
         field
     )
@@ -740,40 +905,90 @@ def test_dmerc_reference_zigzag_curve_cuts_at_default_sampling():
     assert critical.report.reversal_repaired_count >= 2
     assert critical.report.reversal_unrepaired_count == 0
 
-    transitions = map_transitions(
+    resolved_signatures = []
+    explicit_budget_reports = 0
+    adaptive_successes = 0
+    budgets = tuple(dict.fromkeys((8, 10, 12, 16, None, default_budget)))
+    sweep = map_transitions_budget_sweep(
         field,
         critical,
+        budgets,
         TransitionMappingConfig(
-            max_curve_samples=10,
             action_quadrature_order=32,
             max_action_quadrature_order=512,
         ),
     )
-    assert len(transitions) == 1
-    assert transitions[0].status is TransitionStatus.REGULAR
-
-    cut = cut_surface_at_transitions(
-        extraction.incoming,
-        np.full(len(extraction.incoming.points), np.nan),
-        transitions,
-        field=field,
-    )
-
-    assert cut.unresolved_transition_ids.size == 0
-    assert len(np.unique(cut.sheet_ids)) == 2
-    for port in cut.ports:
-        assert port.sheet_id >= 0
-        assert np.all(port.polyline_vertex_ids >= 0)
-        np.testing.assert_allclose(
-            cut.action_values[port.polyline_vertex_ids],
-            port.action_values,
-            rtol=0.0,
-            atol=1.0e-12,
+    cut_cache = {}
+    for budget, transitions in zip(budgets, sweep):
+        assert len(transitions) == 1
+        transition = transitions[0]
+        # This reference crosses the periodic seam: singleton traces must
+        # share the assembled marginal curve's lift (DESIGN.md §§3.1, 10.2).
+        zeta_m = np.unwrap(transition.marginal_points[:, 2], period=critical.period)
+        assert np.any(
+            np.abs(zeta_m - transition.marginal_points[:, 2]) > 0.5 * critical.period
         )
-    parent = next(port for port in cut.ports if port.role == "parent")
-    child_1 = next(port for port in cut.ports if port.role == "child_1")
-    assert parent.sheet_id != child_1.sheet_id
-    triangle_actions = cut.action_values[cut.surface.triangles]
-    finite_rows = np.all(np.isfinite(triangle_actions), axis=1)
-    jump = np.min(np.abs(parent.action_values - child_1.action_values))
-    assert np.all(np.ptp(triangle_actions[finite_rows], axis=1) < 0.5 * jump)
+        np.testing.assert_allclose(
+            transition.event_zeta_unwrapped[:, 1], zeta_m, rtol=0.0, atol=1.0e-14
+        )
+        for port in transition.ports:
+            event_index = 1 if port.role == "child_3" else 0
+            np.testing.assert_allclose(
+                port.zeta_unwrapped,
+                transition.event_zeta_unwrapped[:, event_index],
+                rtol=0.0,
+                atol=1.0e-14,
+            )
+        key = _transition_sample_key(transition)
+        if key not in cut_cache:
+            cut_cache[key] = cut_surface_at_transitions(
+                extraction.incoming,
+                np.full(len(extraction.incoming.points), np.nan),
+                [transition],
+                field=field,
+            )
+        cut = cut_cache[key]
+        if budget == default_budget:
+            assert transition.status is TransitionStatus.REGULAR, (
+                "the plotting command's default must certify the DMercFail cut: "
+                + transition.sampling_reason
+            )
+            assert cut.unresolved_transition_ids.size == 0
+        if transition.status is TransitionStatus.BUDGET_INSUFFICIENT:
+            explicit_budget_reports += 1
+            assert not transition.sampling_certified
+            assert "budget" in transition.sampling_reason
+            np.testing.assert_array_equal(cut.unresolved_transition_ids, [0])
+            assert "sampling budget" in cut.unresolved_transition_reasons[0]
+            assert all(port.sheet_id == -1 for port in cut.ports)
+            continue
+
+        assert transition.status is TransitionStatus.REGULAR
+        assert transition.sampling_certified
+        adaptive_successes += (
+            transition.sampling_samples_used < transition.authoritative_sample_count
+        )
+        assert cut.unresolved_transition_ids.size == 0
+        assert len(np.unique(cut.sheet_ids)) == 2
+        for port in cut.ports:
+            assert port.sheet_id >= 0
+            assert np.all(port.polyline_vertex_ids >= 0)
+            np.testing.assert_allclose(
+                cut.action_values[port.polyline_vertex_ids],
+                port.action_values,
+                rtol=0.0,
+                atol=1.0e-12,
+            )
+        parent = next(port for port in cut.ports if port.role == "parent")
+        child_1 = next(port for port in cut.ports if port.role == "child_1")
+        assert parent.sheet_id != child_1.sheet_id
+        triangle_actions = cut.action_values[cut.surface.triangles]
+        finite_rows = np.all(np.isfinite(triangle_actions), axis=1)
+        jump = np.min(np.abs(parent.action_values - child_1.action_values))
+        assert np.all(np.ptp(triangle_actions[finite_rows], axis=1) < 0.5 * jump)
+        resolved_signatures.append(_sheet_graph_signature(cut))
+
+    assert resolved_signatures
+    assert resolved_signatures == [resolved_signatures[0]] * len(resolved_signatures)
+    assert explicit_budget_reports >= 1
+    assert adaptive_successes >= 1

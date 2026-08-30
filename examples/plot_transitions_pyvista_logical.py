@@ -251,8 +251,9 @@ def parse_arguments() -> argparse.Namespace:
         "--max-curve-samples",
         type=int,
         default=12,
-        help="samples per Gamma_max polyline passed to map_transitions; "
-        "0 keeps every critical-curve vertex",
+        help="adaptive mapping work budget per Gamma_max polyline; an "
+        "uncertified curve remains explicitly budget-insufficient. 0 maps "
+        "every authoritative critical-curve vertex",
     )
     parser.add_argument(
         "--max-path-periods",

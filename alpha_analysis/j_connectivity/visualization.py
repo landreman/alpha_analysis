@@ -499,7 +499,7 @@ def plot_surface_data(data, *, output_path=None, metadata=None):
     return figure, axes
 
 
-def plot_transition_diagnostics(field, transition, *, output_path=None):
+def plot_transition_diagnostics(field, transition, *, output_path=None, metadata=None):
     """Plot matched transition geometry and action diagnostics (§17.5).
 
     The four panels show ``GAMMA_MAX`` and ``T`` with pointwise connectors,
@@ -510,9 +510,12 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
     an equal-height contact the sampling stepped over is shaded on the action
     panel so a jump in ``A_p(u)`` is never read as a steep regular slope. A
     closed curve's wraparound bracket is drawn as the two spans it really
-    occupies, never as the complement between them.
+    occupies, never as the complement between them. Sampling certification
+    and budget failures are explicit; callers may supply equilibrium/hash,
+    mesh, controls, and code-commit context through ``metadata`` (§17.1).
     """
     import matplotlib.pyplot as plt
+    from textwrap import fill
 
     from .types import TransitionStatus
 
@@ -584,6 +587,13 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
                 label=label,
             )
             label = None
+    if not transition.sampling_certified:
+        action_axis.set_title(
+            fill(transition.sampling_reason, width=64),
+            color="darkorange",
+            fontsize="small",
+            loc="left",
+        )
     action_axis.set_xlabel(r"common curve parameter $u$")
     action_axis.set_ylabel(r"action length $A$ [length]")
     action_axis.legend(fontsize="small")
@@ -634,11 +644,22 @@ def plot_transition_diagnostics(field, transition, *, output_path=None):
         )
     profile_axis.set_xlabel(r"lifted $\zeta$ [rad]")
     profile_axis.set_ylabel("B [field units]")
+    context = (
+        "\n"
+        + fill(
+            ", ".join(f"{key}={value}" for key, value in metadata.items()), width=110
+        )
+        if metadata
+        else ""
+    )
     figure.suptitle(
         f"Transition {transition.transition_id}: b={transition.b:.8g}, "
         f"{transition.status.name}, "
         f"{sum(status is TransitionStatus.REGULAR for status in transition.sample_status)}"
-        f"/{len(transition.u)} regular samples"
+        f"/{len(transition.u)} regular samples, sampling "
+        f"{'certified' if transition.sampling_certified else 'uncertified'} "
+        f"({transition.sampling_samples_used}/{transition.authoritative_sample_count})"
+        f"{context}"
     )
     if output_path is not None:
         figure.savefig(output_path, dpi=160)

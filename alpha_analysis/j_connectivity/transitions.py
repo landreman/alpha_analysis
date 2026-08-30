@@ -23,6 +23,7 @@ from scipy.optimize import brentq
 
 from .critical_curves import CriticalCurveStatus, CriticalCurves, CriticalKind
 from .field import BoozerFieldLike
+from .surface_extract import SurfaceMesh
 from .types import FloatArray, IntArray, TransitionStatus
 from .well_trace import _mode_frequency
 
@@ -42,14 +43,27 @@ class TransitionMappingConfig:
     adaptive quadrature over ``[a,d]`` with the same extrema and tangent point
     supplied as interior breakpoints. These controls are the transition-action
     refinement dimension required by §§21.3 and 23.
-    ``max_curve_samples`` optionally selects a deterministic uniform subset of
-    the critical polyline's existing cumulative-arc-length samples; ``None``
-    retains every vertex. ``total_u_length`` and source vertex IDs remain
-    those of the authoritative critical curve, but the subset is not free of
-    geometric effect: the sampled companion points become the polyline the
-    milestone-10 cut inserts, so budget sensitivity of a downstream cut is a
-    §21.3 dimension-9 convergence signal (ADR 0005; decoupling is milestone
-    10.1).
+    ``max_curve_samples`` is a work budget, not a uniform coarsening request.
+    The mapper starts from a deterministic coarse subset of the authoritative
+    critical-curve vertices and maps midpoint vertices until every retained
+    interval is certified. Certification compares companion and marginal
+    geometry, all three action functions, the detected extremum itinerary,
+    proximity to ``EDGE``, and near self-contact. If the budget is exhausted,
+    the transition is ``BUDGET_INSUFFICIENT`` and cannot be cut. ``None`` maps
+    every authoritative vertex. The curve tolerances below are dimensionless
+    logical distance (geometry), action length (action absolute tolerance),
+    and normalized flux ``s`` (edge proximity). This is §21.3 dimension 9 and
+    DESIGN.md milestone 10.1.
+    Geometry is accepted when its midpoint error is at most
+    ``curve_geometry_atol + curve_geometry_rtol * interval_u_length``;
+    each port action uses ``curve_action_atol + curve_action_rtol * scale``,
+    where ``scale`` is the largest absolute endpoint/midpoint action.
+    Intervals within ``curve_edge_proximity`` of ``s=1`` refine to adjacent
+    authoritative vertices. Near-self-contact splits an interval when the
+    separation is below ``curve_self_contact_ratio * interval_u_length``;
+    the threshold is reevaluated on each shorter child and can cease to
+    trigger before adjacency. These are finite-resolution
+    certification controls, not a bound on unseen sub-vertex features.
     ``additivity_atol`` has action-length units and ``additivity_rtol`` is
     dimensionless.
     """
@@ -71,6 +85,12 @@ class TransitionMappingConfig:
     field_identity_tolerance: float = 1.0e-8
     max_curve_samples: int | None = None
     max_action_quadrature_order: int | None = None
+    curve_geometry_atol: float = 1.0e-8
+    curve_geometry_rtol: float = 0.2
+    curve_action_atol: float = 1.0e-8
+    curve_action_rtol: float = 0.02
+    curve_edge_proximity: float = 0.02
+    curve_self_contact_ratio: float = 0.1
 
     def __post_init__(self) -> None:
         for name in (
@@ -107,6 +127,12 @@ class TransitionMappingConfig:
             "additivity_atol",
             "additivity_rtol",
             "field_identity_tolerance",
+            "curve_geometry_atol",
+            "curve_geometry_rtol",
+            "curve_action_atol",
+            "curve_action_rtol",
+            "curve_edge_proximity",
+            "curve_self_contact_ratio",
         ):
             value = getattr(self, name)
             if not np.isfinite(value) or value <= 0.0:
@@ -195,6 +221,17 @@ class TransitionCurve:
     bracket is still recorded. Rows are in sample order and are not sorted: a
     closed curve's wraparound row is ``(n_samples - 1, 0)``, whose ``u``
     values decrease.
+
+    Milestone 10.1 sampling diagnostics keep §21.3 dimension 9 explicit.
+    ``sampling_samples_used`` counts retained, uniquely mapped authoritative
+    vertices; ``authoritative_sample_count`` is the full source-curve count.
+    ``sampling_unresolved_intervals`` stores source-curve index pairs (a
+    decreasing pair is the closed wraparound interval). A transition is safe
+    to cut only when ``sampling_certified`` is true; budget exhaustion uses
+    ``TransitionStatus.BUDGET_INSUFFICIENT`` and ``sampling_reason`` explains
+    the remaining work. The maximum errors are the largest midpoint-versus-
+    interpolation discrepancies encountered during adaptive certification,
+    in logical distance and action-length units respectively.
     """
 
     transition_id: int
@@ -214,6 +251,13 @@ class TransitionCurve:
     interior_maximum_count: IntArray | None = None
     barrier_margin: FloatArray | None = None
     contact_sample_pairs: IntArray | None = None
+    sampling_certified: bool = True
+    sampling_samples_used: int | None = None
+    authoritative_sample_count: int | None = None
+    sampling_unresolved_intervals: IntArray | None = None
+    sampling_reason: str = ""
+    sampling_max_geometry_error: float = 0.0
+    sampling_max_action_error: float = 0.0
 
     def __post_init__(self) -> None:
         u = np.asarray(self.u, dtype=np.float64)
@@ -238,6 +282,28 @@ class TransitionCurve:
             np.empty((0, 2), dtype=np.int64)
             if self.contact_sample_pairs is None
             else np.asarray(self.contact_sample_pairs, dtype=np.int64).reshape(-1, 2)
+        )
+        sampling_samples_used = (
+            n_samples
+            if self.sampling_samples_used is None
+            else int(self.sampling_samples_used)
+        )
+        authoritative_sample_count = (
+            n_samples
+            if self.authoritative_sample_count is None
+            else int(self.authoritative_sample_count)
+        )
+        sampling_unresolved_intervals = (
+            np.empty((0, 2), dtype=np.int64)
+            if self.sampling_unresolved_intervals is None
+            else np.asarray(self.sampling_unresolved_intervals, dtype=np.int64).reshape(
+                -1, 2
+            )
+        )
+        sampling_reason = self.sampling_reason or (
+            "certified legacy/full transition samples"
+            if self.sampling_certified
+            else "transition sampling is not certified"
         )
         if not sample_status:
             sample_status = (self.status,) * n_samples
@@ -293,11 +359,47 @@ class TransitionCurve:
             contact_sample_pairs.min() < 0 or contact_sample_pairs.max() >= n_samples
         ):
             raise ValueError("contact_sample_pairs must index the sample axis")
+        if sampling_samples_used != n_samples:
+            raise ValueError(
+                "sampling_samples_used must equal the retained sample count"
+            )
+        if authoritative_sample_count < n_samples:
+            raise ValueError(
+                "authoritative_sample_count cannot be below retained samples"
+            )
+        if len(sampling_unresolved_intervals) and (
+            sampling_unresolved_intervals.min() < 0
+            or sampling_unresolved_intervals.max() >= authoritative_sample_count
+        ):
+            raise ValueError(
+                "sampling_unresolved_intervals must index authoritative samples"
+            )
+        if not isinstance(sampling_reason, str) or not sampling_reason:
+            raise ValueError("sampling_reason must be nonempty")
+        if (
+            self.status is TransitionStatus.BUDGET_INSUFFICIENT
+            and self.sampling_certified
+        ):
+            raise ValueError("a budget-insufficient transition cannot be certified")
+        for value, name in (
+            (self.sampling_max_geometry_error, "sampling_max_geometry_error"),
+            (self.sampling_max_action_error, "sampling_max_action_error"),
+        ):
+            if not np.isfinite(value) or value < 0.0:
+                raise ValueError(f"{name} must be finite and nonnegative")
         object.__setattr__(self, "interior_maximum_count", interior_maximum_count)
         object.__setattr__(self, "barrier_margin", barrier_margin)
         object.__setattr__(self, "contact_sample_pairs", contact_sample_pairs)
         object.__setattr__(self, "sample_status", sample_status)
         object.__setattr__(self, "sample_failure_reason", sample_failure_reason)
+        object.__setattr__(self, "sampling_samples_used", sampling_samples_used)
+        object.__setattr__(
+            self, "authoritative_sample_count", authoritative_sample_count
+        )
+        object.__setattr__(
+            self, "sampling_unresolved_intervals", sampling_unresolved_intervals
+        )
+        object.__setattr__(self, "sampling_reason", sampling_reason)
         for name, values in (
             ("u", u),
             ("marginal_points", marginal),
@@ -838,24 +940,16 @@ def _curve_status(
     return status
 
 
-def _curve_sample_indices(polyline, max_samples: int | None) -> IntArray:
-    """Select deterministic, ordered samples without changing the PL curve."""
-    count = len(polyline.vertex_ids)
-    if max_samples is None or count <= max_samples:
-        return np.arange(count, dtype=np.int64)
-    if polyline.closed:
-        return np.floor(np.arange(max_samples) * count / max_samples).astype(np.int64)
-    return np.rint(np.linspace(0, count - 1, max_samples)).astype(np.int64)
-
-
-def _map_polyline(
+def _map_polyline_samples(
     field: BoozerFieldLike,
     critical: CriticalCurves,
     polyline,
     transition_id: int,
     config: TransitionMappingConfig,
+    sample_indices: IntArray,
 ) -> TransitionCurve:
-    sample_indices = _curve_sample_indices(polyline, config.max_curve_samples)
+    """Map a specified ordered subset of authoritative polyline vertices."""
+    sample_indices = np.asarray(sample_indices, dtype=np.int64)
     source_ids = np.asarray(polyline.vertex_ids, dtype=np.int64)[sample_indices]
     marginal = np.asarray(critical.points[source_ids], dtype=float)
     u = np.asarray(polyline.u, dtype=float)[sample_indices]
@@ -1112,10 +1206,458 @@ def _map_polyline(
     )
 
 
+def _periodic_point_delta(first, second, period: float) -> FloatArray:
+    """Return ``second-first`` with the zeta component locally unwrapped."""
+    delta = np.asarray(second, dtype=float) - np.asarray(first, dtype=float)
+    delta[2] -= period * np.round(delta[2] / period)
+    return delta
+
+
+def _interval_interior_indices(left: int, right: int, count: int, closed: bool):
+    if right > left:
+        return list(range(left + 1, right))
+    if closed:
+        return list(range(left + 1, count)) + list(range(0, right))
+    return []
+
+
+def _interval_coordinates(polyline, left: int, right: int, candidate: int):
+    left_u = float(polyline.u[left])
+    right_u = float(polyline.u[right])
+    candidate_u = float(polyline.u[candidate])
+    if polyline.closed and right <= left:
+        right_u += float(polyline.total_length)
+        if candidate <= left:
+            candidate_u += float(polyline.total_length)
+    fraction = (candidate_u - left_u) / (right_u - left_u)
+    return left_u, right_u, candidate_u, float(fraction)
+
+
+def _interval_midpoint_index(polyline, left: int, right: int) -> int | None:
+    count = len(polyline.vertex_ids)
+    interior = _interval_interior_indices(left, right, count, bool(polyline.closed))
+    if not interior:
+        return None
+    left_u = float(polyline.u[left])
+    right_u = float(polyline.u[right])
+    if polyline.closed and right <= left:
+        right_u += float(polyline.total_length)
+    target = 0.5 * (left_u + right_u)
+
+    def distance(index):
+        value = float(polyline.u[index])
+        if polyline.closed and right <= left and index <= left:
+            value += float(polyline.total_length)
+        return abs(value - target)
+
+    return min(interior, key=lambda index: (distance(index), index))
+
+
+def _interval_edge_sensitive(critical, polyline, left, right, config):
+    count = len(polyline.vertex_ids)
+    local = [
+        left,
+        *_interval_interior_indices(left, right, count, polyline.closed),
+        right,
+    ]
+    source_ids = np.asarray(polyline.vertex_ids, dtype=np.int64)[local]
+    points = critical.points[source_ids]
+    s = np.sum(points[:, :2] ** 2, axis=1)
+    tags = critical.boundary_tags[source_ids]
+    return bool(
+        np.any(1.0 - s <= config.curve_edge_proximity)
+        or np.any((tags & SurfaceMesh.EDGE) != 0)
+    )
+
+
+def _authoritative_near_self_contact(critical, polyline, candidate, span, config):
+    count = len(polyline.vertex_ids)
+    if count < 4:
+        return False
+    source_ids = np.asarray(polyline.vertex_ids, dtype=np.int64)
+    point = critical.points[source_ids[candidate]]
+    for other in range(count):
+        separation = abs(candidate - other)
+        if polyline.closed:
+            separation = min(separation, count - separation)
+        if separation <= 1:
+            continue
+        distance = np.linalg.norm(
+            _periodic_point_delta(
+                point, critical.points[source_ids[other]], critical.period
+            )
+        )
+        if distance < config.curve_self_contact_ratio * span:
+            return True
+    return False
+
+
+def _interval_priority(critical, polyline, left, right, config):
+    candidate = _interval_midpoint_index(polyline, left, right)
+    if candidate is None:
+        return (-1.0,), None
+    left_u, right_u, _, fraction = _interval_coordinates(
+        polyline, left, right, candidate
+    )
+    span = right_u - left_u
+    source_ids = np.asarray(polyline.vertex_ids, dtype=np.int64)
+    first = critical.points[source_ids[left]]
+    expected = first + fraction * _periodic_point_delta(
+        first, critical.points[source_ids[right]], critical.period
+    )
+    deviation = np.linalg.norm(
+        _periodic_point_delta(
+            expected, critical.points[source_ids[candidate]], critical.period
+        )
+    )
+    edge = _interval_edge_sensitive(critical, polyline, left, right, config)
+    contact = _authoritative_near_self_contact(
+        critical, polyline, candidate, span, config
+    )
+    return (float(edge), float(contact), float(deviation / span), span), candidate
+
+
+def _combine_mapped_samples(
+    field,
+    critical,
+    polyline,
+    transition_id,
+    config,
+    cache,
+    selected,
+    *,
+    sampling_certified,
+    unresolved_intervals,
+    sampling_reason,
+    max_geometry_error,
+    max_action_error,
+):
+    selected = sorted(selected)
+    samples = [cache[index] for index in selected]
+    sample_status = tuple(sample.sample_status[0] for sample in samples)
+    sample_failure_reason = tuple(sample.sample_failure_reason[0] for sample in samples)
+    interior_maximum_count = np.asarray(
+        [sample.interior_maximum_count[0] for sample in samples], dtype=np.int64
+    )
+    barrier_margin = np.asarray(
+        [sample.barrier_margin[0] for sample in samples], dtype=float
+    )
+    contact_sample_pairs = _between_sample_contacts(
+        interior_maximum_count, sample_status, bool(polyline.closed)
+    )
+    status = _curve_status(sample_status, len(contact_sample_pairs))
+    if status is TransitionStatus.REGULAR and not sampling_certified:
+        status = TransitionStatus.BUDGET_INSUFFICIENT
+
+    roles = tuple(port.role for port in samples[0].ports)
+    marginal_points = np.vstack([sample.marginal_points for sample in samples])
+    s_values = np.sum(marginal_points[:, :2] ** 2, axis=1)
+    theta_m = np.unwrap(np.arctan2(marginal_points[:, 1], marginal_points[:, 0]))
+    zeta_m = np.unwrap(marginal_points[:, 2], period=critical.period)
+    iota_values = np.asarray(field.iota(s_values), dtype=float)
+    if iota_values.shape == ():
+        iota_values = np.full(len(selected), float(iota_values))
+    field_line_identity = np.column_stack((s_values, theta_m - iota_values * zeta_m))
+    zeta_shift = zeta_m - marginal_points[:, 2]
+    ports = []
+    for port_index, role in enumerate(roles):
+        sample_ports = [sample.ports[port_index] for sample in samples]
+        ports.append(
+            TransitionPort(
+                role,
+                np.vstack([port.points for port in sample_ports]),
+                np.concatenate([port.zeta_unwrapped for port in sample_ports])
+                + zeta_shift,
+                np.concatenate([port.action_values for port in sample_ports]),
+                np.concatenate([port.quadrature_error for port in sample_ports]),
+                np.concatenate([port.source_vertex_ids for port in sample_ports]),
+            )
+        )
+    return TransitionCurve(
+        transition_id=transition_id,
+        b=critical.b,
+        u=np.asarray([polyline.u[index] for index in selected], dtype=float),
+        total_u_length=float(polyline.total_length),
+        ports=tuple(ports),
+        marginal_points=marginal_points,
+        field_line_identity=field_line_identity,
+        event_zeta_unwrapped=np.vstack(
+            [sample.event_zeta_unwrapped for sample in samples]
+        )
+        + zeta_shift[:, np.newaxis],
+        additivity_residual=np.concatenate(
+            [sample.additivity_residual for sample in samples]
+        ),
+        status=status,
+        source_critical_status=critical.status,
+        controls=config,
+        sample_status=sample_status,
+        sample_failure_reason=sample_failure_reason,
+        interior_maximum_count=interior_maximum_count,
+        barrier_margin=barrier_margin,
+        contact_sample_pairs=contact_sample_pairs,
+        sampling_certified=sampling_certified,
+        sampling_samples_used=len(selected),
+        authoritative_sample_count=len(polyline.vertex_ids),
+        sampling_unresolved_intervals=np.asarray(
+            unresolved_intervals, dtype=np.int64
+        ).reshape(-1, 2),
+        sampling_reason=sampling_reason,
+        sampling_max_geometry_error=max_geometry_error,
+        sampling_max_action_error=max_action_error,
+    )
+
+
+def _certify_interval(critical, polyline, left, middle, right, cache, config):
+    endpoints = (cache[left], cache[middle], cache[right])
+    if any(
+        sample.sample_status[0] is not TransitionStatus.REGULAR for sample in endpoints
+    ):
+        return False, 0.0, 0.0, "mapped sample failure"
+    left_u, right_u, _, fraction = _interval_coordinates(polyline, left, right, middle)
+    span = right_u - left_u
+    geometry_error = 0.0
+    action_error = 0.0
+    action_ok = True
+    for port_index in range(3):
+        first = endpoints[0].ports[port_index]
+        actual = endpoints[1].ports[port_index]
+        last = endpoints[2].ports[port_index]
+        expected_point = first.points[0] + fraction * _periodic_point_delta(
+            first.points[0], last.points[0], critical.period
+        )
+        geometry_error = max(
+            geometry_error,
+            float(
+                np.linalg.norm(
+                    _periodic_point_delta(
+                        expected_point, actual.points[0], critical.period
+                    )
+                )
+            ),
+        )
+        expected_action = (1.0 - fraction) * first.action_values[
+            0
+        ] + fraction * last.action_values[0]
+        error = abs(actual.action_values[0] - expected_action)
+        action_error = max(action_error, float(error))
+        scale = max(
+            abs(actual.action_values[0]),
+            abs(first.action_values[0]),
+            abs(last.action_values[0]),
+        )
+        action_ok &= (
+            error <= config.curve_action_atol + config.curve_action_rtol * scale
+        )
+    geometry_ok = geometry_error <= (
+        config.curve_geometry_atol + config.curve_geometry_rtol * span
+    )
+    counts = [sample.interior_maximum_count[0] for sample in endpoints]
+    itinerary_ok = counts[0] == counts[1] == counts[2]
+    edge_sensitive = _interval_edge_sensitive(critical, polyline, left, right, config)
+
+    near_contact = _authoritative_near_self_contact(
+        critical, polyline, middle, span, config
+    )
+    middle_point = endpoints[1].ports[0].points[0]
+    for other, sample in cache.items():
+        if other in (left, middle, right):
+            continue
+        u_distance = abs(float(polyline.u[middle]) - float(polyline.u[other]))
+        if polyline.closed:
+            u_distance = min(u_distance, float(polyline.total_length) - u_distance)
+        if u_distance <= 1.5 * span:
+            continue
+        distance = np.linalg.norm(
+            _periodic_point_delta(
+                middle_point, sample.ports[0].points[0], critical.period
+            )
+        )
+        if distance < config.curve_self_contact_ratio * span:
+            near_contact = True
+            break
+    passed = (
+        geometry_ok
+        and action_ok
+        and itinerary_ok
+        and not edge_sensitive
+        and not near_contact
+    )
+    reason = ", ".join(
+        name
+        for name, failed in (
+            ("geometry", not geometry_ok),
+            ("action", not action_ok),
+            ("itinerary", not itinerary_ok),
+            ("EDGE proximity", edge_sensitive),
+            ("near self-contact", near_contact),
+        )
+        if failed
+    )
+    return passed, geometry_error, action_error, reason or "certified"
+
+
+def _map_polyline(
+    field: BoozerFieldLike,
+    critical: CriticalCurves,
+    polyline,
+    transition_id: int,
+    config: TransitionMappingConfig,
+    sample_cache=None,
+) -> TransitionCurve:
+    """Adaptively map and certify one authoritative critical polyline (§23.10.1)."""
+    count = len(polyline.vertex_ids)
+    all_indices = np.arange(count, dtype=np.int64)
+    cache = {} if sample_cache is None else sample_cache
+
+    def mapped(index):
+        if index not in cache:
+            cache[index] = _map_polyline_samples(
+                field,
+                critical,
+                polyline,
+                transition_id,
+                config,
+                np.asarray([index], dtype=np.int64),
+            )
+        return cache[index]
+
+    if config.max_curve_samples is None or config.max_curve_samples >= count:
+        if sample_cache is not None:
+            for index in all_indices:
+                mapped(int(index))
+            return _combine_mapped_samples(
+                field,
+                critical,
+                polyline,
+                transition_id,
+                config,
+                cache,
+                set(map(int, all_indices)),
+                sampling_certified=True,
+                unresolved_intervals=[],
+                sampling_reason="mapped every authoritative critical-curve vertex",
+                max_geometry_error=0.0,
+                max_action_error=0.0,
+            )
+        result = _map_polyline_samples(
+            field, critical, polyline, transition_id, config, all_indices
+        )
+        return replace(
+            result,
+            sampling_certified=True,
+            sampling_samples_used=count,
+            authoritative_sample_count=count,
+            sampling_unresolved_intervals=np.empty((0, 2), dtype=np.int64),
+            sampling_reason="mapped every authoritative critical-curve vertex",
+        )
+
+    if polyline.closed:
+        selected = {0, count // 2}
+    else:
+        selected = {0, count - 1}
+    for index in selected:
+        mapped(index)
+    ordered = sorted(selected)
+    pending = list(zip(ordered[:-1], ordered[1:]))
+    if polyline.closed:
+        pending.append((ordered[-1], ordered[0]))
+    pending = [
+        interval
+        for interval in pending
+        if _interval_midpoint_index(polyline, *interval) is not None
+    ]
+    max_geometry_error = 0.0
+    max_action_error = 0.0
+    stop_reason = ""
+    stopped_early = False
+    while pending and len(selected) < config.max_curve_samples:
+        ranked = [
+            (*_interval_priority(critical, polyline, *interval, config)[0], interval)
+            for interval in pending
+        ]
+        *_, interval = max(ranked)
+        pending.remove(interval)
+        left, right = interval
+        middle = _interval_midpoint_index(polyline, left, right)
+        if middle is None:
+            continue
+        selected.add(middle)
+        mapped(middle)
+        passed, geometry_error, action_error, reason = _certify_interval(
+            critical,
+            polyline,
+            left,
+            middle,
+            right,
+            {index: cache[index] for index in selected},
+            config,
+        )
+        max_geometry_error = max(max_geometry_error, geometry_error)
+        max_action_error = max(max_action_error, action_error)
+        statuses = (
+            cache[left].sample_status[0],
+            cache[middle].sample_status[0],
+            cache[right].sample_status[0],
+        )
+        counts = (
+            cache[left].interior_maximum_count[0],
+            cache[middle].interior_maximum_count[0],
+            cache[right].interior_maximum_count[0],
+        )
+        if any(status is not TransitionStatus.REGULAR for status in statuses):
+            stopped_early = True
+            stop_reason = f"certification interrupted by {reason}"
+            pending.append(interval)
+            break
+        if len(set(map(int, counts))) > 1:
+            stopped_early = True
+            stop_reason = (
+                "certification interrupted by an interior-maximum count change"
+            )
+            pending.append(interval)
+            break
+        if passed:
+            continue
+        for child in ((left, middle), (middle, right)):
+            if _interval_midpoint_index(polyline, *child) is not None:
+                pending.append(child)
+    sampling_certified = not pending and not stopped_early
+    if stopped_early:
+        reason = stop_reason
+    elif pending:
+        reason = (
+            f"transition sampling budget {config.max_curve_samples} exhausted "
+            f"after {len(selected)} of {count} authoritative vertices; "
+            f"{len(pending)} intervals remain uncertified"
+        )
+    else:
+        reason = (
+            f"adaptive certification completed with {len(selected)} of {count} "
+            "authoritative vertices"
+        )
+    return _combine_mapped_samples(
+        field,
+        critical,
+        polyline,
+        transition_id,
+        config,
+        cache,
+        selected,
+        sampling_certified=sampling_certified,
+        unresolved_intervals=pending,
+        sampling_reason=reason,
+        max_geometry_error=max_geometry_error,
+        max_action_error=max_action_error,
+    )
+
+
 def map_transitions(
     field: BoozerFieldLike,
     critical: CriticalCurves,
     config: TransitionMappingConfig | None = None,
+    *,
+    _sample_caches=None,
 ) -> tuple[TransitionCurve, ...]:
     """Construct companion curves and matched ports (DESIGN.md §10.2).
 
@@ -1136,8 +1678,17 @@ def map_transitions(
         for polyline in critical.polylines
         if polyline.kind is CriticalKind.GAMMA_MAX
     ]
+    if _sample_caches is not None and len(_sample_caches) != len(maxima):
+        raise ValueError("one transition sample cache is required per GAMMA_MAX curve")
     transitions = [
-        _map_polyline(field, critical, polyline, index, cfg)
+        _map_polyline(
+            field,
+            critical,
+            polyline,
+            index,
+            cfg,
+            None if _sample_caches is None else _sample_caches[index],
+        )
         for index, polyline in enumerate(maxima)
     ]
     duplicate_components: set[int] = set()
@@ -1202,3 +1753,36 @@ def map_transitions(
             interior_maximum_count=np.full(len(transition.u), -1, dtype=np.int64),
         )
     return tuple(transitions)
+
+
+def map_transitions_budget_sweep(
+    field: BoozerFieldLike,
+    critical: CriticalCurves,
+    budgets: tuple[int | None, ...] | list[int | None],
+    config: TransitionMappingConfig | None = None,
+) -> tuple[tuple[TransitionCurve, ...], ...]:
+    """Map a §21.3 sampling sweep while reusing unique vertex traces.
+
+    Each returned item is exactly the result for the corresponding
+    ``max_curve_samples`` work budget. Cached samples are reused only when all
+    other transition controls are identical; the retained samples and
+    certification decision for each budget are unchanged. This makes the
+    required 8/10/16/full topology check affordable on real equilibria.
+    """
+    base = TransitionMappingConfig() if config is None else config
+    maxima_count = sum(
+        polyline.kind is CriticalKind.GAMMA_MAX for polyline in critical.polylines
+    )
+    caches = [{} for _ in range(maxima_count)]
+    results = []
+    for budget in budgets:
+        controls = replace(base, max_curve_samples=budget)
+        results.append(
+            map_transitions(
+                field,
+                critical,
+                controls,
+                _sample_caches=caches,
+            )
+        )
+    return tuple(results)
