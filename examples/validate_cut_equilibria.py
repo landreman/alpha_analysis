@@ -301,6 +301,11 @@ def main() -> None:
                                         transition.sampling_unresolved_intervals.tolist()
                                     ),
                                     "reason": transition.sampling_reason,
+                                    "error_scope": (
+                                        "maximum midpoint discrepancy encountered, "
+                                        "including intervals later refined away; "
+                                        "not a final residual bound"
+                                    ),
                                     "max_geometry_error": (
                                         transition.sampling_max_geometry_error
                                     ),

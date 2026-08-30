@@ -88,6 +88,13 @@ move it into `docs/DESIGN.md` and delete it here.
 - ADR 0005 is decided (2026-08-30): `extract_critical_curves` repairs sub-resolution chain reversals only when a bounded walk of the true `B=b, g=0` curve certifies a simple arc; certification failures stay untouched and counted (`reversal_repaired_count` / `reversal_unrepaired_count` in `CriticalCurveReport`), and the cut-time double-back guard remains the permanent backstop. Repaired ordering changes `u` and `total_u_length`, so milestone-9-recorded per-curve numbers are superseded where a repair fired. The DMercFail λₙ=0.8 reference cuts once sampling certification finishes (`test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit`); structured 8/10-vertex budgets now honestly report insufficiency rather than accepting a coarser cut. Milestones 10.2–10.3 own contact localization with segment-level cutting and failure-directed refinement; Milestone 11 should still branch on `contact_sample_pairs` and `sample_status`, and must treat every demoted/unresolved transition as unresolved connectivity, never as no connection.
 - Milestone 10.1's cut gate requires both `status is REGULAR` and `sampling_certified`, in addition to the per-sample/contact checks described above; per-sample regularity alone is insufficient. It preserves insertion action stencils and refreshes off-cut descendants after branch-limit assignment, using only source copies on the same sheet. A genuinely cross-sheet stencil remains `NaN` and must be counted as unresolved action downstream. The 100-case real matrix and four-backend/extractor DMercFail budget sweep are recorded in `docs/validation/milestone10.1-real-equilibria.md`; certification is relative to authoritative critical-curve and root-scan resolution, not a guarantee about sub-vertex features.
 
+- The sampling itinerary comparison is redundant with final between-sample contact
+  bracketing; both remain intentional safeguards. Near-self-contact refinement is a
+  heuristic trigger, not a certified global separation bound, and currently has no
+  isolated analytic mutation test. Milestones 10.2/10.3 should retain this limitation
+  when extending curve/contact refinement. Early sampling stops now retain their
+  uncertified source intervals for those consumers.
+
 ## Accepted deviations
 
 Design decisions taken during implementation that differ from `docs/DESIGN.md` live in

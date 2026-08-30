@@ -25,6 +25,11 @@ These checks certify the retained PL representation relative to the existing
 critical-curve vertices and detected root-scan itinerary. They do not certify
 features below either upstream resolution. Milestones 10.2/10.3 still own
 contact localization and failure-directed refinement.
+Midpoint probes are not a maximum-error bound over all unmapped authoritative
+vertices: an off-midpoint deviation can escape an individual probe. Full mapping
+remains the explicit comparison for this limitation. The reported maximum errors
+include intervals subsequently refined away, not just the final retained curve;
+the JSON summaries label that scope explicitly.
 
 ## Named acceptance evidence
 
@@ -33,7 +38,8 @@ contact localization and failure-directed refinement.
   synthetic background `(4,16,12)` and pins the independently known graph:
   three distinct sheets; the parent at `s<0.5` does not touch `EDGE`; both
   children extend to `s=1`. It also rejects triangles spanning the action
-  jump. The bounded runs use 8 vertices; full maps all 32.
+  jump. The bounded runs use the identical 8 vertices, checking that budget
+  headroom does not change a certified result; full maps all 32.
 - `test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit` sweeps
   the same four budgets on the ADR 0005 DMercFail reference at
   `lambda_n=0.8`. It preserves the reversal-repair and exact-on-mesh port
@@ -73,6 +79,11 @@ three ports with sheet/vertex IDs `-1`, and an explicit budget reason.
 | structured / PyVista | 8/17: limited | 10/17: limited | 13/17: 2 sheets | 17/17: 2 sheets |
 | Gmsh / marching tetrahedra | 8/9: limited | 9/9: 2 sheets | 9/9: 2 sheets | 9/9: 2 sheets |
 | Gmsh / PyVista | 8/11: limited | 10/11: 2 sheets | 11/11: 2 sheets | 11/11: 2 sheets |
+
+The structured/marching 8/10 refusals enforce the conservative `EDGE`-proximity
+rule: these budgets cannot finish the required adjacent-vertex refinement near
+the edge. They are certification failures, not evidence that every lower-budget
+polyline would necessarily produce the wrong sheet graph.
 
 Every resolved run has the same role incidence: parent on one sheet,
 child-1 and child-3 on the other. Every port action equals the value at its
@@ -165,6 +176,13 @@ post-insertion refresh path.
 Both mutations were reverted and both tests re-run green. No tolerance was
 loosened, no check was removed, no test was marked slow/skip/xfail, and no new
 dependency was added.
+
+Review follow-up extends the existing source-failure and between-sample-contact
+tests with bounded runs. Both must retain uncertified intervals and their
+physical/event statuses rather than being relabeled budget failures. The source
+failure test was observed red when the intervals were discarded, then green
+after retaining the stopping interval and remaining work. Certification now uses
+explicit control state, independent of diagnostic wording.
 
 ## Local verification budget
 

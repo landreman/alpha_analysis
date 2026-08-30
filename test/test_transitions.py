@@ -489,6 +489,16 @@ def test_one_degenerate_sample_does_not_erase_a_regular_transition_curve():
         assert np.isnan(port.action_values[0])
         assert np.all(np.isfinite(port.action_values[1:]))
 
+    limited = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(action_quadrature_order=48, max_curve_samples=3),
+    )[0]
+    assert limited.status is TransitionStatus.UNRESOLVED
+    assert not limited.sampling_certified
+    assert len(limited.sampling_unresolved_intervals) > 0
+    assert "budget" not in limited.sampling_reason
+
 
 def test_high_mode_transition_actions_resolve_every_internal_extremum():
     """Internal ripple must not fool either child or parent quadrature."""
@@ -755,6 +765,15 @@ def test_equal_height_contact_between_samples_is_multiway_not_regular():
     )
     assert np.max(np.abs(transition.additivity_residual)) < 1.0e-12
     assert all(np.all(np.isfinite(port.action_values)) for port in transition.ports)
+
+    limited = map_transitions(
+        field, critical, TransitionMappingConfig(max_curve_samples=3)
+    )[0]
+    assert limited.status is TransitionStatus.MULTIWAY
+    assert not limited.sampling_certified
+    assert len(limited.sampling_unresolved_intervals) > 0
+    assert "budget" not in limited.sampling_reason
+    assert all(status is TransitionStatus.REGULAR for status in limited.sample_status)
 
     # The recorded barrier margin shrinks toward the contact and is infinite
     # where the parent well has no other maximum at all.

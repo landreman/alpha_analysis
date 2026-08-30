@@ -996,6 +996,11 @@ statuses. `map_transitions_budget_sweep` reuses unique vertex traces with all
 non-budget controls fixed, without changing any budget's retained sample set or
 decision.
 
+Early numerical/nongeneric stops retain the stopping interval and all other
+uncertified source-index intervals. An explicit stop flag controls certification;
+human-readable diagnostic wording does not control it. The physical/event reason
+takes precedence over budget exhaustion when both occur on the last allowed sample.
+
 ### 10.3 Align \(T\) with the triangular mesh
 
 Only a regular, sampling-certified transition may enter this operation. A

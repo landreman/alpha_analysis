@@ -124,6 +124,10 @@ def _transition_summary(field, transition) -> dict:
             transition.sampling_unresolved_intervals.tolist()
         ),
         "sampling_reason": transition.sampling_reason,
+        "sampling_error_scope": (
+            "maximum midpoint discrepancy encountered, including intervals later "
+            "refined away; not a final residual bound"
+        ),
         "sampling_max_geometry_error": transition.sampling_max_geometry_error,
         "sampling_max_action_error": transition.sampling_max_action_error,
         "total_u_length": transition.total_u_length,

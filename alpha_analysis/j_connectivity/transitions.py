@@ -1568,6 +1568,7 @@ def _map_polyline(
     max_geometry_error = 0.0
     max_action_error = 0.0
     stop_reason = ""
+    stopped_early = False
     while pending and len(selected) < config.max_curve_samples:
         ranked = [
             (*_interval_priority(critical, polyline, *interval, config)[0], interval)
@@ -1603,38 +1604,36 @@ def _map_polyline(
             cache[right].interior_maximum_count[0],
         )
         if any(status is not TransitionStatus.REGULAR for status in statuses):
-            stop_reason = f"sampling stopped after explicit {reason}"
-            pending = []
+            stopped_early = True
+            stop_reason = f"certification interrupted by {reason}"
+            pending.append(interval)
             break
         if len(set(map(int, counts))) > 1:
-            stop_reason = "sampling exposed an itinerary change (nongeneric event)"
-            pending = []
+            stopped_early = True
+            stop_reason = (
+                "certification interrupted by an interior-maximum count change"
+            )
+            pending.append(interval)
             break
         if passed:
             continue
         for child in ((left, middle), (middle, right)):
             if _interval_midpoint_index(polyline, *child) is not None:
                 pending.append(child)
-        stop_reason = f"adaptive refinement required by {reason}"
-
-    sampling_certified = (
-        not pending
-        and not stop_reason.startswith("sampling stopped")
-        and "nongeneric" not in stop_reason
-    )
-    if pending:
+    sampling_certified = not pending and not stopped_early
+    if stopped_early:
+        reason = stop_reason
+    elif pending:
         reason = (
             f"transition sampling budget {config.max_curve_samples} exhausted "
             f"after {len(selected)} of {count} authoritative vertices; "
             f"{len(pending)} intervals remain uncertified"
         )
-    elif sampling_certified:
+    else:
         reason = (
             f"adaptive certification completed with {len(selected)} of {count} "
             "authoritative vertices"
         )
-    else:
-        reason = stop_reason
     return _combine_mapped_samples(
         field,
         critical,
