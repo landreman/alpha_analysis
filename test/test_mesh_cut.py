@@ -874,7 +874,8 @@ def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit():
 
     resolved_signatures = []
     explicit_budget_reports = 0
-    budgets = (8, 10, 16, None)
+    adaptive_successes = 0
+    budgets = (8, 10, 12, 16, None)
     sweep = map_transitions_budget_sweep(
         field,
         critical,
@@ -908,6 +909,9 @@ def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit():
 
         assert transition.status is TransitionStatus.REGULAR
         assert transition.sampling_certified
+        adaptive_successes += (
+            transition.sampling_samples_used < transition.authoritative_sample_count
+        )
         assert cut.unresolved_transition_ids.size == 0
         assert len(np.unique(cut.sheet_ids)) == 2
         for port in cut.ports:
@@ -931,3 +935,4 @@ def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit():
     assert resolved_signatures
     assert resolved_signatures == [resolved_signatures[0]] * len(resolved_signatures)
     assert explicit_budget_reports >= 1
+    assert adaptive_successes >= 1

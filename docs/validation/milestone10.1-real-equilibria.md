@@ -41,10 +41,13 @@ the JSON summaries label that scope explicitly.
   jump. The bounded runs use the identical 8 vertices, checking that budget
   headroom does not change a certified result; full maps all 32.
 - `test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit` sweeps
-  the same four budgets on the ADR 0005 DMercFail reference at
+  the four required budgets plus 12 on the ADR 0005 DMercFail reference at
   `lambda_n=0.8`. It preserves the reversal-repair and exact-on-mesh port
   action checks from the previous reference test. The 8/10 budgets are
   explicitly insufficient; 16/full have the same two-sheet incidence.
+  Those last two use the same full-mapping path. Budget 12 supplies a genuinely
+  adaptive 12/16 success, whose different cut polyline must reproduce the full
+  sheet graph; the test explicitly requires at least one adaptive success.
 - `test_transition_sampling_budget_is_explicit_when_certification_cannot_finish`
   gives a 16-vertex analytic circle only two mapped vertices, then checks
   `BUDGET_INSUFFICIENT`, retained sample count, explicit intervals/reason, and
@@ -84,6 +87,9 @@ The structured/marching 8/10 refusals enforce the conservative `EDGE`-proximity
 rule: these budgets cannot finish the required adjacent-vertex refinement near
 the edge. They are certification failures, not evidence that every lower-budget
 polyline would necessarily produce the wrong sheet graph.
+The additional structured/marching budget-12 run certifies 12/16 vertices and
+has 188 cut edges, versus 232 at full mapping, with the same two-sheet graph.
+The example script includes this additional budget as well as the required four.
 
 Every resolved run has the same role incidence: parent on one sheet,
 child-1 and child-3 on the other. Every port action equals the value at its

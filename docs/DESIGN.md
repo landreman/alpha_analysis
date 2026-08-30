@@ -970,9 +970,10 @@ vertex nearest the arc-length midpoint of each uncertified interval. Retain
 every mapped vertex. Compare its companion/marginal geometry and all three
 actions with interpolation from the interval endpoints; refine on geometric or
 action disagreement, a detected interior-maximum itinerary/count change, `EDGE`
-proximity, or near self-contact. Near `EDGE` and self-contact, resolve the local
-interval down to adjacent authoritative vertices rather than certifying a chord
-across the sensitive region. `None` maps every authoritative vertex.
+proximity, or near self-contact. Near `EDGE`, resolve the local interval down to
+adjacent authoritative vertices. The near-self-contact trigger is span-relative:
+split the interval, then reevaluate the threshold on its shorter children; it may
+cease to trigger before adjacency. `None` maps every authoritative vertex.
 
 The geometric test is
 `error <= curve_geometry_atol + curve_geometry_rtol * interval_u_length`, and
@@ -985,6 +986,10 @@ current interval's arc length. These are reported controls, not universal
 accuracy guarantees: certification is relative to the existing authoritative
 critical-curve resolution and detected root-scan itinerary. Features below
 either resolution remain §21.3 convergence work.
+
+Every mapped midpoint is retained, replacing a rejected parent chord. Adjacent
+authoritative vertices provide no further midpoint to test: reaching that terminal
+PL resolution does not establish a continuous sub-vertex error bound.
 
 If this certification cannot finish within the budget, return
 `TransitionStatus.BUDGET_INSUFFICIENT`, retain finite mapped samples and explicit

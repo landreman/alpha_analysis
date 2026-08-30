@@ -1,4 +1,4 @@
-"""Validate 8/10/16/full sampling on the resolved DMercFail reference cut.
+"""Validate 8/10/12/16/full sampling on the resolved DMercFail reference cut.
 
 Run from the repository root with::
 
@@ -51,7 +51,7 @@ def main() -> None:
     )
     field = BoozerField.from_boozmn(path)
     b = 5.040465893072380 + 0.8 * (12.050343540204448 - 5.040465893072380)
-    budgets = (8, 10, 16, None)
+    budgets = (8, 10, 12, 16, None)
     controls = TransitionMappingConfig(
         action_quadrature_order=32, max_action_quadrature_order=512
     )

@@ -302,7 +302,10 @@ def main() -> None:
                                     ),
                                     "reason": transition.sampling_reason,
                                     "error_scope": (
-                                        "maximum midpoint discrepancy encountered, "
+                                        "not measured; every authoritative vertex mapped"
+                                        if transition.sampling_samples_used
+                                        == transition.authoritative_sample_count
+                                        else "maximum midpoint discrepancy encountered, "
                                         "including intervals later refined away; "
                                         "not a final residual bound"
                                     ),

@@ -125,7 +125,9 @@ def _transition_summary(field, transition) -> dict:
         ),
         "sampling_reason": transition.sampling_reason,
         "sampling_error_scope": (
-            "maximum midpoint discrepancy encountered, including intervals later "
+            "not measured; every authoritative vertex mapped"
+            if transition.sampling_samples_used == transition.authoritative_sample_count
+            else "maximum midpoint discrepancy encountered, including intervals later "
             "refined away; not a final residual bound"
         ),
         "sampling_max_geometry_error": transition.sampling_max_geometry_error,

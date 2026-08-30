@@ -57,10 +57,12 @@ class TransitionMappingConfig:
     Geometry is accepted when its midpoint error is at most
     ``curve_geometry_atol + curve_geometry_rtol * interval_u_length``;
     each port action uses ``curve_action_atol + curve_action_rtol * scale``,
-    where ``scale`` is the largest absolute endpoint/midpoint action. Intervals within
-    ``curve_edge_proximity`` of ``s=1`` or within
-    ``curve_self_contact_ratio * interval_u_length`` of a nonlocal strand
-    refine to adjacent authoritative vertices. These are finite-resolution
+    where ``scale`` is the largest absolute endpoint/midpoint action.
+    Intervals within ``curve_edge_proximity`` of ``s=1`` refine to adjacent
+    authoritative vertices. Near-self-contact splits an interval when the
+    separation is below ``curve_self_contact_ratio * interval_u_length``;
+    the threshold is reevaluated on each shorter child and can cease to
+    trigger before adjacency. These are finite-resolution
     certification controls, not a bound on unseen sub-vertex features.
     ``additivity_atol`` has action-length units and ``additivity_rtol`` is
     dimensionless.
