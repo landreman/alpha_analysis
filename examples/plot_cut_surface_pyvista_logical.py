@@ -231,9 +231,9 @@ def parse_arguments() -> argparse.Namespace:
         "--max-curve-samples",
         type=int,
         default=10,
-        help="samples per GAMMA_MAX polyline passed to map_transitions; "
-        "0 keeps every critical-curve vertex, at a cost that can run to "
-        "tens of minutes on a real equilibrium",
+        help="adaptive mapping work budget per GAMMA_MAX polyline; an "
+        "uncertified curve remains explicitly budget-insufficient. 0 maps "
+        "every authoritative critical-curve vertex",
     )
     parser.add_argument(
         "--downsample-reduction",

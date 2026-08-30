@@ -1,8 +1,9 @@
-"""Exercise Milestone 10 cuts on the five required real equilibria.
+"""Exercise Milestones 10--10.1 cuts on the five required real equilibria.
 
-The matrix, mesh controls, and bounded transition sampling match the Milestone
-9 validation driver. Curves with failed or bracketed nongeneric samples are
-passed through the cut stage and must remain explicit unresolved hyperedges.
+The matrix and mesh controls match the Milestone 9 validation driver.
+Transition mapping uses a bounded adaptive certification budget: uncertified,
+failed, or bracketed nongeneric curves are passed through the cut stage and
+must remain explicit unresolved hyperedges.
 Only cases containing a fully generic transition pay for surface-wide well
 traces; those topology-sensitive cases retain the authoritative extracted
 mesh. Every case performs a pickle-free topology serialization round trip.
@@ -66,7 +67,9 @@ def _write_checkpoint(path: Path, payload: dict) -> None:
 
 def _needs_action_data(transition) -> bool:
     return (
-        len(transition.u) >= 2
+        transition.status is TransitionStatus.REGULAR
+        and transition.sampling_certified
+        and len(transition.u) >= 2
         and not len(transition.contact_sample_pairs)
         and all(
             status is TransitionStatus.REGULAR for status in transition.sample_status
@@ -170,7 +173,12 @@ def _parse_args() -> argparse.Namespace:
         default=(6, 24, 12),
     )
     parser.add_argument("--gmsh-target-size", type=float, default=0.3)
-    parser.add_argument("--max-curve-samples", type=int, default=8)
+    parser.add_argument(
+        "--max-curve-samples",
+        type=int,
+        default=8,
+        help="adaptive transition-mapping work budget per critical curve",
+    )
     parser.add_argument("--resume", action="store_true")
     return parser.parse_args()
 
@@ -281,6 +289,27 @@ def main() -> None:
                                 )
                             ),
                             "transition_count": len(transitions),
+                            "transition_sampling": [
+                                {
+                                    "transition_id": transition.transition_id,
+                                    "certified": transition.sampling_certified,
+                                    "samples_used": transition.sampling_samples_used,
+                                    "authoritative_sample_count": (
+                                        transition.authoritative_sample_count
+                                    ),
+                                    "unresolved_intervals": (
+                                        transition.sampling_unresolved_intervals.tolist()
+                                    ),
+                                    "reason": transition.sampling_reason,
+                                    "max_geometry_error": (
+                                        transition.sampling_max_geometry_error
+                                    ),
+                                    "max_action_error": (
+                                        transition.sampling_max_action_error
+                                    ),
+                                }
+                                for transition in transitions
+                            ],
                             "needed_surface_actions": needs_actions,
                             "regular_action_count": regular_action_count,
                             "downsampling": downsampling,

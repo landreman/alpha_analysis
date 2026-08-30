@@ -94,6 +94,7 @@ from .transitions import (
     TransitionMappingConfig,
     TransitionPort,
     map_transitions,
+    map_transitions_budget_sweep,
 )
 from .well_trace import (
     WellProfile,
@@ -176,6 +177,7 @@ __all__ = [
     "save_cut_surface",
     "trace_regular_well",
     "map_transitions",
+    "map_transitions_budget_sweep",
 ]
 
 

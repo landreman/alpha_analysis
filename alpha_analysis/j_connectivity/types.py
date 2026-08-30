@@ -46,6 +46,7 @@ class TransitionStatus(Enum):
     MATCH_FAILURE = auto()
     MAX_PERIODS = auto()
     UNRESOLVED = auto()
+    BUDGET_INSUFFICIENT = auto()
 
 
 class FloodFillStatus(Enum):

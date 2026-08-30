@@ -963,7 +963,44 @@ For sampled points \(m(u)\in\Gamma_{\max}\):
 
 The points \(a(u)\) form \(T\).
 
+`TransitionMappingConfig.max_curve_samples` is a work budget, not a uniform
+coarsening request. For a bounded run, start from a deterministic coarse subset
+of the authoritative critical-curve vertices and recursively map the existing
+vertex nearest the arc-length midpoint of each uncertified interval. Retain
+every mapped vertex. Compare its companion/marginal geometry and all three
+actions with interpolation from the interval endpoints; refine on geometric or
+action disagreement, a detected interior-maximum itinerary/count change, `EDGE`
+proximity, or near self-contact. Near `EDGE` and self-contact, resolve the local
+interval down to adjacent authoritative vertices rather than certifying a chord
+across the sensitive region. `None` maps every authoritative vertex.
+
+The geometric test is
+`error <= curve_geometry_atol + curve_geometry_rtol * interval_u_length`, and
+each port's action test is
+`error <= curve_action_atol + curve_action_rtol * max(abs(endpoint/midpoint A))`.
+The absolute tolerances have logical-distance and action-length units
+respectively. `curve_edge_proximity` is a normalized-flux distance `1-s` from
+the plasma edge, and `curve_self_contact_ratio` scales a logical distance by the
+current interval's arc length. These are reported controls, not universal
+accuracy guarantees: certification is relative to the existing authoritative
+critical-curve resolution and detected root-scan itinerary. Features below
+either resolution remain §21.3 convergence work.
+
+If this certification cannot finish within the budget, return
+`TransitionStatus.BUDGET_INSUFFICIENT`, retain finite mapped samples and explicit
+uncertified source-index intervals, and do not cut. `sampling_samples_used`,
+`authoritative_sample_count`, `sampling_certified`, `sampling_reason`, and the
+largest midpoint discrepancies encountered make the budget outcome
+machine-readable. Existing physical/numerical sample failures keep their own
+statuses. `map_transitions_budget_sweep` reuses unique vertex traces with all
+non-budget controls fixed, without changing any budget's retained sample set or
+decision.
+
 ### 10.3 Align \(T\) with the triangular mesh
+
+Only a regular, sampling-certified transition may enter this operation. A
+budget-insufficient transition remains an explicit unresolved hyperedge with
+all ports and the budget reason; it is never ordinary missing connectivity.
 
 The production implementation should insert \(T\) as a constrained polyline:
 
@@ -974,6 +1011,14 @@ The production implementation should insert \(T\) as a constrained polyline:
 5. duplicate the final polyline vertices and edges;
 6. assign parent action values to one copy and child-1 values to the other;
 7. use the matched \(\Gamma_{\max}\) copy for child 3.
+
+Insertion helpers may interpolate from a `T` vertex before that vertex has
+received its limiting branch action. Preserve their interpolation dependency
+chain and refresh off-cut descendants after port assignment, using each
+stencil vertex's copy on the descendant's own sheet. Never retain a stale
+parent/child blend. A stencil that genuinely crosses the final cut is
+unresolved (`NaN` action), not an interpolation across the discontinuity;
+later stages must account for that unresolved action under §21.2.
 
 For an earlier prototype, a mesh-aligned approximation based on itinerary changes across edges is acceptable, provided the direct backward map from \(\Gamma_{\max}\) is used to validate the location and branch correspondence.
 

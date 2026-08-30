@@ -117,6 +117,15 @@ def _transition_summary(field, transition) -> dict:
         ),
         "sample_failure_reason_counts": dict(Counter(transition.sample_failure_reason)),
         "sample_count": len(transition.u),
+        "sampling_certified": transition.sampling_certified,
+        "sampling_samples_used": transition.sampling_samples_used,
+        "authoritative_sample_count": transition.authoritative_sample_count,
+        "sampling_unresolved_intervals": (
+            transition.sampling_unresolved_intervals.tolist()
+        ),
+        "sampling_reason": transition.sampling_reason,
+        "sampling_max_geometry_error": transition.sampling_max_geometry_error,
+        "sampling_max_action_error": transition.sampling_max_action_error,
         "total_u_length": transition.total_u_length,
         "s_range": [
             float(np.min(transition.field_line_identity[:, 0])),
@@ -212,7 +221,12 @@ def _parse_args() -> argparse.Namespace:
         "--lambda-n", type=float, choices=LAMBDA_N, action="append", dest="lambda_n"
     )
     parser.add_argument("--max-field-periods", type=int, default=128)
-    parser.add_argument("--max-curve-samples", type=int, default=8)
+    parser.add_argument(
+        "--max-curve-samples",
+        type=int,
+        default=8,
+        help="adaptive transition-mapping work budget per critical curve",
+    )
     parser.add_argument("--action-quadrature-order", type=int, default=32)
     parser.add_argument(
         "--structured-resolution",

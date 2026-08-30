@@ -19,6 +19,7 @@ from alpha_analysis.j_connectivity import (
     TransitionStatus,
     extract_critical_curves,
     map_transitions,
+    map_transitions_budget_sweep,
     trace_regular_well,
 )
 from alpha_analysis.j_connectivity.synthetic_fields import SyntheticFourierField
@@ -216,9 +217,10 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
 
     # The common PL arc-length parameter has an independently known circle
     # limit, and its error decreases when transition-curve sampling doubles.
+    finer_critical = _critical_circles(field, s=0.5, zeta_values=(0.0,), count=16)
     sampled_finer = map_transitions(
         field,
-        _critical_circles(field, s=0.5, zeta_values=(0.0,), count=16),
+        finer_critical,
         TransitionMappingConfig(action_quadrature_order=48),
     )[0]
     exact_length = 2.0 * np.pi * np.sqrt(0.5)
@@ -227,16 +229,43 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
     )
     capped = map_transitions(
         field,
-        _critical_circles(field, s=0.5, zeta_values=(0.0,), count=16),
+        finer_critical,
         TransitionMappingConfig(action_quadrature_order=48, max_curve_samples=5),
     )[0]
-    np.testing.assert_array_equal(
-        _port(capped, "child_3").source_vertex_ids,
-        np.array([0, 3, 6, 9, 12]),
-    )
+    source_ids = _port(capped, "child_3").source_vertex_ids
+    assert np.all(np.diff(source_ids) > 0)
+    assert set(source_ids).issubset(set(range(16)))
     assert len(capped.u) == 5
     assert capped.controls.max_curve_samples == 5
     assert capped.total_u_length == sampled_finer.total_u_length
+    assert capped.status is TransitionStatus.BUDGET_INSUFFICIENT
+    assert not capped.sampling_certified
+    cached_full, cached_capped = (
+        item[0]
+        for item in map_transitions_budget_sweep(
+            field,
+            finer_critical,
+            (None, 5),
+            TransitionMappingConfig(action_quadrature_order=48),
+        )
+    )
+    for cached, standalone in (
+        (cached_capped, capped),
+        (cached_full, sampled_finer),
+    ):
+        assert cached.status is standalone.status
+        np.testing.assert_allclose(
+            cached.field_line_identity, standalone.field_line_identity, atol=1.0e-14
+        )
+        np.testing.assert_allclose(
+            cached.event_zeta_unwrapped,
+            standalone.event_zeta_unwrapped,
+            atol=1.0e-14,
+        )
+        for cached_port, standalone_port in zip(cached.ports, standalone.ports):
+            np.testing.assert_allclose(
+                cached_port.action_values, standalone_port.action_values, atol=1.0e-14
+            )
 
     # Reversing G+iota*I reverses physical tracing: T moves from the negative
     # lifted root to the positive one while the action remains unchanged.
@@ -326,6 +355,108 @@ def test_generic_split_recovers_T_lifted_identity_and_additive_actions(tmp_path)
     )[0]
     assert source_unresolved.status is TransitionStatus.REGULAR
     assert source_unresolved.source_critical_status is CriticalCurveStatus.UNRESOLVED
+
+
+def test_transition_sampling_budget_is_explicit_when_certification_cannot_finish(
+    tmp_path,
+):
+    """A coarse work budget must not masquerade as a resolved cut curve."""
+    field = _field(iota=0.4)
+    critical = _critical_circles(field, s=0.5, zeta_values=(0.0,), count=16)
+
+    transition = map_transitions(
+        field,
+        critical,
+        TransitionMappingConfig(
+            action_quadrature_order=48,
+            max_curve_samples=2,
+        ),
+    )[0]
+
+    assert transition.status is TransitionStatus.BUDGET_INSUFFICIENT
+    assert not transition.sampling_certified
+    assert transition.sampling_samples_used == 2
+    assert transition.authoritative_sample_count == 16
+    assert len(transition.sampling_unresolved_intervals) > 0
+    assert "budget" in transition.sampling_reason
+    output = tmp_path / "sampling-budget.png"
+    figure, _ = plot_transition_diagnostics(field, transition, output_path=output)
+    try:
+        assert output.stat().st_size > 0
+        assert "BUDGET_INSUFFICIENT" in figure._suptitle.get_text()
+        assert "sampling uncertified (2/16)" in figure._suptitle.get_text()
+    finally:
+        plt.close(figure)
+
+
+def test_transition_sampling_refines_nonlinear_port_actions():
+    """Action curvature, not just curve geometry, can exhaust the work budget."""
+    # B=2-cos(zeta)+(0.3+0.2s+0.02cos(theta))cos(2zeta), iota=0.
+    # At b=1.4, the exact marginal curve is zeta=0,
+    # s=0.5-0.1cos(theta), and every well profile has coefficient 0.4.
+    # G=1+100s^2 therefore makes each limiting action a known nonlinear
+    # function on that curve without introducing a nongeneric event.
+    field = SyntheticFourierField(
+        nfp=1,
+        m=np.array([0, 0, 0, 1, 1]),
+        n=np.array([0, 1, 2, 2, -2]),
+        cosine_coefficients=np.array(
+            [[2.0, 0.0], [-1.0, 0.0], [0.3, 0.2], [0.01, 0.0], [0.01, 0.0]]
+        ),
+        sine_coefficients=np.zeros((5, 2)),
+        iota_coefficients=np.array([0.0]),
+        G_coefficients=np.array([1.0, 0.0, 100.0]),
+        I_coefficients=np.array([0.0]),
+    )
+    theta = np.linspace(0.0, 2.0 * np.pi, 32, endpoint=False)
+    s = 0.5 - 0.1 * np.cos(theta)
+    points = np.column_stack(
+        (np.sqrt(s) * np.cos(theta), np.sqrt(s) * np.sin(theta), np.zeros(32))
+    )
+    ids = np.arange(32, dtype=np.int64)
+    critical = extract_critical_curves(
+        SurfaceCurveMesh(
+            period=2.0 * np.pi,
+            points=points,
+            segments=np.column_stack((ids, np.roll(ids, -1))),
+            B=np.full(32, 1.4),
+            g=np.zeros(32),
+            boundary_tags=np.full(32, SurfaceMesh.G_ZERO, dtype=np.int64),
+        ),
+        field,
+        1.4,
+    )
+    controls = TransitionMappingConfig(
+        max_curve_samples=8,
+        curve_geometry_rtol=1.0,
+        curve_action_rtol=1.0e-3,
+    )
+    limited, full = (
+        item[0]
+        for item in map_transitions_budget_sweep(field, critical, (8, None), controls)
+    )
+    assert limited.status is TransitionStatus.BUDGET_INSUFFICIENT
+    assert limited.sampling_max_action_error > 0.1
+    assert full.status is TransitionStatus.REGULAR
+    root = np.arccos(0.25)
+
+    def B(zeta):
+        return 2.0 - np.cos(zeta) + 0.4 * np.cos(2.0 * zeta)
+
+    normalized_child = quad(
+        lambda zeta: np.sqrt(1.0 - B(zeta) / 1.4) / B(zeta),
+        -root,
+        0.0,
+        epsabs=1.0e-12,
+        epsrel=1.0e-12,
+    )[0]
+    expected = (1.0 + 100.0 * full.field_line_identity[:, 0] ** 2) * normalized_child
+    np.testing.assert_allclose(
+        _port(full, "child_1").action_values, expected, rtol=2e-10
+    )
+    np.testing.assert_allclose(
+        _port(full, "parent").action_values, 2.0 * expected, rtol=2e-8
+    )
 
 
 def test_one_degenerate_sample_does_not_erase_a_regular_transition_curve():

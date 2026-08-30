@@ -280,6 +280,10 @@ class _MutableMesh:
         self.parent_tetrahedra = list(map(int, surface.triangle_parent_tetrahedra))
         self.component_ids = list(map(int, surface.component_ids))
         self.action = list(map(float, action_values))
+        # Insertion happens before branch-specific limiting actions are
+        # assigned. Keep the interpolation DAG so off-cut descendants can
+        # be refreshed from the correct sheet copies afterwards (§10.3).
+        self.action_stencils: dict[int, tuple[tuple[int, ...], np.ndarray]] = {}
         self.field = field
         self.config = config
         self.trace_config = trace_config
@@ -348,7 +352,12 @@ class _MutableMesh:
                 np.dot(barycentric, np.asarray([self.action[index] for index in ids]))
             )
         )
-        return len(self.points) - 1
+        new_id = len(self.points) - 1
+        self.action_stencils[new_id] = (
+            tuple(map(int, ids)),
+            np.asarray(barycentric, dtype=float).copy(),
+        )
+        return new_id
 
     def _split_triangle(self, triangle_id, point, barycentric, tag, edge_scale):
         ids = self.triangles[triangle_id]
@@ -1232,7 +1241,9 @@ def _interpolate_port_action(transition, port, parameter):
 
 def _is_resolvable(transition):
     return (
-        len(transition.u) >= 2
+        transition.status is TransitionStatus.REGULAR
+        and transition.sampling_certified
+        and len(transition.u) >= 2
         and not len(transition.contact_sample_pairs)
         and all(
             status is TransitionStatus.REGULAR for status in transition.sample_status
@@ -1406,6 +1417,43 @@ def _geometry_resolution_issue(mesh, transition):
     return None
 
 
+def _refresh_inserted_actions(mesh, triangles, labels, copy_id, assigned):
+    """Refresh off-cut insertion descendants after branch actions are assigned.
+
+    A helper vertex can have been interpolated from a not-yet-assigned point
+    on ``T``. Keeping that stale value blends parent and child actions even
+    after the topology is correctly cut (DESIGN.md §§10.3 and 25). Evaluate
+    the insertion DAG again, using the copy of each stencil vertex on the
+    descendant's own sheet. Authoritative port values are never overwritten.
+    A stencil that genuinely crosses a final cut cannot interpolate a
+    single-valued action and remains explicit ``NaN`` instead of a plausible
+    blend; downstream stages must account for that unresolved action (§21.2).
+    """
+    incidence = [set() for _ in mesh.points]
+    for triangle, label in zip(triangles, labels):
+        for vertex in triangle:
+            incidence[int(vertex)].add(int(label))
+    for vertex in sorted(mesh.action_stencils):
+        if vertex in assigned or not incidence[vertex]:
+            continue
+        if len(incidence[vertex]) != 1:
+            mesh.action[vertex] = np.nan
+            continue
+        component = next(iter(incidence[vertex]))
+        source_ids, weights = mesh.action_stencils[vertex]
+        active = np.flatnonzero(weights != 0.0)
+        source_copies = [
+            copy_id.get((source_ids[index], component), source_ids[index])
+            for index in active
+        ]
+        if any(component not in incidence[source] for source in source_copies):
+            mesh.action[vertex] = np.nan
+            continue
+        mesh.action[vertex] = float(
+            np.dot(weights[active], [mesh.action[source] for source in source_copies])
+        )
+
+
 def cut_surface_at_transitions(
     surface: SurfaceMesh,
     action_values: FloatArray,
@@ -1446,9 +1494,12 @@ def cut_surface_at_transitions(
     for transition in transitions:
         if not _is_resolvable(transition):
             unresolved.append(transition.transition_id)
-            unresolved_reasons.append(
-                "transition has failed samples or a bracketed nongeneric event"
-            )
+            if transition.status is TransitionStatus.BUDGET_INSUFFICIENT:
+                unresolved_reasons.append(transition.sampling_reason)
+            else:
+                unresolved_reasons.append(
+                    "transition has failed samples or a bracketed nongeneric event"
+                )
             for port in transition.ports:
                 unresolved_ports.append(
                     CutTransitionPort(
@@ -1604,6 +1655,7 @@ def cut_surface_at_transitions(
         )
 
     ports = list(unresolved_ports)
+    assigned_action_vertices = set()
     for inserted in inserted_transitions:
         transition = inserted.transition
         parent_component, child_component = branch_components[transition.transition_id]
@@ -1611,12 +1663,15 @@ def cut_surface_at_transitions(
         child_1 = next(port for port in transition.ports if port.role == "child_1")
         child_3 = next(port for port in transition.ports if port.role == "child_3")
         for vertex, parameter in inserted.vertex_u.items():
-            mesh.action[copy_id[(vertex, parent_component)]] = _interpolate_port_action(
+            parent_copy = copy_id[(vertex, parent_component)]
+            child_copy = copy_id[(vertex, child_component)]
+            mesh.action[parent_copy] = _interpolate_port_action(
                 transition, parent, parameter
             )
-            mesh.action[copy_id[(vertex, child_component)]] = _interpolate_port_action(
+            mesh.action[child_copy] = _interpolate_port_action(
                 transition, child_1, parameter
             )
+            assigned_action_vertices.update((parent_copy, child_copy))
         parent_ids = np.array(
             [copy_id[(int(vertex), parent_component)] for vertex in inserted.sample_ids]
         )
@@ -1646,6 +1701,7 @@ def cut_surface_at_transitions(
             mesh.action[target] = _interpolate_port_action(
                 transition, child_3, parameter
             )
+            assigned_action_vertices.add(target)
         ports.extend(
             (
                 CutTransitionPort(
@@ -1671,6 +1727,14 @@ def cut_surface_at_transitions(
                 ),
             )
         )
+
+    _refresh_inserted_actions(
+        mesh,
+        triangles,
+        pre_duplicate_labels,
+        copy_id,
+        assigned_action_vertices,
+    )
 
     final_labels = _triangle_components(triangles)
     label_map = {}
