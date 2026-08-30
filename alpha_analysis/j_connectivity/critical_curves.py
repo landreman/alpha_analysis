@@ -11,7 +11,7 @@ radian squared.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import IntEnum, auto
 
 import numpy as np
@@ -66,6 +66,22 @@ class CriticalCurveConfig:
     distance within which the two endpoint walks must agree before their
     common junction is accepted.  Both bounds are finite by construction: an
     exhausted walk is reported, never extended.
+
+    The mesh-edge chain can also order two nearly coincident curve points
+    against the direction of the curve, so the walked polyline doubles back on
+    itself at sub-chord scale (ADR 0005).  With ``repair_reversals`` on, every
+    reversal triple whose strand separation is below
+    ``repair_separation_ratio`` of the local chord scale is certified against
+    the true curve: a recorded walk from the central vertex must pass within
+    ``repair_on_curve_ratio`` of the local scale of every vertex in the
+    ``repair_window``-vertex window, show no self-contact closer than
+    ``repair_contact_ratio`` of the local scale between walk samples far apart
+    in arc length, and cross no ``D_parallel^2 B`` sign change.  Only then is
+    the window reordered by true arc length; any certification failure leaves
+    the chain untouched and is counted, and the cut-time double-back guard
+    remains the permanent backstop.  A reversal with super-resolution strand
+    separation is genuine geometry and is never touched.
+    ``max_repair_walk_steps`` bounds each recorded certification walk.
     """
 
     B_tolerance: float = 1.0e-9
@@ -77,6 +93,12 @@ class CriticalCurveConfig:
     max_walk_arclength_ratio: float = 24.0
     max_walk_steps: int = 48
     junction_match_tolerance: float = 1.0e-6
+    repair_reversals: bool = True
+    repair_window: int = 3
+    repair_separation_ratio: float = 0.25
+    repair_on_curve_ratio: float = 0.05
+    repair_contact_ratio: float = 0.1
+    max_repair_walk_steps: int = 256
 
     def __post_init__(self) -> None:
         for name in (
@@ -87,6 +109,9 @@ class CriticalCurveConfig:
             "max_midpoint_displacement_ratio",
             "max_walk_arclength_ratio",
             "junction_match_tolerance",
+            "repair_separation_ratio",
+            "repair_on_curve_ratio",
+            "repair_contact_ratio",
         ):
             value = getattr(self, name)
             if not np.isfinite(value) or value <= 0.0:
@@ -95,6 +120,10 @@ class CriticalCurveConfig:
             raise ValueError("max_refinement_levels must be nonnegative")
         if self.max_walk_steps < 1:
             raise ValueError("max_walk_steps must be at least one")
+        if self.repair_window < 1:
+            raise ValueError("repair_window must be at least one")
+        if self.max_repair_walk_steps < 1:
+            raise ValueError("max_repair_walk_steps must be at least one")
 
 
 @dataclass(frozen=True)
@@ -105,6 +134,13 @@ class CriticalPolyline:
     ``u`` is cumulative logical arc length from the first vertex.  Closed
     polylines do not repeat their first vertex; ``total_length`` includes the
     closing segment.
+
+    ``vertex_ids`` are ordered along the certified curve: where the raw
+    mesh-edge chain doubled back on itself at sub-chord scale, the affected
+    window has been reordered by arc length along the true ``B=b, g=0`` curve
+    (ADR 0005).  ``segment_ids`` remain the extracted provenance segments the
+    chain was walked from, so after a repair a consecutive ``vertex_ids`` pair
+    need not be the endpoint pair of any single listed segment.
     """
 
     kind: CriticalKind
@@ -124,6 +160,11 @@ class CriticalCurveReport:
     ``boundary_exit_split_count`` counts fold necks whose junction lies
     outside ``s <= 1`` and whose bridging segment was replaced by two arms
     ending on the ``EDGE`` boundary.
+    ``reversal_repaired_count`` counts sub-resolution polyline reversals whose
+    reordering the true-curve walk certified (ADR 0005);
+    ``reversal_unrepaired_count`` counts reversals whose certification failed
+    and whose chain order was therefore left untouched for the cut-time guard
+    to report.
     """
 
     refined_segment_count: int
@@ -134,6 +175,8 @@ class CriticalCurveReport:
     ambiguous_segment_length_history: tuple[float, ...]
     curve_walk_junction_count: int = 0
     boundary_exit_split_count: int = 0
+    reversal_repaired_count: int = 0
+    reversal_unrepaired_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -971,6 +1014,335 @@ def _walk_polylines(
     return tuple(polylines)
 
 
+def _walk_curve_recorded(
+    field: BoozerFieldLike,
+    b: float,
+    start: FloatArray,
+    orientation: float,
+    scale: float,
+    budget: float,
+    config: CriticalCurveConfig,
+) -> tuple[list[FloatArray], list[float]]:
+    """Record a bounded predictor-corrector walk along ``B=b, g=0``.
+
+    Unlike ``_walk_curve`` this returns every corrected point together with
+    its ``D_parallel^2 B`` value: the caller certifies a polyline window
+    against the walked arc (ADR 0005) rather than solving for one event.  The
+    walk stops at the domain boundary, when the arc-length ``budget`` is
+    spent, or after ``max_repair_walk_steps`` steps; every returned point
+    satisfies both level sets to the configured tolerances by construction.
+    """
+    points = [np.asarray(start, dtype=np.float64).copy()]
+    D2_values = [float(_point_values(field, points[0])[2])]
+    point = points[0].copy()
+    tangent = _curve_tangent(field, point)
+    if tangent is None:
+        return points, D2_values
+    tangent = orientation * tangent
+    arclength = 0.0
+    step = 0.2 * scale
+    minimum_step = 1.0e-5 * scale
+    for _ in range(config.max_repair_walk_steps):
+        candidate = _project_to_curve(field, b, point + step * tangent, tangent, config)
+        if candidate is None:
+            step *= 0.5
+            if step < minimum_step:
+                return points, D2_values
+            continue
+        delta = candidate - point
+        moved = float(np.linalg.norm(delta))
+        if moved <= 0.0 or not np.isfinite(moved):
+            return points, D2_values
+        points.append(candidate.copy())
+        D2_values.append(float(_point_values(field, candidate)[2]))
+        arclength += moved
+        if _logical_s(candidate) > 1.0 + config.merge_tolerance or arclength >= budget:
+            return points, D2_values
+        following = _curve_tangent(field, candidate)
+        if following is None:
+            return points, D2_values
+        along = float(np.dot(following, delta))
+        if along == 0.0:
+            return points, D2_values
+        tangent = following * np.sign(along)
+        point = candidate
+        step = min(1.5 * step, 0.3 * scale)
+    return points, D2_values
+
+
+def _certify_reversal_window(
+    field: BoozerFieldLike,
+    b: float,
+    window_points: list[FloatArray],
+    middle_offset: int,
+    scale: float,
+    config: CriticalCurveConfig,
+) -> FloatArray | None:
+    """Certify a reversal window against the true curve; return arc lengths.
+
+    A recorded walk from the window's central vertex, in both directions,
+    must (a) pass within ``repair_on_curve_ratio * scale`` of every windowed
+    vertex, (b) show no self-contact — no two walk samples farther apart than
+    ``2 * scale`` in arc length within ``repair_contact_ratio * scale`` in
+    space — and (c) cross no ``D_parallel^2 B`` sign change.  On success the
+    vertices' arc-length parameters along the walk are returned; on any
+    failure ``None`` is returned and the caller leaves the chain untouched,
+    so the cut-time double-back guard (ADR 0005 option 1) stays the backstop.
+    """
+    base = np.asarray(window_points[middle_offset], dtype=np.float64)
+    # Directional budgets reach just past the window's two ends: a symmetric
+    # budget could wrap most of a short closed curve and read the closure as
+    # self-contact.
+    span_before = sum(
+        float(np.linalg.norm(window_points[k + 1] - window_points[k]))
+        for k in range(middle_offset)
+    )
+    span_after = sum(
+        float(np.linalg.norm(window_points[k + 1] - window_points[k]))
+        for k in range(middle_offset, len(window_points) - 1)
+    )
+    forward, forward_D2 = _walk_curve_recorded(
+        field, b, base, +1.0, scale, max(span_before, span_after) + scale, config
+    )
+    backward, backward_D2 = _walk_curve_recorded(
+        field, b, base, -1.0, scale, max(span_before, span_after) + scale, config
+    )
+    arc = np.asarray(list(reversed(backward[1:])) + forward, dtype=np.float64)
+    D2_arc = np.asarray(list(reversed(backward_D2[1:])) + forward_D2)
+    if len(arc) < 2 or np.any(D2_arc * D2_arc[len(backward) - 1] < 0.0):
+        return None
+    parameter = np.concatenate(
+        ([0.0], np.cumsum(np.linalg.norm(np.diff(arc, axis=0), axis=1)))
+    )
+    # Self-contact of the walked arc: a genuine tight fold must never be
+    # reordered, so its presence anywhere on the arc fails certification.
+    for index in range(len(arc)):
+        far = np.abs(parameter - parameter[index]) > 2.0 * scale
+        if np.any(far):
+            separation = float(np.min(np.linalg.norm(arc[far] - arc[index], axis=1)))
+            if separation < config.repair_contact_ratio * scale:
+                return None
+    t_values = np.empty(len(window_points))
+    for slot, vertex in enumerate(window_points):
+        distances = np.linalg.norm(arc - vertex[np.newaxis, :], axis=1)
+        nearest = int(np.argmin(distances))
+        best_t, best_d = float(parameter[nearest]), float(distances[nearest])
+        for first in (nearest - 1, nearest):
+            if 0 <= first < len(arc) - 1:
+                segment = arc[first + 1] - arc[first]
+                length_sq = float(np.dot(segment, segment))
+                if length_sq > 0.0:
+                    fraction = float(
+                        np.clip(
+                            np.dot(vertex - arc[first], segment) / length_sq, 0.0, 1.0
+                        )
+                    )
+                    projected = arc[first] + fraction * segment
+                    distance = float(np.linalg.norm(vertex - projected))
+                    if distance < best_d:
+                        best_d = distance
+                        best_t = float(parameter[first] + fraction * np.sqrt(length_sq))
+        if best_d > config.repair_on_curve_ratio * scale:
+            return None
+        t_values[slot] = best_t
+    return t_values
+
+
+def _chain_steps(
+    points: FloatArray, order: list[int], closed: bool, period: float
+) -> FloatArray:
+    """Return each chain step as a seam-unwrapped displacement vector.
+
+    ``steps[i]`` runs from vertex ``order[i]`` to its successor; a closed
+    chain includes the closing step back to ``order[0]``.
+    """
+    count = len(order)
+    pair_count = count if closed else count - 1
+    steps = np.empty((pair_count, 3), dtype=np.float64)
+    for index in range(pair_count):
+        steps[index] = _periodic_delta(
+            points[order[index]], points[order[(index + 1) % count]], period
+        )
+    return steps
+
+
+def _reversal_triples(
+    points: FloatArray,
+    order: list[int],
+    closed: bool,
+    period: float,
+    separation_bound: float,
+) -> list[tuple[int, float]]:
+    """Return (middle index, local scale) for each sub-resolution reversal.
+
+    A triple reverses when its two steps point against each other (negative
+    dot product) and the strand separation — the perpendicular offset of the
+    third point from the incoming line — is below ``separation_bound`` times
+    the local chord scale.  Wider reversals are genuine geometry and are
+    never returned.
+    """
+    count = len(order)
+    steps = _chain_steps(points, order, closed, period)
+    middles = list(range(1, count - 1))
+    if closed and count >= 3:
+        middles += [count - 1, 0]
+    triples = []
+    for middle in middles:
+        incoming = steps[(middle - 1) % count]
+        outgoing = steps[middle % count]
+        incoming_length = float(np.linalg.norm(incoming))
+        outgoing_length = float(np.linalg.norm(outgoing))
+        if incoming_length <= 0.0 or outgoing_length <= 0.0:
+            continue
+        if float(np.dot(incoming, outgoing)) >= 0.0:
+            continue
+        direction = incoming / incoming_length
+        offset = incoming + outgoing
+        separation = float(
+            np.linalg.norm(offset - np.dot(offset, direction) * direction)
+        )
+        scale = max(incoming_length, outgoing_length)
+        if separation < separation_bound * scale:
+            triples.append((middle, scale))
+    return triples
+
+
+def _repair_polyline_reversals(
+    points: FloatArray,
+    polylines: tuple[CriticalPolyline, ...],
+    field: BoozerFieldLike,
+    b: float,
+    period: float,
+    config: CriticalCurveConfig,
+) -> tuple[tuple[CriticalPolyline, ...], int, int]:
+    """Reorder certified sub-resolution reversals in the polylines (ADR 0005).
+
+    The mesh-edge chain can step through sliver configurations that place a
+    vertex beyond its neighbor along the curve, so the chain doubles back at
+    sub-chord scale even though every vertex lies on the true curve.  Each
+    such reversal is certified by ``_certify_reversal_window``; only when the
+    true curve confirms one simple arc is the window reordered by arc length,
+    and the reorder is kept only if it removes the sub-resolution reversals in
+    the window without moving the window's chain attachment points.  Failed
+    certifications are counted and left untouched — the cut-time double-back
+    guard remains the permanent backstop — and reversals with
+    super-resolution separation are genuine geometry, never touched.
+    Repairs recompute ``u`` and ``total_length``; ``segment_ids`` keep their
+    extraction provenance.
+    """
+    repaired_total = 0
+    unrepaired_total = 0
+    if not config.repair_reversals:
+        return polylines, repaired_total, unrepaired_total
+    result = []
+    for polyline in polylines:
+        order = [int(vertex) for vertex in polyline.vertex_ids]
+        count = len(order)
+        if count < 3:
+            result.append(polyline)
+            continue
+        changed = False
+        failed_middles: set[int] = set()
+        for _ in range(count):
+            candidates = [
+                (middle, scale)
+                for middle, scale in _reversal_triples(
+                    points,
+                    order,
+                    polyline.closed,
+                    period,
+                    config.repair_separation_ratio,
+                )
+                if order[middle] not in failed_middles
+            ]
+            if not candidates:
+                break
+            middle, scale = candidates[0]
+            width = config.repair_window
+            if polyline.closed:
+                window = [
+                    (middle + shift) % count for shift in range(-width, width + 1)
+                ]
+                if len(set(window)) < len(window):
+                    window = list(range(count))
+                head_open = tail_open = False
+            else:
+                start = max(0, middle - width)
+                stop = min(count - 1, middle + width)
+                window = list(range(start, stop + 1))
+                head_open = start == 0
+                tail_open = stop == count - 1
+            window_positions = [np.asarray(points[order[window[0]]], dtype=np.float64)]
+            for slot in window[1:]:
+                window_positions.append(
+                    window_positions[-1]
+                    + _periodic_delta(window_positions[-1], points[order[slot]], period)
+                )
+            middle_offset = window.index(middle)
+            t_values = _certify_reversal_window(
+                field, b, window_positions, middle_offset, scale, config
+            )
+            reordered = None
+            if t_values is not None:
+                sorted_slots = [
+                    slot for _, slot in sorted(zip(t_values, range(len(window))))
+                ]
+                for candidate_slots in (sorted_slots, sorted_slots[::-1]):
+                    first_fixed = candidate_slots[0] == 0
+                    last_fixed = candidate_slots[-1] == len(window) - 1
+                    if polyline.closed or not (head_open or tail_open):
+                        acceptable = first_fixed and last_fixed
+                    elif head_open and tail_open:
+                        acceptable = True
+                    elif head_open:
+                        acceptable = last_fixed
+                    else:
+                        acceptable = first_fixed
+                    if acceptable:
+                        reordered = [order[window[slot]] for slot in candidate_slots]
+                        break
+            if reordered is not None:
+                trial = list(order)
+                for position, vertex in zip(window, reordered):
+                    trial[position] = vertex
+                remaining = {
+                    remaining_middle
+                    for remaining_middle, _ in _reversal_triples(
+                        points,
+                        trial,
+                        polyline.closed,
+                        period,
+                        config.repair_separation_ratio,
+                    )
+                }
+                if remaining.isdisjoint(set(window)):
+                    order = trial
+                    changed = True
+                    repaired_total += 1
+                    continue
+            failed_middles.add(order[middle])
+            unrepaired_total += 1
+        if not changed:
+            result.append(polyline)
+            continue
+        steps = _chain_steps(points, order, polyline.closed, period)
+        lengths = np.linalg.norm(steps, axis=1)
+        u = np.zeros(count, dtype=np.float64)
+        u[1:] = np.cumsum(lengths[: count - 1])
+        total = float(u[-1])
+        if polyline.closed:
+            total += float(lengths[-1])
+        result.append(
+            replace(
+                polyline,
+                vertex_ids=np.asarray(order, dtype=np.int64),
+                u=u,
+                total_length=total,
+            )
+        )
+    return tuple(result), repaired_total, unrepaired_total
+
+
 def extract_critical_curves(
     curve: SurfaceCurveMesh | SurfaceExtraction,
     field: BoozerFieldLike,
@@ -991,6 +1363,11 @@ def extract_critical_curves(
     If refinement is disabled or the local solve fails its residual/locality
     gates, the original segment remains explicitly degenerate and the result
     status is ``UNRESOLVED``.
+
+    Polylines whose mesh-edge chain doubles back on itself at sub-chord scale
+    are reordered by arc length along the true curve when a bounded
+    certification walk confirms one simple arc (ADR 0005); certification
+    failures leave the chain untouched and are counted in the report.
     """
     cfg = config or CriticalCurveConfig()
     if not np.isfinite(b):
@@ -1154,6 +1531,9 @@ def extract_critical_curves(
     )
     segment_kind = _classify_segments(segments, point_kind, midpoint_kind, unresolved)
     polylines = _walk_polylines(points, segments, segment_kind, curve.period)
+    polylines, repaired_reversals, unrepaired_reversals = _repair_polyline_reversals(
+        points, polylines, field, b, curve.period, cfg
+    )
     unresolved_count = int(np.count_nonzero(unresolved))
     degree = np.bincount(segments.ravel(), minlength=len(points))
     tag_array = np.asarray(tags_list, dtype=np.int64)
@@ -1198,5 +1578,7 @@ def extract_critical_curves(
             ambiguous_segment_length_history=tuple(history),
             curve_walk_junction_count=walk_junction_count,
             boundary_exit_split_count=boundary_split_count,
+            reversal_repaired_count=repaired_reversals,
+            reversal_unrepaired_count=unrepaired_reversals,
         ),
     )

@@ -1,7 +1,7 @@
 # ADR 0005: Companion cuts inherit sub-resolution zigzags from GAMMA_MAX polylines
 
-- **Status:** Proposed
-- **Date:** 2026-08-30
+- **Status:** Accepted
+- **Date:** 2026-08-30 (decided 2026-08-30)
 - **Milestone:** 10 (follow-up; discovered while implementing ADR 0004)
 - **Design sections:** §8 (critical curves), §10.2 (companion curve), §10.3
   (align \(T\) with the triangular mesh), §21.2 (forbidden numerics)
@@ -57,14 +57,19 @@ the \(11.1\) parent/child action jump, port actions exact on the mesh.
    wrong here — no refinement clears an exact retrace.
 2. **Fix the polyline upstream in `extract_critical_curves`** — the mesh-edge
    chain steps through near-degenerate (sliver) configurations that put an
-   interior vertex beyond its neighbor; reorder or straighten where a local
-   swap removes a >90° reversal without changing the vertex set, validating
-   against the true \(g=0,\,B=b\) curve. The honest end state: the head
-   reversal is an ordering artifact (order 1→0→2 is monotone), and fixing it
-   would put this curve's true endpoint *on* the EDGE boundary, shrinking the
-   ADR 0004 gap at its head to \(\sim 5\times10^{-3}\). Cost: milestone-8
-   output (vertex order, hence `u`, `total_u_length`) changes, and everything
-   milestone 9 recorded on real equilibria shifts with it.
+   interior vertex beyond its neighbor; reorder where the **true**
+   \(g=0,\,B=b\) curve certifies that the reversal is an ordering artifact,
+   never on chain geometry alone. `_walk_polylines` follows extracted segment
+   adjacency, so replacing order 1→0→2 by 0→1→2 changes which vertices are
+   connected — only the implicit curve may arbitrate between connectivity and
+   geometry, and a genuine tight fold or self-contact (a §5.4 event, live on
+   a DMercFail equilibrium) must never be smoothed into a generic cut. The
+   honest end state: the head reversal is an ordering artifact, and fixing it
+   puts this curve's outermost vertex (s = 0.9888) at the head, shrinking the
+   ADR 0004 gap. Cost: milestone-8 output (vertex order, hence `u`,
+   `total_u_length`) changes, and everything milestone 9 recorded on real
+   equilibria shifts with it — but the pre-repair `u` carries phantom
+   back-and-forth arc length, so that recorded output is the buggy one.
 3. **Collapse sub-resolution zigzags at transition-mapping time** — drop or
    merge samples whose step reverses at below-mesh scale before mapping.
    Keeps the critical curve authoritative but silently edits the transition's
@@ -75,21 +80,93 @@ the \(11.1\) parent/child action jump, port actions exact on the mesh.
    exactly the fragility §21.3 warns about; rejected as a resolution, useful
    only as a demonstration.
 
+## Diagnosis (2026-08-30, before deciding)
+
+The context above conjectured the reversals were ordering artifacts but did
+not demonstrate it, and its claim that "mesh refinement cannot clear it" was
+asserted, not measured. Both were settled empirically before the decision by
+walking the true \(B=b,\,g=0\) curve (the milestone-8 predictor–corrector
+continuation) through every reversal window, on structured \((6,24,12)\) and
+\((10,40,20)\) backgrounds with both extractors:
+
+- every windowed vertex lies **on** the walked true curve to \(\le
+  4\times10^{-4}\), two to three orders of magnitude below the local chord
+  scale \(\sim 0.05\);
+- the walked arcs show **no self-contact** (minimum far-pair separation
+  \(\approx 0.1\), the full arc span) and no \(D_\parallel^2 B\) sign change:
+  there is no genuine fold here to protect;
+- ordering the windowed vertices by true arc length turns each zigzag into a
+  single adjacent transposition, and at the head the true order ends at the
+  \(s=0.9888\) vertex, past which the walk exits \(s>1\) — the curve really
+  terminates on `EDGE`;
+- at \((10,40,20)\) the zigzag **reappears** at different indices with a new
+  near-duplicate vertex pair \(3.7\times10^{-4}\) apart, so refinement
+  relocates the artifact rather than clearing it — the "cannot clear it"
+  claim survives, now with evidence rather than assertion.
+
 ## Decision
 
-Left blank until the researcher decides.
+A strengthened option 2, with option 1 retained permanently as the backstop;
+options 3 and 4 are rejected. Directed by the researcher on 2026-08-30, who
+commissioned the synthesized robustness plan (diagnose against the true
+curve first; repair only what certification confirms; keep the guard) after
+review of this ADR and an independent assessment.
+
+`extract_critical_curves` repairs each polyline whose chain reverses at
+sub-resolution scale, and the **true curve is the only arbiter**: a reversal
+triple qualifies only when its strand separation is below
+`repair_separation_ratio` of the local chord scale (a wider reversal is
+genuine, representable geometry and is never touched), and the surrounding
+window is reordered only when a bounded recorded continuation walk certifies
+one simple arc — every windowed vertex within `repair_on_curve_ratio` of the
+local scale of the walked arc, no self-contact between walk samples far apart
+in arc length, no \(D_\parallel^2 B\) sign change — and the reorder both
+removes the sub-resolution reversals in its window and preserves the window's
+chain attachment points. Any certification failure leaves the chain exactly
+as extracted and is counted (`reversal_unrepaired_count`); a genuine fold
+fails certification by construction and remains an explicitly reportable
+nongeneric feature. Repairs recompute `u` and `total_length` (removing the
+phantom back-and-forth length the raw chain carried), keep the vertex set
+and `segment_ids` provenance untouched, and are counted
+(`reversal_repaired_count`).
+
+Transition-mapping sample budgets must not alter which authoritative curve is
+cut: the repair happens before any sampling, so every `max_curve_samples`
+subset of a repaired curve is a subset of the same simple polyline. (Full
+decoupling of the *inserted cut geometry* from the sample budget is the
+follow-on milestone 10.1; this ADR removes the budget's ability to make the
+authoritative curve itself self-overlapping.)
 
 ## Consequences
 
-- Interim safeguard (option 1) is in `_geometry_resolution_issue` with test
+- The repair is `_repair_polyline_reversals` /
+  `_certify_reversal_window` / `_walk_curve_recorded` in
+  `critical_curves.py`, on by default (`repair_reversals`), with
+  `test_sub_resolution_zigzag_is_reordered_by_certified_walk`,
+  `test_uncertified_reversal_is_left_untouched_and_counted`, and
+  `test_wide_reversal_is_not_a_repair_candidate` pinning the certified
+  repair, the refusal path, and the sub-resolution gate.
+- The cut-time double-back guard (option 1) stays in
+  `_geometry_resolution_issue` with test
   `test_sub_resolution_double_back_is_not_cut`; the branched-graph crash and
-  the silent chain-destruction path are both closed (see also the constrained
-  chain protection recorded in ADR 0004's consequences).
-- The ADR 0004 reference demonstration currently needs `--max-curve-samples 8`
-  on the DMercFail file; with the default 10 samples the transition reports
-  `companion T doubles back on itself at samples 3->4->5 with strand
-  separation 7.730e-04, below the local resolution requirement 1.227e-02 …`
-  explicitly.
-- If option 2 is taken, the milestone-9 real-equilibrium sweep in
-  `docs/validation/milestone9-real-equilibria.md` must be regenerated, and the
-  ADR 0004 endpoint-gap numbers rechecked, since curve ordering feeds both.
+  the silent chain-destruction path remain closed (see also the constrained
+  chain protection recorded in ADR 0004's consequences). Known limit: the
+  guard fires only on a strict reversal (negative step dot product); a
+  near-90° turn with sub-resolution strand separation bounds the same
+  un-representable strip and passes the guard. The upstream repair makes
+  that combination rare, and milestone 10.1's budget-invariance checks are
+  the place it would surface.
+- The ADR 0004 reference demonstration no longer needs
+  `--max-curve-samples 8`: on the DMercFail file at \(\lambda_n=0.8\),
+  default sampling (10), 16 samples, and the full 16-vertex curve all cut to
+  the same 2-sheet graph with port actions exact on the mesh
+  (`test_dmerc_reference_zigzag_curve_cuts_at_default_sampling`).
+- Making sample order differ from the surface's own (still zigzagged)
+  `G_ZERO` chain order exposed a latent defect: a tagged path between two
+  samples can pass through a third sample's mesh vertex, and
+  `_insert_curve` overwrote that sample's authoritative `u` with the
+  passing path's interpolation, shifting its assigned action. The
+  authoritative parameter now always wins (`vertex_u.setdefault`).
+- The milestone-9/10 real-equilibrium sweeps are regenerated (curve ordering
+  feeds `u`, `total_u_length`, and the uniform sample subsets), and the ADR
+  0004 endpoint-gap statement is superseded as described there.

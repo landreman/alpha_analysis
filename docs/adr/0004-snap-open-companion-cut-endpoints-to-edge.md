@@ -18,7 +18,7 @@ cut polyline dangles, and edge-blocked union-find finds one incident component
 instead of two: before the 2026-08-29 screen, `_branch_components` crashed with
 "must have exactly two incident triangle sides; found [0]", and with the screen the
 transition becomes a geometry-unresolved hyperedge
-(`test_open_T_endpoint_short_of_edge_is_not_cut`).
+(`test_open_T_endpoint_beyond_snap_tolerance_is_not_cut`).
 
 The numbers make this a decision, not a corner case. On
 `boozmn_20260406-01-262-…_DMercFail_…_low_resolution.nc` at \(\lambda_n=0.8\), the
@@ -88,7 +88,7 @@ boundary edge, clamp \(u\)/action on the extension to the endpoint sample).
 - Port sample counts, `polyline_vertex_ids`, action arrays, and `total_u_length` are
   unchanged; `cut_edges` additionally contains the extension segments, which is what
   makes `_branch_components` find two sides and the sheet graph split.
-- `test_open_T_endpoint_short_of_edge_is_not_cut` now drives the beyond-tolerance
+- `test_open_T_endpoint_beyond_snap_tolerance_is_not_cut` drives the beyond-tolerance
   branch via a tightened `max_surface_distance_ratio` (the synthetic grid's edges
   are so coarse that every interior point is within the default allowance); a new
   test pins the snapped case: three sheets, a duplicated boundary terminus, and
@@ -119,5 +119,18 @@ boundary edge, clamp \(u\)/action on the extension to the endpoint sample).
   jump). The default 10-sample subset of the same file remains explicitly
   unresolved for a distinct upstream reason — the companion polyline doubles
   back on itself at sub-mesh scale — recorded and decided in ADR 0005.
+- **Update (2026-08-30, ADR 0005 accepted):** the certified upstream reversal
+  repair supersedes two statements above. The reference command now cuts at
+  the *default* sampling (and at 16 and full sampling, to the same 2-sheet
+  graph); `--max-curve-samples 8` is no longer load-bearing. And this ADR's
+  quantitative premise — the endpoint gap of \(4.6\times10^{-2}\) at
+  \((6,24,12)\) — was measured on the mis-ordered chain whose head vertex was
+  the *second*-outermost point; on the repaired chain the head is the
+  \(s=0.9888\) vertex and the snapped extension is correspondingly shorter.
+  The snap itself remains necessary: a PL endpoint still generically stops
+  short of the PL `EDGE` polyline, and the allowance is now also re-checked
+  on the post-insertion mesh at the point of use, deferring to the
+  per-transition unresolved path when the refined-mesh allowance is
+  exceeded.
 - This does not touch §21.2: a failed or distant endpoint still yields an explicit
   unresolved hyperedge, never a silent no-connection.
