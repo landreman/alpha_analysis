@@ -88,8 +88,11 @@ mapped. A sample whose field-line scan runs to the 128-field-period cap costs te
 seconds on its own, so a whole critical curve can take over half an hour, while an
 8- to 12-vertex subset of the same curve takes about 20 s. It selects a deterministic
 uniform subset of the existing critical-curve vertices, and `total_u_length` and the
-source vertex IDs remain those of the authoritative curve, so it bounds cost without
-coarsening geometry.
+source vertex IDs remain those of the authoritative curve. Be aware the subset is
+not geometry-free: the sampled points become the inserted cut polyline in milestone
+10, so if a result (sheet count, cut resolution) changes with the budget, that is a
+§21.3 convergence signal to report, not a knob to tune (see ADR 0005 and milestone
+10.1).
 If the new machinery is specific to one value of \(b = B_{bounce}\), then
 exercise the functionality for
 \(\lambda_n = 0.05, 0.1, 0.5, 0.9, 0.95\) where \(\lambda_n\) is defined by

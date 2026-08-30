@@ -688,3 +688,125 @@ def test_boundary_exit_points_appear_in_the_critical_curve_diagnostic(tmp_path):
     labels = [collection.get_label() for collection in axis.collections]
     assert "edge exit (s=1)" in labels
     plt.close(figure)
+
+
+def _zigzag_circle_curve(field, thetas_deg, s=0.25):
+    """Chain the analytic ``GAMMA_MAX`` circle in the given theta order.
+
+    Every point lies exactly on ``B=b, g=0`` (the ``zeta=0`` circle of
+    ``_radial_field`` at ``b=2``); only the segment chaining carries the
+    requested order, exactly like a mesh-edge chain that stepped through a
+    sliver configuration (ADR 0005).
+    """
+    thetas = np.deg2rad(np.asarray(thetas_deg, dtype=float))
+    points = np.column_stack(
+        (
+            np.sqrt(s) * np.cos(thetas),
+            np.sqrt(s) * np.sin(thetas),
+            np.zeros(len(thetas)),
+        )
+    )
+    count = len(points)
+    segments = np.column_stack((np.arange(count), np.roll(np.arange(count), -1)))
+    s_values = np.sum(points[:, :2] ** 2, axis=1)
+    theta_values = np.arctan2(points[:, 1], points[:, 0])
+    return SurfaceCurveMesh(
+        period=2.0 * np.pi,
+        points=points,
+        segments=segments,
+        B=np.asarray(field.B(s_values, theta_values, points[:, 2])),
+        g=np.asarray(
+            field.B(s_values, theta_values, points[:, 2])
+            * field.D_B(s_values, theta_values, points[:, 2])
+        ),
+        boundary_tags=np.full(count, SurfaceMesh.G_ZERO, dtype=np.int64),
+    )
+
+
+_ZIGZAG_CHAIN = [0.0, 45.0, 90.5, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0]
+
+
+def test_sub_resolution_zigzag_is_reordered_by_certified_walk():
+    # The chain visits 90.5 degrees and then doubles back to 90: a
+    # sub-resolution reversal whose vertices all lie on the true curve. The
+    # certified walk must restore monotone order along the circle, remove the
+    # phantom back-and-forth arc length from u, and count the repair
+    # (ADR 0005). The window spans a quarter turn, so an uncertified
+    # chord-projection sort would misorder the far vertices.
+    field = _radial_field()
+    result = extract_critical_curves(
+        _zigzag_circle_curve(field, _ZIGZAG_CHAIN), field, 2.0
+    )
+
+    assert result.status is CriticalCurveStatus.REGULAR
+    assert result.report.reversal_repaired_count == 1
+    assert result.report.reversal_unrepaired_count == 0
+    polyline = next(p for p in result.polylines if p.kind is CriticalKind.GAMMA_MAX)
+    thetas = (
+        np.rad2deg(
+            np.arctan2(
+                result.points[polyline.vertex_ids, 1],
+                result.points[polyline.vertex_ids, 0],
+            )
+        )
+        % 360.0
+    )
+    np.testing.assert_allclose(
+        thetas, [0.0, 45.0, 90.0, 90.5, 135.0, 180.0, 225.0, 270.0, 315.0]
+    )
+    # The vertex set is untouched: the repair reorders, never invents.
+    assert sorted(polyline.vertex_ids.tolist()) == list(range(9))
+    assert np.all(np.diff(polyline.u) > 0.0)
+    ordered = np.deg2rad(np.sort(_ZIGZAG_CHAIN))
+    radius = 0.5
+    chords = 2.0 * radius * np.sin(np.diff(ordered) / 2.0)
+    closing = 2.0 * radius * np.sin((2.0 * np.pi - ordered[-1] + ordered[0]) / 2.0)
+    np.testing.assert_allclose(
+        polyline.total_length, float(np.sum(chords) + closing), rtol=1.0e-12
+    )
+
+
+def test_uncertified_reversal_is_left_untouched_and_counted():
+    # A walk that cannot cover the window cannot certify the reorder; the
+    # chain must stay exactly as extracted -- the cut-time double-back guard
+    # remains the backstop -- and the failure must be counted, not hidden.
+    field = _radial_field()
+    starved = CriticalCurveConfig(max_repair_walk_steps=1)
+    result = extract_critical_curves(
+        _zigzag_circle_curve(field, _ZIGZAG_CHAIN), field, 2.0, starved
+    )
+
+    assert result.report.reversal_repaired_count == 0
+    assert result.report.reversal_unrepaired_count == 1
+    polyline = next(p for p in result.polylines if p.kind is CriticalKind.GAMMA_MAX)
+    thetas = (
+        np.rad2deg(
+            np.arctan2(
+                result.points[polyline.vertex_ids, 1],
+                result.points[polyline.vertex_ids, 0],
+            )
+        )
+        % 360.0
+    )
+    np.testing.assert_allclose(thetas, _ZIGZAG_CHAIN)
+
+    disabled = CriticalCurveConfig(repair_reversals=False)
+    untouched = extract_critical_curves(
+        _zigzag_circle_curve(field, _ZIGZAG_CHAIN), field, 2.0, disabled
+    )
+    assert untouched.report.reversal_repaired_count == 0
+    assert untouched.report.reversal_unrepaired_count == 0
+
+
+def test_wide_reversal_is_not_a_repair_candidate():
+    # A reversal whose strand separation resolves at the chain's own chord
+    # scale is genuine geometry (a fold the mesh can represent), never a
+    # repair candidate; only sub-resolution strand separations qualify.
+    from alpha_analysis.j_connectivity.critical_curves import _reversal_triples
+
+    period = 2.0 * np.pi
+    wide = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.5, 0.4, 0.0]])
+    assert _reversal_triples(wide, [0, 1, 2], False, period, 0.25) == []
+    narrow = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.5, 0.01, 0.0]])
+    candidates = _reversal_triples(narrow, [0, 1, 2], False, period, 0.25)
+    assert [middle for middle, _ in candidates] == [1]

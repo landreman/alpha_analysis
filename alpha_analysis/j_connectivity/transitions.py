@@ -44,9 +44,12 @@ class TransitionMappingConfig:
     refinement dimension required by §§21.3 and 23.
     ``max_curve_samples`` optionally selects a deterministic uniform subset of
     the critical polyline's existing cumulative-arc-length samples; ``None``
-    retains every vertex. It is an explicit validation/performance control,
-    not geometric coarsening: ``total_u_length`` and source vertex IDs remain
-    those of the authoritative critical curve.
+    retains every vertex. ``total_u_length`` and source vertex IDs remain
+    those of the authoritative critical curve, but the subset is not free of
+    geometric effect: the sampled companion points become the polyline the
+    milestone-10 cut inserts, so budget sensitivity of a downstream cut is a
+    §21.3 dimension-9 convergence signal (ADR 0005; decoupling is milestone
+    10.1).
     ``additivity_atol`` has action-length units and ``additivity_rtol`` is
     dimensionless.
     """
