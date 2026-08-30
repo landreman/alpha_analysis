@@ -1,0 +1,278 @@
+{
+  "implementation_status": "BLOCKED: proposed ADR 0006; not converged",
+  "equilibrium": "analytic field in ADR 0006",
+  "b": 3.001685664207343,
+  "resolution": [
+    4,
+    16,
+    36
+  ],
+  "localization_controls": {
+    "u_tolerance": 1e-05,
+    "max_bisections": 20,
+    "event_tolerance": 1e-07
+  },
+  "source_sha256": {
+    "alpha_analysis/j_connectivity/transition_events.py": "6cb2e18af4d7dc9ef89604f6e99811a8fb4615fab22c1221932b1a7c0de29be6",
+    "alpha_analysis/j_connectivity/mesh_cut.py": "c9950385d07d9afed76ac7106fa709a37817967e3c282085c7d29552d08b0006",
+    "alpha_analysis/j_connectivity/_chart_repair.py": "65860cb3700e20eea6a12c9af5b7b50f40c9a0cd61062749690536ac56e039b4"
+  },
+  "surface_status": "REGULAR",
+  "critical_status": "REGULAR",
+  "source_vertices": 571,
+  "source_triangles": 904,
+  "source_sample_counts": [
+    71,
+    69
+  ],
+  "source_contact_pairs": [
+    [
+      [
+        0,
+        1
+      ],
+      [
+        40,
+        41
+      ]
+    ],
+    [
+      [
+        2,
+        3
+      ],
+      [
+        33,
+        34
+      ]
+    ]
+  ],
+  "mapping_seconds": 2.645462416985538,
+  "events": [
+    {
+      "event_id": 0,
+      "unresolved": true,
+      "marginal_points": [
+        [
+          0.7071067811865485,
+          -1.4389841310117442e-16,
+          2.0749263679204173
+        ],
+        [
+          0.7071067811865485,
+          -1.4389841310117442e-16,
+          4.20825893925917
+        ]
+      ],
+      "occurrences": [
+        {
+          "source_transition_id": 0,
+          "source_pair": [
+            0,
+            1
+          ],
+          "u_interval": [
+            0.11875746287171357,
+            0.11876473077029813
+          ],
+          "localized": true,
+          "reason": "localized count-change interval",
+          "retained_traces": 16
+        },
+        {
+          "source_transition_id": 1,
+          "source_pair": [
+            2,
+            3
+          ],
+          "u_interval": [
+            0.12251319531150429,
+            0.12252265613852703
+          ],
+          "localized": true,
+          "reason": "localized count-change interval",
+          "retained_traces": 13
+        }
+      ]
+    },
+    {
+      "event_id": 1,
+      "unresolved": true,
+      "marginal_points": [
+        [
+          -0.7071067811865488,
+          1.2333316783357017e-14,
+          2.0749263679204173
+        ],
+        [
+          -0.7071067811865488,
+          1.2333316783357017e-14,
+          4.208258939259169
+        ]
+      ],
+      "occurrences": [
+        {
+          "source_transition_id": 0,
+          "source_pair": [
+            40,
+            41
+          ],
+          "u_interval": [
+            2.5242545994403582,
+            2.52425985805223
+          ],
+          "localized": true,
+          "reason": "localized count-change interval",
+          "retained_traces": 14
+        },
+        {
+          "source_transition_id": 1,
+          "source_pair": [
+            33,
+            34
+          ],
+          "u_interval": [
+            2.2090121133218945,
+            2.209019906898509
+          ],
+          "localized": true,
+          "reason": "localized count-change interval",
+          "retained_traces": 14
+        }
+      ]
+    }
+  ],
+  "arcs": [
+    {
+      "arc_id": 0,
+      "source_id": 0,
+      "event_endpoints": [
+        0,
+        1
+      ],
+      "status": "REGULAR",
+      "samples": 51,
+      "reason": ""
+    },
+    {
+      "arc_id": 1,
+      "source_id": 0,
+      "event_endpoints": [
+        1,
+        0
+      ],
+      "status": "REGULAR",
+      "samples": 50,
+      "reason": ""
+    },
+    {
+      "arc_id": 2,
+      "source_id": 1,
+      "event_endpoints": [
+        0,
+        1
+      ],
+      "status": "REGULAR",
+      "samples": 46,
+      "reason": ""
+    },
+    {
+      "arc_id": 3,
+      "source_id": 1,
+      "event_endpoints": [
+        1,
+        0
+      ],
+      "status": "REGULAR",
+      "samples": 50,
+      "reason": ""
+    }
+  ],
+  "cut_outcome": "completed diagnostic, not accepted",
+  "sheet_count": 5,
+  "unresolved_arc_ids": [
+    3
+  ],
+  "unresolved_arc_reasons": [
+    "inserted companion curve branches or terminates away from an authorized endpoint; invalid vertices [(243, 3, 8, []), (811, 1, 0, [45])]"
+  ],
+  "port_sheet_ids": [
+    [
+      3,
+      "parent",
+      -1
+    ],
+    [
+      3,
+      "child_1",
+      -1
+    ],
+    [
+      3,
+      "child_3",
+      -1
+    ],
+    [
+      0,
+      "parent",
+      2
+    ],
+    [
+      0,
+      "child_1",
+      1
+    ],
+    [
+      0,
+      "child_3",
+      3
+    ],
+    [
+      1,
+      "parent",
+      0
+    ],
+    [
+      1,
+      "child_1",
+      1
+    ],
+    [
+      1,
+      "child_3",
+      3
+    ],
+    [
+      2,
+      "parent",
+      0
+    ],
+    [
+      2,
+      "child_1",
+      2
+    ],
+    [
+      2,
+      "child_3",
+      4
+    ]
+  ],
+  "expected_sheet_count": 6,
+  "source_folded_triangle_ids": [
+    449,
+    454,
+    460,
+    478,
+    484,
+    490,
+    497,
+    499,
+    502,
+    519,
+    522,
+    528,
+    559
+  ],
+  "total_seconds": 12.641984416986816
+}

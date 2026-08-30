@@ -490,8 +490,25 @@ def _project_to_curve(
         B, g, _ = _point_values(field, point)
         return np.array([B - b, g, float(np.dot(point - predicted, tangent))])
 
+    def jacobian(point):
+        # A curve can lie on zeta=0 to roundoff. MINPACK's relative
+        # difference step then becomes too small to resolve the field's
+        # variation; use a fixed logical step for this geometric corrector.
+        # The accepted point still satisfies the unchanged field residuals.
+        step = 1.0e-6
+        return np.column_stack(
+            [
+                (residual(point + step * axis) - residual(point - step * axis))
+                / (2.0 * step)
+                for axis in np.eye(3)
+            ]
+        )
+
     solved = root(
-        residual, np.asarray(predicted, dtype=np.float64), options={"xtol": 1.0e-13}
+        residual,
+        np.asarray(predicted, dtype=np.float64),
+        jac=jacobian,
+        options={"xtol": 1.0e-13},
     )
     point = np.asarray(solved.x, dtype=np.float64)
     if point.shape != (3,) or not np.all(np.isfinite(point)):

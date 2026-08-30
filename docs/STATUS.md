@@ -44,6 +44,16 @@ here — a convention settled during implementation, a data file that has to be
 regenerated, a known-shaky tolerance. Keep it short; when an entry becomes permanent,
 move it into `docs/DESIGN.md` and delete it here.
 
+- Milestone 10.2 is stopped on **proposed ADR 0006**. Contact localization and
+  one-sided limits work in the experimental branch, but the production synthetic
+  arrangement yields five sheets instead of six and retains one arc unresolved.
+  Its source incoming mesh has 13 folded field-line-chart triangles. Decide whether
+  10.2 must include the local surface-resolution prerequisite assigned to 10.3, or
+  explicitly revise the acceptance scope, before proceeding. The six-sheet test
+  remains an ordinary failing test; the experimental cut guard also regresses the
+  existing DMerc budget-invariance test. No milestone is marked complete by this
+  draft.
+
 - Milestone 0 established base-only `j_connectivity` imports; optional features must use `optional_import()` so missing extras provide an install command.
 - Milestone 1's `BoozerFieldLike.B()` uses pointwise NumPy broadcasting; legacy `compute_B()` retains its outer-`s` grid semantics.
 - Milestone 2's `find_global_B_bounds()` returns refined extrema, a safety-margin bracket, and radial extrema profiles on the configured `s` grid for later background-mesh diagnostics.
