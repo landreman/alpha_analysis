@@ -30,6 +30,17 @@ class ConstrainedCutError(RuntimeError):
     """A curve could not be inserted without guessing surface topology."""
 
 
+class _TransitionCutConflict(ConstrainedCutError):
+    """One transition's cut cannot be completed without corrupting the mesh.
+
+    Raised where completing the current transition would destroy an earlier
+    constrained chain, exceed the boundary-snap allowance at the point of
+    use, or assign parent/child sides without a decisive data margin.  The
+    caller demotes that single transition to an explicit unresolved hyperedge
+    instead of aborting every resolved transition on the slice.
+    """
+
+
 @dataclass(frozen=True)
 class ConstrainedCutConfig:
     """Geometric controls for DESIGN.md §10.3 polyline insertion.
@@ -37,6 +48,12 @@ class ConstrainedCutConfig:
     Logical-distance controls are dimensionless and ``B_tolerance`` has field
     units. A failed local projection raises instead of selecting another
     nearby level-set sheet (DESIGN.md §21.2).
+
+    ``side_assignment_margin_ratio`` makes the parent/child side assignment
+    refuse to guess: the two candidate assignment costs must differ by at
+    least this fraction of the mean parent/child-1 action jump, or the
+    transition is reported unresolved rather than assigned by a coin-flip
+    comparison a single bad trace could decide.
     """
 
     snap_tolerance: float = 1.0e-10
@@ -44,6 +61,7 @@ class ConstrainedCutConfig:
     B_tolerance: float = 1.0e-9
     path_anchor_count: int = 8
     min_transition_strip_edge_ratio: float = 0.1
+    side_assignment_margin_ratio: float = 0.1
 
     def __post_init__(self) -> None:
         for name in (
@@ -51,6 +69,7 @@ class ConstrainedCutConfig:
             "max_surface_distance_ratio",
             "B_tolerance",
             "min_transition_strip_edge_ratio",
+            "side_assignment_margin_ratio",
         ):
             value = getattr(self, name)
             if not np.isfinite(value) or value <= 0.0:
@@ -247,7 +266,9 @@ def _closest_point_triangle(point, first, second, third):
 
 
 class _MutableMesh:
-    def __init__(self, surface, action_values, field, config) -> None:
+    def __init__(
+        self, surface, action_values, field, config, trace_config=None
+    ) -> None:
         self.level = float(surface.level)
         self.period = float(surface.period)
         self.points = [row.copy() for row in surface.points]
@@ -261,6 +282,7 @@ class _MutableMesh:
         self.action = list(map(float, action_values))
         self.field = field
         self.config = config
+        self.trace_config = trace_config
         # Edges already claimed by an inserted constrained chain. A later
         # constraint must not flip one away: the recorded cut path would then
         # reference a destroyed edge and the cut would silently dangle.
@@ -342,6 +364,14 @@ class _MutableMesh:
 
     def _split_edge(self, edge, point, fraction, tag, edge_scale):
         first, second = map(int, edge)
+        if tuple(sorted((first, second))) in self.constrained_edges:
+            # Splitting a claimed edge would leave an earlier transition's
+            # recorded cut referencing a destroyed edge — a silent dangling
+            # cut (§21.2). The caller demotes this transition instead.
+            raise _TransitionCutConflict(
+                f"inserting this curve would split constrained cut edge "
+                f"({first}, {second}) claimed by an earlier transition"
+            )
         barycentric = np.array([1.0 - fraction, fraction])
         new_id = self._new_point(point, barycentric, [first, second], tag, edge_scale)
         owners = [
@@ -406,6 +436,11 @@ class _MutableMesh:
                 / (barycentric[local_first] + barycentric[local_second])
             )
             edge = (ids[local_first], ids[local_second])
+            if not preserve and tuple(sorted(map(int, edge))) in self.constrained_edges:
+                # A helper anchor is guidance, not authoritative geometry:
+                # snapping it to the claimed edge's nearest endpoint keeps the
+                # earlier chain whole where a split would destroy it.
+                return int(edge[0] if fraction <= 0.5 else edge[1])
             inherited = self.tags[edge[0]] & self.tags[edge[1]]
             return self._split_edge(
                 edge, insert_at, fraction, inherited | int(tag), edge_scale
@@ -955,7 +990,11 @@ def _insert_curve(
         if cumulative[-1] > 0.0:
             values = start_u + (end_u - start_u) * cumulative / cumulative[-1]
             for vertex, value in zip(chain[1:-1], values[1:-1]):
-                vertex_u[int(vertex)] = float(value)
+                # A path between two samples may pass through a third sample's
+                # vertex when the mesh's own chain order disagrees with the
+                # certified sample order (ADR 0005); the authoritative sample
+                # parameter must win over a passing path's interpolation.
+                vertex_u.setdefault(int(vertex), float(value))
         segment_edges = {
             tuple(sorted((int(a), int(b)))) for a, b in zip(chain[:-1], chain[1:])
         }
@@ -971,10 +1010,43 @@ def _insert_curve(
             endpoint_id = int(sample_ids[endpoint_index])
             if (mesh.tags[endpoint_id] & SurfaceMesh.EDGE) != 0:
                 continue
-            _, snapped = _nearest_edge_boundary_point(mesh, mesh.points[endpoint_id])
+            component = None
+            incident_lengths = []
+            origin = np.asarray(mesh.points[endpoint_id], dtype=float)
+            for triangle_index, triangle in enumerate(mesh.triangles):
+                if endpoint_id not in triangle:
+                    continue
+                component = int(mesh.component_ids[triangle_index])
+                for vertex in triangle:
+                    if vertex != endpoint_id:
+                        incident_lengths.append(
+                            float(
+                                np.linalg.norm(
+                                    _periodic_delta(
+                                        origin, mesh.points[vertex], mesh.period
+                                    )
+                                )
+                            )
+                        )
+            gap, snapped = _nearest_edge_boundary_point(
+                mesh, mesh.points[endpoint_id], component
+            )
             if snapped is None:
                 raise ConstrainedCutError(
                     "surface has no EDGE boundary to terminate an open companion T"
+                )
+            # The pre-insertion screen bounded this gap against the coarser
+            # pre-split mesh; the allowance the snap actually applies must be
+            # the one that holds where it is used, on the mutated mesh.
+            allowance = mesh.config.max_surface_distance_ratio * max(
+                max(incident_lengths, default=0.0), mesh.config.snap_tolerance
+            )
+            if gap > allowance:
+                raise _TransitionCutConflict(
+                    f"open T endpoint {endpoint_index} is {gap:.3e} from its "
+                    f"component's EDGE boundary on the refined mesh (allowed "
+                    f"{allowance:.3e}); the snapped extension would exceed the "
+                    "local resolution"
                 )
             boundary_id = mesh.insert_point(snapped, preserve=True)
             if boundary_id == endpoint_id:
@@ -1065,7 +1137,7 @@ def _traced_side_action(mesh, component, triangle_labels, sample_ids):
                 mesh.field,
                 mesh.level,
                 np.array([s, theta, float(projected[2])]),
-                WellTraceConfig(),
+                mesh.trace_config or WellTraceConfig(),
             )
             if np.isfinite(trace.action_length):
                 return sample_index, float(trace.action_length)
@@ -1086,7 +1158,7 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
         }
     )
     if len(adjacent) != 2:
-        raise ConstrainedCutError(
+        raise _TransitionCutConflict(
             "a generic companion cut must have exactly two incident triangle sides; "
             f"found {adjacent}"
         )
@@ -1116,7 +1188,7 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
                 mesh, component, triangle_labels, inserted.sample_ids
             )
             if traced is None:
-                raise ConstrainedCutError(
+                raise _TransitionCutConflict(
                     "a cut side has no finite neighboring action data and no "
                     "traceable probe point"
                 )
@@ -1126,6 +1198,21 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
         costs[component_index] = (np.mean(parent_errors), np.mean(child_errors))
     direct = costs[0, 0] + costs[1, 1]
     swapped = costs[0, 1] + costs[1, 0]
+    # The assignment must be decided by the data, not by which side of a
+    # near-tie a stray trace landed on: the two candidate costs must differ by
+    # a decisive fraction of the physical parent/child action jump, or the
+    # transition is reported unresolved (docs/STATUS.md hardening item).
+    jump = np.abs(parent.action_values - child.action_values)
+    jump = jump[np.isfinite(jump)]
+    jump_scale = float(np.mean(jump)) if len(jump) else 0.0
+    margin = mesh.config.side_assignment_margin_ratio * jump_scale
+    if jump_scale <= 0.0 or abs(direct - swapped) < margin:
+        raise _TransitionCutConflict(
+            f"parent/child side assignment is not decisive: costs "
+            f"{direct:.6e} and {swapped:.6e} differ by less than "
+            f"{mesh.config.side_assignment_margin_ratio} of the mean "
+            f"parent/child action jump {jump_scale:.6e}"
+        )
     return (
         (adjacent[0], adjacent[1]) if direct <= swapped else (adjacent[1], adjacent[0])
     )
@@ -1157,11 +1244,27 @@ def _is_resolvable(transition):
     )
 
 
-def _nearest_edge_boundary_point(mesh, point):
-    """Return the distance to the PL ``EDGE`` boundary and its closest point."""
+def _nearest_edge_boundary_point(mesh, point, component=None):
+    """Return the distance to the PL ``EDGE`` boundary and its closest point.
+
+    With ``component`` given, only boundary edges owned by a triangle of that
+    surface component are candidates: an endpoint must never be screened or
+    snapped against a disconnected component that happens to be nearby in
+    Euclidean coordinates (§21.2).
+    """
+    allowed = None
+    if component is not None:
+        allowed = set()
+        for triangle_id, triangle in enumerate(mesh.triangles):
+            if mesh.component_ids[triangle_id] != component:
+                continue
+            for index in range(3):
+                allowed.add(tuple(sorted((triangle[index], triangle[(index + 1) % 3]))))
     best_distance = np.inf
     best_point = None
     for edge in mesh.edges():
+        if allowed is not None and edge not in allowed:
+            continue
         if not all((mesh.tags[vertex] & SurfaceMesh.EDGE) != 0 for vertex in edge):
             continue
         first = np.asarray(mesh.points[edge[0]], dtype=float)
@@ -1186,8 +1289,11 @@ def _geometry_resolution_issue(mesh, transition):
     parent = next(port for port in transition.ports if port.role == "parent")
     closed = _curve_is_closed(transition)
     edge_scales = []
+    curve_component = None
     for index, point in enumerate(parent.points):
-        distance, _, ids, _, barycentric, edge_scale = mesh._nearest_location(point)
+        distance, triangle_id, ids, _, barycentric, edge_scale = mesh._nearest_location(
+            point
+        )
         allowed = mesh.config.max_surface_distance_ratio * max(
             edge_scale, mesh.config.snap_tolerance
         )
@@ -1195,6 +1301,18 @@ def _geometry_resolution_issue(mesh, transition):
             return (
                 f"companion T is {distance:.3e} from the nearest surface "
                 f"triangle (allowed {allowed:.3e})"
+            )
+        component = int(mesh.component_ids[triangle_id])
+        if curve_component is None:
+            curve_component = component
+        elif component != curve_component:
+            # T lives on one connected sheet of the incoming surface; samples
+            # locating on two disconnected components mean the projection
+            # jumped components, and cutting across that jump would merge
+            # geometry §21.2 forbids merging.
+            return (
+                f"companion T samples locate on disconnected surface "
+                f"components {curve_component} and {component}"
             )
         distances = np.array(
             [
@@ -1230,7 +1348,7 @@ def _geometry_resolution_issue(mesh, transition):
             # polyline. Within the local surface-distance allowance the
             # insertion extends the cut to the boundary (ADR 0004); beyond it
             # the terminal segment is genuinely unresolved.
-            gap, _ = _nearest_edge_boundary_point(mesh, point)
+            gap, _ = _nearest_edge_boundary_point(mesh, point, curve_component)
             if gap > allowed:
                 return (
                     f"an open companion T endpoint is {gap:.3e} from the EDGE "
@@ -1239,7 +1357,9 @@ def _geometry_resolution_issue(mesh, transition):
                     "background mesh until the endpoint reaches EDGE"
                 )
         if not endpoint:
-            boundary_distance, _ = _nearest_edge_boundary_point(mesh, point)
+            boundary_distance, _ = _nearest_edge_boundary_point(
+                mesh, point, curve_component
+            )
             required = mesh.config.min_transition_strip_edge_ratio * edge_scale
             if boundary_distance < required:
                 return (
@@ -1293,14 +1413,21 @@ def cut_surface_at_transitions(
     *,
     field: BoozerFieldLike | None = None,
     config: ConstrainedCutConfig | None = None,
+    trace_config: WellTraceConfig | None = None,
 ) -> CutSurface:
     """Insert transition polylines, duplicate ``T``, and assign sheets.
 
     ``action_values`` are pre-cut half-bounce actions in length units. With a
     supplied field, helper vertices are projected to the local ``B=b`` sheet;
     otherwise they lie on the existing PL level surface for analytic tests.
-    Failed or bracketed nongeneric curves remain explicit unresolved ports,
-    never ordinary missing connectivity (DESIGN.md §21.2).
+    ``trace_config`` configures the probe well traced for side assignment
+    when no finite pre-cut action neighbors a cut side; it should match the
+    configuration ``evaluate_surface_data`` was (or would have been) called
+    with.  Failed or bracketed nongeneric curves remain explicit unresolved
+    ports, never ordinary missing connectivity (DESIGN.md §21.2), and a
+    transition whose insertion or side assignment cannot be completed
+    trustworthily is demoted to the same explicit unresolved form instead of
+    aborting every other transition on the slice.
     """
     config = config or ConstrainedCutConfig()
     action = np.asarray(action_values, dtype=np.float64)
@@ -1310,7 +1437,7 @@ def cut_surface_at_transitions(
         transitions
     ):
         raise ValueError("transition IDs must be unique within one cut surface")
-    mesh = _MutableMesh(surface, action, field, config)
+    mesh = _MutableMesh(surface, action, field, config, trace_config)
     inserted_transitions = []
     unresolved = []
     unresolved_reasons = []
@@ -1359,22 +1486,41 @@ def cut_surface_at_transitions(
         ):
             raise ConstrainedCutError("parent and child-1 do not share one companion T")
         closed = _curve_is_closed(transition)
-        sample_ids, path_edges, vertex_u = _insert_curve(
-            mesh,
-            parent.points,
-            transition.u,
-            transition.total_u_length,
-            closed,
-            snap_open_ends=True,
-        )
-        gamma_ids, _, gamma_vertex_u = _insert_curve(
-            mesh,
-            child_3.points,
-            transition.u,
-            transition.total_u_length,
-            closed,
-            tagged=True,
-        )
+        try:
+            sample_ids, path_edges, vertex_u = _insert_curve(
+                mesh,
+                parent.points,
+                transition.u,
+                transition.total_u_length,
+                closed,
+                snap_open_ends=True,
+            )
+            gamma_ids, _, gamma_vertex_u = _insert_curve(
+                mesh,
+                child_3.points,
+                transition.u,
+                transition.total_u_length,
+                closed,
+                tagged=True,
+            )
+        except _TransitionCutConflict as conflict:
+            # Vertices this transition already inserted are harmless
+            # on-surface refinements; its partially constrained chain stays
+            # protected but never becomes a cut. The transition itself is an
+            # explicit unresolved hyperedge, not a dead pitch slice.
+            unresolved.append(transition.transition_id)
+            unresolved_reasons.append(str(conflict))
+            for port in transition.ports:
+                unresolved_ports.append(
+                    CutTransitionPort(
+                        transition.transition_id,
+                        port.role,
+                        -1,
+                        np.full(len(port.points), -1, dtype=np.int64),
+                        port.action_values,
+                    )
+                )
+            continue
         inserted_transitions.append(
             _InsertedTransition(
                 transition,
@@ -1391,19 +1537,49 @@ def cut_surface_at_transitions(
     destroyed = [edge for edge in blocked_edges if edge not in surviving_edges]
     if destroyed:
         # A stale blocked edge would leave a silent gap in the cut and a
-        # plausible, wrong sheet graph (§21.2). Fail loudly instead.
+        # plausible, wrong sheet graph (§21.2). The split/flip guards make
+        # this unreachable; if it fires anyway the cut cannot be trusted.
         raise ConstrainedCutError(
             f"{len(destroyed)} constrained cut edges were destroyed by later "
             "insertions; the cut cannot be trusted"
         )
-    pre_duplicate_labels = _triangle_components(mesh.triangles, blocked_edges)
-    all_cut_vertices = {vertex for edge in blocked_edges for vertex in edge}
-    branch_components = {
-        inserted.transition.transition_id: _branch_components(
-            mesh, inserted, pre_duplicate_labels, all_cut_vertices
-        )
-        for inserted in inserted_transitions
-    }
+    while True:
+        pre_duplicate_labels = _triangle_components(mesh.triangles, blocked_edges)
+        all_cut_vertices = {vertex for edge in blocked_edges for vertex in edge}
+        branch_components = {}
+        demoted = None
+        for inserted in inserted_transitions:
+            try:
+                branch_components[inserted.transition.transition_id] = (
+                    _branch_components(
+                        mesh, inserted, pre_duplicate_labels, all_cut_vertices
+                    )
+                )
+            except _TransitionCutConflict as conflict:
+                demoted = (inserted, str(conflict))
+                break
+        if demoted is None:
+            break
+        # Side assignment for this transition is not trustworthy: withdraw
+        # its blocked edges so it splits nothing, report it unresolved, and
+        # relabel for the surviving transitions.
+        inserted, reason = demoted
+        inserted_transitions.remove(inserted)
+        unresolved.append(inserted.transition.transition_id)
+        unresolved_reasons.append(reason)
+        for port in inserted.transition.ports:
+            unresolved_ports.append(
+                CutTransitionPort(
+                    inserted.transition.transition_id,
+                    port.role,
+                    -1,
+                    np.full(len(port.points), -1, dtype=np.int64),
+                    port.action_values,
+                )
+            )
+        blocked_edges = set()
+        for survivor in inserted_transitions:
+            blocked_edges.update(survivor.path_edges)
 
     copy_id = {}
     for vertex in sorted(all_cut_vertices):
