@@ -861,14 +861,15 @@ def refine_surface_near_curves(
     Interior midpoints are projected to ``B=b`` along the local gradient with
     a bounded displacement (§8.4); a failed projection leaves that edge
     unsplit and is counted, never replaced by a distant root (§21.2).
-    Boundary midpoints stay exactly on the PL boundary polyline — ``EDGE``,
-    ``G_ZERO``, and unresolved boundaries are geometric provenance the
-    refinement must not move — and carry the exact field value at the PL
-    midpoint, which differs from the level by the boundary polyline's own
-    discretization error.  Periodic-seam and axis edges are never split here
-    because their twins live on the other seam copy; they are counted as
-    skipped.  Without a field (analytic PL fixtures) every midpoint is the PL
-    midpoint, matching the cut's own analytic insertion behavior.
+    A ``g=0`` boundary midpoint is solved onto the true ``B=b, g=0`` curve
+    (the boundary polyline converges to the curve carrying the authoritative
+    critical vertices); other boundary midpoints — ``EDGE`` and unresolved
+    boundaries — stay exactly on the PL boundary polyline, whose geometry the
+    refinement must not move, and carry the exact field value at the PL
+    midpoint.  Periodic-seam and axis edges are never split here because
+    their twins live on the other seam copy; they are counted as skipped.
+    Without a field (analytic PL fixtures) every midpoint is the PL midpoint,
+    matching the cut's own analytic insertion behavior.
     """
     config = config or LocalRefinementConfig()
     points = [row.copy() for row in np.asarray(surface.points, dtype=float)]
@@ -938,7 +939,31 @@ def refine_surface_near_curves(
         length = float(np.linalg.norm(delta))
         midpoint = np.asarray(points[first], dtype=float) + 0.5 * delta
         midpoint[2] %= period
-        if field is not None and not boundary:
+        if field is not None and boundary and (joint & SurfaceMesh.G_ZERO):
+            # A g=0 boundary midpoint goes onto the true B=b, g=0 curve, so
+            # the refined boundary polyline converges to the curve the
+            # authoritative critical vertices live on; a PL midpoint would
+            # freeze the boundary's discretization gap while insertion
+            # allowances shrink with the local edge scale.
+            from .critical_curves import (
+                CriticalCurveConfig,
+                _projected_midpoint,
+            )
+
+            projected = _projected_midpoint(
+                np.asarray(points[first], dtype=float),
+                np.asarray(points[second], dtype=float),
+                midpoint,
+                field,
+                float(surface.level),
+                period,
+                CriticalCurveConfig(),
+            )
+            if projected is None:
+                projection_rejections += 1
+                continue
+            midpoint = np.asarray(projected, dtype=float)
+        elif field is not None and not boundary:
             projected = _project_to_level_near(
                 midpoint,
                 field,
