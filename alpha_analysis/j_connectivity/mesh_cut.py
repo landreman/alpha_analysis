@@ -7,7 +7,7 @@ dimensionless ``(x=sqrt(s) cos(theta), y=sqrt(s) sin(theta), zeta)`` with
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field, replace
 from heapq import heappop, heappush
 from pathlib import Path
 
@@ -20,6 +20,7 @@ from .surface_extract import (
     _evaluate_B,
     _physical_g,
     _project_to_level_near,
+    surface_flux,
 )
 from .transitions import TransitionCurve
 from .types import FloatArray, IntArray, TransitionStatus
@@ -62,6 +63,7 @@ class ConstrainedCutConfig:
     path_anchor_count: int = 8
     min_transition_strip_edge_ratio: float = 0.1
     side_assignment_margin_ratio: float = 0.1
+    max_corridor_faces: int = 64
 
     def __post_init__(self) -> None:
         for name in (
@@ -76,6 +78,8 @@ class ConstrainedCutConfig:
                 raise ValueError(f"{name} must be finite and positive")
         if self.path_anchor_count < 1:
             raise ValueError("path_anchor_count must be positive")
+        if self.max_corridor_faces < 1:
+            raise ValueError("max_corridor_faces must be positive")
 
 
 @dataclass(frozen=True)
@@ -102,6 +106,34 @@ class CutTransitionPort:
 
 
 @dataclass(frozen=True)
+class CutEvent:
+    """An unresolved nongeneric event with arbitrary incident port endpoints.
+
+    Indices identify the cut surface's ports and their sample endpoints. A
+    failed incident arc keeps its port with sheet/vertex ID -1; it is never
+    silently interpreted as absent connectivity.
+    """
+
+    event_id: int
+    marginal_points: FloatArray
+    port_indices: IntArray
+    sample_indices: IntArray
+    unresolved: bool = True
+
+    def __post_init__(self):
+        points = np.asarray(self.marginal_points, dtype=np.float64).reshape(-1, 3)
+        ports = np.asarray(self.port_indices, dtype=np.int64)
+        samples = np.asarray(self.sample_indices, dtype=np.int64)
+        if ports.ndim != 1 or samples.shape != ports.shape:
+            raise ValueError("event port and sample indices must share one axis")
+        if np.any(ports < 0) or np.any(samples < 0):
+            raise ValueError("event incidence indices must be nonnegative")
+        object.__setattr__(self, "marginal_points", points)
+        object.__setattr__(self, "port_indices", ports)
+        object.__setattr__(self, "sample_indices", samples)
+
+
+@dataclass(frozen=True)
 class CutSurface:
     """A transition-cut mesh with cell-located sheet IDs and port incidence."""
 
@@ -112,6 +144,12 @@ class CutSurface:
     ports: tuple[CutTransitionPort, ...]
     unresolved_transition_ids: IntArray
     unresolved_transition_reasons: tuple[str, ...] = ()
+    events: tuple[CutEvent, ...] = ()
+    corridor_count: int = 0
+    max_corridor_faces_used: int = 0
+    unresolved_event_action_vertex_ids: IntArray = dataclass_field(
+        default_factory=lambda: np.empty(0, dtype=np.int64)
+    )
 
     def __post_init__(self) -> None:
         action = np.asarray(self.action_values, dtype=np.float64)
@@ -119,6 +157,15 @@ class CutSurface:
         edges = np.asarray(self.cut_edges, dtype=np.int64).reshape(-1, 2)
         unresolved = np.asarray(self.unresolved_transition_ids, dtype=np.int64)
         reasons = tuple(self.unresolved_transition_reasons)
+        event_unknown = np.asarray(
+            self.unresolved_event_action_vertex_ids, dtype=np.int64
+        )
+        if event_unknown.ndim != 1 or np.any(
+            (event_unknown < 0) | (event_unknown >= len(action))
+        ):
+            raise ValueError("unresolved event-action vertex lies outside the surface")
+        if np.any(np.isfinite(action[event_unknown])):
+            raise ValueError("an unresolved event action must be NaN")
         if action.shape != (len(self.surface.points),):
             raise ValueError("cut action must have one value per surface point")
         if sheets.shape != (len(self.surface.triangles),):
@@ -135,11 +182,22 @@ class CutSurface:
                 raise ValueError("only unresolved ports may use negative vertex IDs")
             if ids.size and ids.min() >= 0 and ids.max() >= len(self.surface.points):
                 raise ValueError("cut port index lies outside the surface")
+        if len({event.event_id for event in self.events}) != len(self.events):
+            raise ValueError("event IDs must be unique")
+        for event in self.events:
+            for port_index, sample_index in zip(
+                event.port_indices, event.sample_indices
+            ):
+                if port_index >= len(self.ports) or sample_index >= len(
+                    self.ports[port_index].action_values
+                ):
+                    raise ValueError("event incidence lies outside its cut port")
         object.__setattr__(self, "action_values", action)
         object.__setattr__(self, "sheet_ids", sheets)
         object.__setattr__(self, "cut_edges", edges)
         object.__setattr__(self, "unresolved_transition_ids", unresolved)
         object.__setattr__(self, "unresolved_transition_reasons", reasons)
+        object.__setattr__(self, "unresolved_event_action_vertex_ids", event_unknown)
 
     def to_pyvista(self):
         """Return a PyVista surface with named point and cell arrays (§17.1)."""
@@ -147,6 +205,25 @@ class CutSurface:
         view.point_data["A action length [length]"] = self.action_values
         view.cell_data["sheet ID [integer]"] = self.sheet_ids
         return view
+
+    def unresolved_action_flux(self, field: BoozerFieldLike) -> float:
+        """Measure all cells containing unknown action by |ds wedge d alpha|.
+
+        This is the dimensionless surface measure of §4.4, not a bound on
+        bounce-time-weighted volume or on Theta. No NaN cell is discarded;
+        later quadrature must retain this unresolved contribution (§21.2).
+        Event/transition connectivity uncertainty remains separately explicit.
+        """
+        unknown = np.any(
+            ~np.isfinite(self.action_values[self.surface.triangles]), axis=1
+        )
+        surface = replace(
+            self.surface,
+            triangles=self.surface.triangles[unknown],
+            triangle_parent_tetrahedra=self.surface.triangle_parent_tetrahedra[unknown],
+            component_ids=self.surface.component_ids[unknown],
+        )
+        return surface_flux(surface, field)
 
     def to_networkx(self):
         """Return the coarse sheet/transition diagnostic graph from §10.5."""
@@ -195,6 +272,21 @@ class CutSurface:
                         node,
                         ("sheet", int(port.sheet_id)),
                         port_index=int(port_index),
+                        role=port.role,
+                    )
+        for event in self.events:
+            node = ("event", int(event.event_id))
+            graph.add_node(node, kind="event", unresolved=event.unresolved)
+            for port_index, sample_index in zip(
+                event.port_indices, event.sample_indices
+            ):
+                port = self.ports[int(port_index)]
+                if port.sheet_id >= 0:
+                    graph.add_edge(
+                        node,
+                        ("sheet", int(port.sheet_id)),
+                        port_index=int(port_index),
+                        sample_index=int(sample_index),
                         role=port.role,
                     )
         return graph
@@ -291,6 +383,8 @@ class _MutableMesh:
         # constraint must not flip one away: the recorded cut path would then
         # reference a destroyed edge and the cut would silently dangle.
         self.constrained_edges: set[tuple[int, int]] = set()
+        self.corridor_count = 0
+        self.max_corridor_faces_used = 0
 
     def _unwrapped_triangle(self, triangle_id, point):
         ids = self.triangles[triangle_id]
@@ -339,21 +433,78 @@ class _MutableMesh:
             raise ConstrainedCutError("cannot insert a curve into an empty surface")
         return best
 
+    def _field_line_chart(self, points, origin_zeta):
+        points = np.asarray(points, dtype=float)
+        zeta = points[..., 2] + self.period * np.round(
+            (origin_zeta - points[..., 2]) / self.period
+        )
+        s = np.sum(points[..., :2] ** 2, axis=-1)
+        alpha = (
+            np.arctan2(points[..., 1], points[..., 0])
+            - np.asarray(self.field.iota(s)) * zeta
+        )
+        return np.stack(
+            (np.sqrt(s) * np.cos(alpha), np.sqrt(s) * np.sin(alpha)), axis=-1
+        )
+
     def _new_point(self, point, barycentric, ids, tag, edge_scale):
         point = np.asarray(point, dtype=float).copy()
         point[2] %= self.period
+        chart_insertion = (
+            getattr(self, "normal_insertion", False)
+            and self.field is not None
+            and not (tag & SurfaceMesh.G_ZERO)
+        )
+        if chart_insertion:
+            chart = np.dot(
+                barycentric,
+                self._field_line_chart(np.asarray(self.points)[list(ids)], point[2]),
+            )
+            s = float(np.dot(chart, chart))
+            alpha = float(np.arctan2(chart[1], chart[0]))
+            iota = float(self.field.iota(s))
+            theta = alpha + iota * point[2]
+            point[:2] = np.sqrt(s) * np.array([np.cos(theta), np.sin(theta)])
         if self.field is not None:
             residual = abs(
                 float(_evaluate_B(self.field, point[np.newaxis, :])[0]) - self.level
             )
             if residual > self.config.B_tolerance:
-                projected = _project_to_level_near(
-                    point,
-                    self.field,
-                    self.level,
-                    SurfaceExtractionConfig(B_tolerance=self.config.B_tolerance),
-                    self.config.max_surface_distance_ratio * edge_scale,
-                )
+                projected = None
+                if chart_insertion:
+                    zeta = float(point[2])
+                    for _ in range(32):
+                        theta = alpha + iota * zeta
+                        value = float(self.field.B(s, theta, zeta)) - self.level
+                        candidate = np.array(
+                            [
+                                np.sqrt(s) * np.cos(theta),
+                                np.sqrt(s) * np.sin(theta),
+                                zeta % self.period,
+                            ]
+                        )
+                        if (
+                            np.linalg.norm(
+                                _periodic_delta(point, candidate, self.period)
+                            )
+                            > self.config.max_surface_distance_ratio * edge_scale
+                        ):
+                            break
+                        if abs(value) <= self.config.B_tolerance:
+                            projected = candidate
+                            break
+                        derivative = float(self.field.D_B(s, theta, zeta))
+                        if not np.isfinite(derivative) or derivative == 0:
+                            break
+                        zeta -= value / derivative
+                else:
+                    projected = _project_to_level_near(
+                        point,
+                        self.field,
+                        self.level,
+                        SurfaceExtractionConfig(B_tolerance=self.config.B_tolerance),
+                        self.config.max_surface_distance_ratio * edge_scale,
+                    )
                 if projected is None:
                     raise ConstrainedCutError(
                         "a constrained vertex could not be projected locally to B=b"
@@ -447,6 +598,65 @@ class _MutableMesh:
         distance, triangle_id, ids, closest, barycentric, edge_scale = (
             self._nearest_location(point)
         )
+        if getattr(self, "normal_insertion", False) and self.field is not None:
+            # Incoming wells are locally graphs over (s,alpha). A true B=b
+            # point need not lie on the current PL face: Euclidean nearest
+            # insertion can fold a face near an event. Use the local lifted
+            # field-line chart to select its face, keeping component provenance
+            # and the original logical-distance acceptance allowance.
+            component = self.component_ids[triangle_id]
+            candidate_ids = np.flatnonzero(np.asarray(self.component_ids) == component)
+            triangles = np.asarray(self.triangles, dtype=np.int64)[candidate_ids]
+            coordinates = np.asarray(self.points)[triangles].copy()
+            coordinates[:, :, 2] += self.period * np.round(
+                (point[2] - coordinates[:, :, 2]) / self.period
+            )
+            flux = np.sum(coordinates[:, :, :2] ** 2, axis=2)
+            theta = np.arctan2(coordinates[:, :, 1], coordinates[:, :, 0])
+            alpha = theta - np.asarray(self.field.iota(flux)) * coordinates[:, :, 2]
+            chart = np.stack(
+                (np.sqrt(flux) * np.cos(alpha), np.sqrt(flux) * np.sin(alpha)), axis=2
+            )
+            point_flux = float(np.sum(point[:2] ** 2))
+            point_alpha = float(
+                np.arctan2(point[1], point[0])
+                - float(self.field.iota(point_flux)) * point[2]
+            )
+            query = np.sqrt(point_flux) * np.array(
+                [np.cos(point_alpha), np.sin(point_alpha)]
+            )
+            first, second = chart[:, 1] - chart[:, 0], chart[:, 2] - chart[:, 0]
+            delta = query - chart[:, 0]
+            determinant = first[:, 0] * second[:, 1] - first[:, 1] * second[:, 0]
+            valid = np.abs(determinant) > np.finfo(float).tiny
+            weights = np.full((len(triangles), 3), np.nan)
+            weights[valid, 1] = (
+                delta[valid, 0] * second[valid, 1] - delta[valid, 1] * second[valid, 0]
+            ) / determinant[valid]
+            weights[valid, 2] = (
+                first[valid, 0] * delta[valid, 1] - first[valid, 1] * delta[valid, 0]
+            ) / determinant[valid]
+            weights[:, 0] = 1 - weights[:, 1] - weights[:, 2]
+            valid &= np.all(weights >= -self.config.snap_tolerance, axis=1)
+            if not np.any(valid):
+                raise ConstrainedCutError(
+                    "no same-component face contains the event point in its field-line chart"
+                )
+            locations = np.sum(weights[:, :, None] * coordinates, axis=1)
+            distances = np.linalg.norm(locations - point, axis=1)
+            distances[~valid] = np.inf
+            nearest = int(np.argmin(distances))
+            distance = float(distances[nearest])
+            triangle_id = int(candidate_ids[nearest])
+            ids = triangles[nearest]
+            closest = locations[nearest]
+            barycentric = weights[nearest]
+            local = coordinates[nearest]
+            edge_scale = max(
+                np.linalg.norm(local[1] - local[0]),
+                np.linalg.norm(local[2] - local[0]),
+                np.linalg.norm(local[2] - local[1]),
+            )
         allowed = self.config.max_surface_distance_ratio * max(
             edge_scale, self.config.snap_tolerance
         )
@@ -480,7 +690,7 @@ class _MutableMesh:
             triangle_id, insert_at, barycentric, int(tag), edge_scale
         )
 
-    def insert_tagged_point(self, point, tag):
+    def insert_tagged_point(self, point, tag, *, component=None):
         """Insert an authoritative curve point on the nearest tagged edge.
 
         Standalone critical-curve refinement follows the true ``B=b, g=0``
@@ -489,8 +699,21 @@ class _MutableMesh:
         harmless offset from turning a boundary curve into an interior cut.
         """
         point = np.asarray(point, dtype=float)
+        allowed_vertices = (
+            None
+            if component is None
+            else {
+                vertex
+                for triangle, owner in zip(self.triangles, self.component_ids)
+                if owner == component
+                for vertex in triangle
+            }
+        )
         tagged_vertices = [
-            index for index, value in enumerate(self.tags) if (value & tag) != 0
+            index
+            for index, value in enumerate(self.tags)
+            if (value & tag) != 0
+            and (allowed_vertices is None or index in allowed_vertices)
         ]
         if tagged_vertices:
             distances = np.array(
@@ -506,6 +729,10 @@ class _MutableMesh:
                 return nearest
         best = None
         for edge in self.edges():
+            if allowed_vertices is not None and not all(
+                vertex in allowed_vertices for vertex in edge
+            ):
+                continue
             if not all((self.tags[vertex] & tag) != 0 for vertex in edge):
                 continue
             first = np.asarray(self.points[edge[0]], dtype=float)
@@ -621,6 +848,33 @@ class _MutableMesh:
         length = float(np.linalg.norm(chord))
         if length <= self.config.snap_tolerance:
             raise ConstrainedCutError("a constrained segment has zero logical length")
+        if getattr(self, "normal_insertion", False) and self.field is not None:
+            chart = self._field_line_chart(np.asarray(self.points), origin[2])
+            chart_origin = chart[first].copy()
+            chord = chart[second] - chart_origin
+            length = float(np.linalg.norm(chord))
+            if length <= self.config.snap_tolerance:
+                raise _TransitionCutConflict(
+                    "a constrained arc collapses in its local field-line chart"
+                )
+            tangent = chord / length
+            transverse = np.array([-tangent[1], tangent[0]])
+            projected = {}
+
+            def project(vertex):
+                if vertex not in projected:
+                    value = (
+                        chart[vertex]
+                        if vertex < len(chart)
+                        else self._field_line_chart(self.points[vertex], origin[2])
+                    )
+                    delta = value - chart_origin
+                    projected[vertex] = np.array(
+                        [np.dot(delta, tangent), np.dot(delta, transverse)]
+                    )
+                return projected[vertex]
+
+            return project, length
         tangent = chord / length
         normals = []
         for triangle in self.triangles:
@@ -652,10 +906,15 @@ class _MutableMesh:
             )
         normal /= normal_norm
         transverse = np.cross(normal, tangent)
+        projected = {}
 
         def project(vertex):
-            delta = _periodic_delta(origin, self.points[vertex], self.period)
-            return np.array([np.dot(delta, tangent), np.dot(delta, transverse)])
+            if vertex not in projected:
+                delta = _periodic_delta(origin, self.points[vertex], self.period)
+                projected[vertex] = np.array(
+                    [np.dot(delta, tangent), np.dot(delta, transverse)]
+                )
+            return projected[vertex]
 
         return project, length
 
@@ -738,23 +997,6 @@ class _MutableMesh:
             return [int(first), int(second)]
         project, length = self._local_projection(first, second)
         tolerance = max(self.config.snap_tolerance, 1.0e-12 * length)
-        # A segment through an existing vertex is two constraints, not an
-        # ambiguous four-triangle edge flip.
-        on_segment = []
-        for vertex in range(len(self.points)):
-            if vertex in (first, second):
-                continue
-            coordinate = project(vertex)
-            if (
-                tolerance < coordinate[0] < length - tolerance
-                and abs(coordinate[1]) <= tolerance
-            ):
-                on_segment.append((coordinate[0], vertex))
-        if on_segment:
-            middle = min(on_segment)[1]
-            first_half = self.constrain_edge(first, middle)
-            second_half = self.constrain_edge(middle, second)
-            return first_half[:-1] + second_half
         endpoint_components = {
             self.component_ids[index]
             for index, triangle in enumerate(self.triangles)
@@ -765,7 +1007,54 @@ class _MutableMesh:
                 "constrained endpoints do not share one surface component"
             )
         target_component = endpoint_components.pop()
+        component_vertices = {
+            vertex
+            for index, triangle in enumerate(self.triangles)
+            if self.component_ids[index] == target_component
+            for vertex in triangle
+        }
+        origin = np.asarray(self.points[first], dtype=float)
+        physical_chord = _periodic_delta(origin, self.points[second], self.period)
+        physical_length = np.linalg.norm(physical_chord)
+        tangent = physical_chord / length
 
+        def local_crossing(edge, fraction, crossing_x):
+            start = np.asarray(self.points[edge[0]], dtype=float)
+            delta = _periodic_delta(start, self.points[edge[1]], self.period)
+            crossing = start + fraction * delta
+            gap = np.linalg.norm(
+                _periodic_delta(origin, crossing, self.period) - crossing_x * tangent
+            )
+            return gap <= self.config.max_surface_distance_ratio * min(
+                physical_length, np.linalg.norm(delta)
+            )
+
+        # A segment through an existing vertex is two constraints, not an
+        # ambiguous four-triangle edge flip.
+        on_segment = []
+        for vertex in component_vertices:
+            if vertex in (first, second):
+                continue
+            coordinate = project(vertex)
+            if (
+                tolerance < coordinate[0] < length - tolerance
+                and abs(coordinate[1]) <= tolerance
+                and np.linalg.norm(
+                    _periodic_delta(origin, self.points[vertex], self.period)
+                    - coordinate[0] * tangent
+                )
+                <= (
+                    self.config.max_surface_distance_ratio * physical_length
+                    if getattr(self, "normal_insertion", False)
+                    else tolerance
+                )
+            ):
+                on_segment.append((coordinate[0], vertex))
+        if on_segment:
+            middle = min(on_segment)[1]
+            first_half = self.constrain_edge(first, middle)
+            second_half = self.constrain_edge(middle, second)
+            return first_half[:-1] + second_half
         # Split every crossed edge at the local tangent-plane intersection.
         # Consecutive crossings bound one triangle, so conforming edge splits
         # create the desired constrained chain without requiring a convex
@@ -793,7 +1082,9 @@ class _MutableMesh:
             if not tolerance < fraction < 1.0 - tolerance:
                 continue
             crossing_x = first_point[0] + fraction * (second_point[0] - first_point[0])
-            if tolerance < crossing_x < length - tolerance:
+            if tolerance < crossing_x < length - tolerance and local_crossing(
+                edge, fraction, crossing_x
+            ):
                 crossings.append((crossing_x, edge, fraction))
         chain = [int(first)]
         for _, edge, fraction in sorted(crossings):
@@ -825,12 +1116,21 @@ class _MutableMesh:
         ):
             return chain
         maximum_flips = max(1, 2 * len(self.edges()))
+        flipped_edges = set()
         for _ in range(maximum_flips):
             if target in self.edges():
                 return [int(first), int(second)]
             crossing = []
+            allowed_edges = {
+                tuple(sorted((triangle[local], triangle[(local + 1) % 3])))
+                for index, triangle in enumerate(self.triangles)
+                if self.component_ids[index] == target_component
+                for local in range(3)
+            }
             for edge in self.edges():
                 if first in edge or second in edge:
+                    continue
+                if edge not in allowed_edges:
                     continue
                 first_point, second_point = project(edge[0]), project(edge[1])
                 denominator = first_point[1] - second_point[1]
@@ -842,20 +1142,134 @@ class _MutableMesh:
                 crossing_x = first_point[0] + fraction * (
                     second_point[0] - first_point[0]
                 )
-                if tolerance < crossing_x < length - tolerance:
+                if tolerance < crossing_x < length - tolerance and local_crossing(
+                    edge, fraction, crossing_x
+                ):
                     crossing.append((crossing_x, edge))
             if not crossing:
                 break
             progress = False
             for _, edge in sorted(crossing):
+                if edge in flipped_edges:
+                    continue
                 if self._flip_crossing_edge(edge, project):
+                    flipped_edges.add(edge)
                     progress = True
                     break
             if not progress:
                 break
+        if getattr(self, "intrinsic_insertion", False):
+            return self._constrain_corridor(first, second)
         return self.constrained_path(
             first, second, self.points[first], self.points[second]
         )
+
+    def _constrain_corridor(self, first, second):
+        """Route one constraint through adjacent faces, including folded charts.
+
+        A dual path selects an actual connected strip of triangles; overlapping
+        projections cannot introduce unrelated edge crossings. Each crossed
+        edge is split once, omitting no original cell or its unresolved
+        action measure. Component provenance is retained. Existing constraints and physical boundaries
+        are barriers. This is the mesh-aligned insertion allowed by §10.3.
+        """
+        owners = {}
+        starts, goals = set(), set()
+        for index, triangle in enumerate(self.triangles):
+            if first in triangle:
+                starts.add(index)
+            if second in triangle:
+                goals.add(index)
+            for a, b in zip(triangle, np.roll(triangle, -1)):
+                owners.setdefault(tuple(sorted((int(a), int(b)))), []).append(index)
+        origin = np.asarray(self.points[first])
+        chord = _periodic_delta(origin, self.points[second], self.period)
+        length2 = float(np.dot(chord, chord))
+        crossings = {}
+        adjacency = {}
+        for edge, incident in owners.items():
+            if len(incident) != 2 or edge in self.constrained_edges:
+                continue
+            if first in edge or second in edge:
+                continue
+            a, b = incident
+            if self.component_ids[a] != self.component_ids[b]:
+                continue
+            start = origin + _periodic_delta(origin, self.points[edge[0]], self.period)
+            delta = _periodic_delta(
+                self.points[edge[0]], self.points[edge[1]], self.period
+            )
+            # Closest points on the two supporting lines. A vertex hit uses
+            # an edge midpoint to keep the path in face interiors rather than
+            # branching at that vertex. The existing geometric allowance is
+            # checked below; this does not enlarge the resolution bound.
+            solution = np.linalg.lstsq(
+                np.column_stack((delta, -chord)), origin - start, rcond=None
+            )[0]
+            fraction = float(solution[0])
+            if (
+                not self.config.snap_tolerance
+                < fraction
+                < 1 - self.config.snap_tolerance
+            ):
+                fraction = 0.5
+            point = start + fraction * delta
+            parameter = float(np.clip(np.dot(point - origin, chord) / length2, 0, 1))
+            gap = float(np.linalg.norm(point - origin - parameter * chord))
+            scale = float(np.linalg.norm(delta))
+            if gap > self.config.max_surface_distance_ratio * scale:
+                continue
+            crossings[edge] = (point, fraction, scale)
+            weight = scale + 100 * gap * gap / max(
+                np.sqrt(length2), self.config.snap_tolerance
+            )
+            adjacency.setdefault(a, []).append((b, edge, weight))
+            adjacency.setdefault(b, []).append((a, edge, weight))
+        distances = {index: 0.0 for index in starts}
+        queue = [(0.0, index) for index in sorted(starts)]
+        previous = {}
+        reached = None
+        while queue:
+            cost, index = heappop(queue)
+            if cost != distances[index]:
+                continue
+            if index in goals:
+                reached = index
+                break
+            for neighbor, edge, weight in adjacency.get(index, ()):
+                candidate = cost + weight
+                if candidate < distances.get(neighbor, np.inf):
+                    distances[neighbor] = candidate
+                    previous[neighbor] = (index, edge)
+                    heappush(queue, (candidate, neighbor))
+        if reached is None:
+            raise _TransitionCutConflict(
+                "no bounded face corridor joins the mapped transition samples"
+            )
+        edges = []
+        while reached not in starts:
+            reached, edge = previous[reached]
+            edges.append(edge)
+        if len(edges) + 1 > self.config.max_corridor_faces:
+            raise _TransitionCutConflict(
+                f"constrained insertion needs {len(edges)+1} faces, above the local corridor budget {self.config.max_corridor_faces}"
+            )
+        chain = [int(first)]
+        for edge in reversed(edges):
+            point, fraction, scale = crossings[edge]
+            inherited = self.tags[edge[0]] & self.tags[edge[1]]
+            chain.append(self._split_edge(edge, point, fraction, inherited, scale))
+        chain.append(int(second))
+        current = self.edges()
+        if any(
+            tuple(sorted((a, b))) not in current for a, b in zip(chain[:-1], chain[1:])
+        ):
+            raise _TransitionCutConflict(
+                "a face corridor did not produce one connected constrained chain"
+            )
+        self.corridor_count += 1
+        self.max_corridor_faces_used = max(self.max_corridor_faces_used, len(edges) + 1)
+        return chain
 
     def tagged_path(self, first, second, tag):
         adjacency = {}
@@ -919,6 +1333,7 @@ class _InsertedTransition:
     path_edges: set[tuple[int, int]]
     vertex_u: dict[int, float]
     gamma_vertex_u: dict[int, float]
+    event_endpoint_indices: tuple[int, ...] = ()
 
 
 def _curve_is_closed(transition):
@@ -931,7 +1346,16 @@ def _curve_is_closed(transition):
 
 
 def _insert_curve(
-    mesh, points, u, total_length, closed, *, tagged=False, snap_open_ends=False
+    mesh,
+    points,
+    u,
+    total_length,
+    closed,
+    *,
+    tagged=False,
+    snap_open_ends=False,
+    event_endpoint_indices=(),
+    adaptive_anchors=False,
 ):
     tag = SurfaceMesh.G_ZERO if tagged else 0
     sample_ids = np.array(
@@ -965,8 +1389,27 @@ def _insert_curve(
             )
             anchor_ids = [first]
             anchor_points = [first_point]
-            for anchor_index in range(1, mesh.config.path_anchor_count):
-                fraction = anchor_index / mesh.config.path_anchor_count
+            anchor_count = mesh.config.path_anchor_count
+            if adaptive_anchors:
+                # Contact bisection already puts many samples inside a single
+                # face. Additional anchors are useful only for longer chords;
+                # the same constrained-edge routine still visits every crossed
+                # triangle, including when no extra anchor is needed.
+                scale = mesh._nearest_location(first_point)[-1]
+                anchor_count = min(
+                    anchor_count,
+                    max(
+                        1,
+                        int(
+                            np.ceil(
+                                np.linalg.norm(delta)
+                                / max(scale, mesh.config.snap_tolerance)
+                            )
+                        ),
+                    ),
+                )
+            for anchor_index in range(1, anchor_count):
+                fraction = anchor_index / anchor_count
                 anchor_point = first_point + fraction * delta
                 anchor_point[2] %= mesh.period
                 anchor_id = mesh.insert_point(anchor_point, preserve=False)
@@ -983,7 +1426,7 @@ def _insert_curve(
                 try:
                     section = mesh.constrain_edge(anchor_first, anchor_second)
                 except ConstrainedCutError as error:
-                    raise ConstrainedCutError(
+                    raise type(error)(
                         "transition segment "
                         f"{first_index}->{second_index}, anchor {anchor_number} "
                         f"could not be constrained: {error}"
@@ -1040,6 +1483,8 @@ def _insert_curve(
         # it so the cut terminates on the surface edge; the extension carries
         # the endpoint's clamped parameter (ADR 0004).
         for endpoint_index in (0, len(sample_ids) - 1):
+            if endpoint_index in event_endpoint_indices:
+                continue
             endpoint_id = int(sample_ids[endpoint_index])
             if (mesh.tags[endpoint_id] & SurfaceMesh.EDGE) != 0:
                 continue
@@ -1081,13 +1526,27 @@ def _insert_curve(
                     f"{allowance:.3e}); the snapped extension would exceed the "
                     "local resolution"
                 )
-            boundary_id = mesh.insert_point(snapped, preserve=True)
+            # The snap is on a known PL EDGE, whose nonlinear field-line
+            # chart need not contain that Euclidean point. Preserve the
+            # boundary provenance instead of searching chart interiors again.
+            try:
+                boundary_id = (
+                    mesh.insert_tagged_point(
+                        snapped, SurfaceMesh.EDGE, component=component
+                    )
+                    if getattr(mesh, "normal_insertion", False)
+                    else mesh.insert_point(snapped, preserve=True)
+                )
+            except ConstrainedCutError as error:
+                raise _TransitionCutConflict(
+                    f"open T endpoint {endpoint_index} boundary insertion: {error}"
+                ) from error
             if boundary_id == endpoint_id:
                 continue
             try:
                 chain = mesh.constrain_edge(endpoint_id, boundary_id)
             except ConstrainedCutError as error:
-                raise ConstrainedCutError(
+                raise _TransitionCutConflict(
                     f"open T endpoint {endpoint_index} could not be extended "
                     f"to the EDGE boundary: {error}"
                 ) from error
@@ -1098,6 +1557,43 @@ def _insert_curve(
             }
             path_edges.update(extension_edges)
             mesh.constrained_edges.update(extension_edges)
+    degree = {}
+    for first, second in path_edges:
+        degree[first] = degree.get(first, 0) + 1
+        degree[second] = degree.get(second, 0) + 1
+    ends = set() if closed else {int(sample_ids[0]), int(sample_ids[-1])}
+    # Open ends may have been extended to EDGE by ADR 0004.
+    if (snap_open_ends or tagged) and not closed:
+        ends = {
+            vertex
+            for vertex, count in degree.items()
+            if count == 1
+            and (
+                (mesh.tags[vertex] & SurfaceMesh.EDGE)
+                # A staged critical port can cover only part of G_ZERO;
+                # its supplied endpoints are already boundary vertices, not
+                # dangling companion cuts. Reordered full curves can instead
+                # end at an interior sample carrying EDGE (ADR 0005).
+                or (tagged and vertex in (int(sample_ids[0]), int(sample_ids[-1])))
+                or vertex
+                in {int(sample_ids[index]) for index in event_endpoint_indices}
+            )
+        }
+    invalid = [
+        vertex
+        for vertex, count in degree.items()
+        if count != (1 if vertex in ends else 2)
+    ]
+    if (
+        invalid
+        or (not closed and len(ends) != 2)
+        or any(int(vertex) not in degree for vertex in sample_ids)
+    ):
+        raise _TransitionCutConflict(
+            f"inserted {'critical' if tagged else 'companion'} curve branches or terminates "
+            "away from an authorized endpoint; "
+            f"invalid vertices {[(v,degree[v],mesh.tags[v],np.flatnonzero(sample_ids==v).tolist()) for v in invalid[:8]]}"
+        )
     return sample_ids, path_edges, vertex_u
 
 
@@ -1181,10 +1677,15 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
     transition = inserted.transition
     parent = next(port for port in transition.ports if port.role == "parent")
     child = next(port for port in transition.ports if port.role == "child_1")
+    regular_sample_ids = [
+        vertex
+        for index, vertex in enumerate(inserted.sample_ids)
+        if index not in inserted.event_endpoint_indices
+    ]
     adjacent = sorted(
         {
             component
-            for vertex in inserted.sample_ids
+            for vertex in regular_sample_ids
             for component in _incident_components(
                 mesh.triangles, triangle_labels, vertex
             )
@@ -1200,6 +1701,8 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
         parent_errors = []
         child_errors = []
         for sample_index, vertex in enumerate(inserted.sample_ids):
+            if sample_index in inserted.event_endpoint_indices:
+                continue
             neighbor_values = []
             for triangle_id, triangle in enumerate(mesh.triangles):
                 if triangle_labels[triangle_id] != component or vertex not in triangle:
@@ -1319,7 +1822,7 @@ def _nearest_edge_boundary_point(mesh, point, component=None):
     return best_distance, best_point
 
 
-def _geometry_resolution_issue(mesh, transition):
+def _geometry_resolution_issue(mesh, transition, event_endpoint_indices=()):
     """Return why the current surface cannot represent ``T``, or ``None``."""
     parent = next(port for port in transition.ports if port.role == "parent")
     closed = _curve_is_closed(transition)
@@ -1376,7 +1879,7 @@ def _geometry_resolution_issue(mesh, transition):
                 "companion T collapses onto the EDGE boundary at an interior "
                 "sample; refine the background mesh to resolve the intervening sheet"
             )
-        if endpoint and not on_edge_boundary:
+        if endpoint and not on_edge_boundary and index not in event_endpoint_indices:
             # An open T terminates on the domain boundary (its endpoints share
             # the marginal endpoints' flux surface), but a PL endpoint
             # generically lands a fraction of one edge short of the PL EDGE
@@ -1486,6 +1989,9 @@ def cut_surface_at_transitions(
     field: BoozerFieldLike | None = None,
     config: ConstrainedCutConfig | None = None,
     trace_config: WellTraceConfig | None = None,
+    _event_endpoints=None,
+    _event_marginal_points=(),
+    _arc_unresolved_reasons=None,
 ) -> CutSurface:
     """Insert transition polylines, duplicate ``T``, and assign sheets.
 
@@ -1510,19 +2016,49 @@ def cut_surface_at_transitions(
     ):
         raise ValueError("transition IDs must be unique within one cut surface")
     mesh = _MutableMesh(surface, action, field, config, trace_config)
+    event_endpoints = {} if _event_endpoints is None else _event_endpoints
+    mesh.normal_insertion = bool(event_endpoints)
+    mesh.intrinsic_insertion = bool(event_endpoints)
+    preflight_issues = {
+        transition.transition_id: _geometry_resolution_issue(
+            mesh, transition, event_endpoints.get(transition.transition_id, ())
+        )
+        for transition in transitions
+        if event_endpoints and _is_resolvable(transition)
+    }
+    if event_endpoints:
+        # All event anchors enter before constraints, so later incidence at a
+        # true junction does not split/destroy an already constrained chain.
+        for points in _event_marginal_points:
+            for point in points:
+                mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
+        for role in ("child_3", "parent"):
+            for transition in transitions:
+                if not _is_resolvable(transition) or preflight_issues.get(
+                    transition.transition_id
+                ):
+                    continue
+                port = next(port for port in transition.ports if port.role == role)
+                for point in port.points:
+                    if port.role == "child_3":
+                        mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
+                    else:
+                        mesh.insert_point(point, preserve=True)
     inserted_transitions = []
     unresolved = []
     unresolved_reasons = []
     unresolved_ports = []
     blocked_edges = set()
     for transition in transitions:
+        endpoint_indices = event_endpoints.get(transition.transition_id, ())
         if not _is_resolvable(transition):
             unresolved.append(transition.transition_id)
             if transition.status is TransitionStatus.BUDGET_INSUFFICIENT:
                 unresolved_reasons.append(transition.sampling_reason)
             else:
                 unresolved_reasons.append(
-                    "transition has failed samples or a bracketed nongeneric event"
+                    (_arc_unresolved_reasons or {}).get(transition.transition_id)
+                    or "transition has failed samples or a bracketed nongeneric event"
                 )
             for port in transition.ports:
                 unresolved_ports.append(
@@ -1535,7 +2071,9 @@ def cut_surface_at_transitions(
                     )
                 )
             continue
-        geometry_issue = _geometry_resolution_issue(mesh, transition)
+        geometry_issue = preflight_issues.get(
+            transition.transition_id
+        ) or _geometry_resolution_issue(mesh, transition, endpoint_indices)
         if geometry_issue is not None:
             unresolved.append(transition.transition_id)
             unresolved_reasons.append(geometry_issue)
@@ -1569,6 +2107,8 @@ def cut_surface_at_transitions(
                 transition.total_u_length,
                 closed,
                 snap_open_ends=True,
+                event_endpoint_indices=endpoint_indices,
+                adaptive_anchors=bool(event_endpoints),
             )
             gamma_ids, _, gamma_vertex_u = _insert_curve(
                 mesh,
@@ -1577,6 +2117,7 @@ def cut_surface_at_transitions(
                 transition.total_u_length,
                 closed,
                 tagged=True,
+                event_endpoint_indices=endpoint_indices,
             )
         except _TransitionCutConflict as conflict:
             # Vertices this transition already inserted are harmless
@@ -1604,6 +2145,7 @@ def cut_surface_at_transitions(
                 path_edges,
                 vertex_u,
                 gamma_vertex_u,
+                endpoint_indices,
             )
         )
         blocked_edges.update(path_edges)
@@ -1687,6 +2229,19 @@ def cut_surface_at_transitions(
         child_1 = next(port for port in transition.ports if port.role == "child_1")
         child_3 = next(port for port in transition.ports if port.role == "child_3")
         for vertex, parameter in inserted.vertex_u.items():
+            if (vertex, parent_component) not in copy_id or (
+                vertex,
+                child_component,
+            ) not in copy_id:
+                raise ConstrainedCutError(
+                    f"arc {transition.transition_id} vertex {vertex} at {mesh.points[vertex]} "
+                    f"u={parameter} lacks sides {parent_component,child_component}; "
+                    f"incident={_incident_components(mesh.triangles,pre_duplicate_labels,vertex)}, "
+                    f"cut degree={sum(vertex in edge for edge in blocked_edges)}, "
+                    f"arc degree={sum(vertex in edge for edge in inserted.path_edges)}, "
+                    f"sample indices={np.flatnonzero(inserted.sample_ids == vertex).tolist()}, "
+                    f"tags={mesh.tags[vertex]}"
+                )
             parent_copy = copy_id[(vertex, parent_component)]
             child_copy = copy_id[(vertex, child_component)]
             mesh.action[parent_copy] = _interpolate_port_action(
@@ -1704,7 +2259,8 @@ def cut_surface_at_transitions(
         )
         gamma_components = {
             component
-            for vertex in inserted.gamma_ids
+            for index, vertex in enumerate(inserted.gamma_ids)
+            if index not in inserted.event_endpoint_indices
             for component in _incident_components(
                 mesh.triangles, pre_duplicate_labels, int(vertex)
             )
@@ -1752,6 +2308,39 @@ def cut_surface_at_transitions(
             )
         )
 
+    # In a partially cut arrangement, an uncut incident arc can leave two
+    # different one-sided event limits on one mesh vertex. Neither limit is
+    # the value of that unresolved vertex. Keep both on their ports, mark the
+    # vertex unknown, and propagate its NaN through the insertion stencils.
+    # Ordinary (non-event) port samples must still have a unique action.
+    event_vertices = {
+        int(port.polyline_vertex_ids[index])
+        for port in ports
+        if port.sheet_id >= 0
+        for index in event_endpoints.get(port.transition_id, ())
+    }
+    controls = {item.transition_id: item.controls for item in transitions}
+    values_by_vertex = {}
+    for port in ports:
+        if port.sheet_id < 0:
+            continue
+        control = controls[port.transition_id]
+        for vertex, value in zip(port.polyline_vertex_ids, port.action_values):
+            tolerance = control.additivity_atol + control.additivity_rtol * abs(value)
+            values_by_vertex.setdefault(int(vertex), []).append((value, tolerance))
+    event_unknown = []
+    for vertex, values in values_by_vertex.items():
+        value, tolerance = values[0]
+        if any(abs(other - value) > tolerance + error for other, error in values[1:]):
+            if vertex not in event_vertices:
+                raise ConstrainedCutError(
+                    "incompatible action limits at a non-event port vertex"
+                )
+            mesh.action[vertex] = np.nan
+            event_unknown.append(vertex)
+        else:
+            mesh.action[vertex] = value
+
     _refresh_inserted_actions(
         mesh,
         triangles,
@@ -1797,6 +2386,11 @@ def cut_surface_at_transitions(
         tuple(ports),
         np.asarray(unresolved, dtype=np.int64),
         tuple(unresolved_reasons),
+        corridor_count=mesh.corridor_count,
+        max_corridor_faces_used=mesh.max_corridor_faces_used,
+        unresolved_event_action_vertex_ids=np.asarray(
+            sorted(event_unknown), dtype=np.int64
+        ),
     )
 
 
@@ -1810,10 +2404,16 @@ def save_cut_surface(path: str | Path, cut: CutSurface) -> None:
         port_actions.extend(port.action_values)
         offsets.append(len(vertex_ids))
     surface = cut.surface
+    event_offsets = np.concatenate(
+        ([0], np.cumsum([len(event.port_indices) for event in cut.events]))
+    )
+    event_point_offsets = np.concatenate(
+        ([0], np.cumsum([len(event.marginal_points) for event in cut.events]))
+    )
     with Path(path).open("wb") as stream:
         np.savez_compressed(
             stream,
-            schema_version=np.array([2], dtype=np.int64),
+            schema_version=np.array([3], dtype=np.int64),
             level=np.array([surface.level]),
             period=np.array([surface.period]),
             points=surface.points,
@@ -1829,21 +2429,47 @@ def save_cut_surface(path: str | Path, cut: CutSurface) -> None:
             cut_edges=cut.cut_edges,
             unresolved_transition_ids=cut.unresolved_transition_ids,
             unresolved_transition_reasons=np.asarray(
-                cut.unresolved_transition_reasons, dtype="U256"
+                cut.unresolved_transition_reasons, dtype=str
             ),
+            corridor_count=np.array([cut.corridor_count], dtype=np.int64),
+            max_corridor_faces_used=np.array(
+                [cut.max_corridor_faces_used], dtype=np.int64
+            ),
+            unresolved_event_action_vertex_ids=cut.unresolved_event_action_vertex_ids,
             port_transition_ids=np.array([port.transition_id for port in cut.ports]),
             port_roles=np.array([port.role for port in cut.ports], dtype="U16"),
             port_sheet_ids=np.array([port.sheet_id for port in cut.ports]),
             port_offsets=np.asarray(offsets, dtype=np.int64),
             port_vertex_ids=np.asarray(vertex_ids, dtype=np.int64),
             port_action_values=np.asarray(port_actions, dtype=np.float64),
+            event_ids=np.array(
+                [event.event_id for event in cut.events], dtype=np.int64
+            ),
+            event_offsets=event_offsets,
+            event_point_offsets=event_point_offsets,
+            event_port_indices=np.array(
+                [index for event in cut.events for index in event.port_indices],
+                dtype=np.int64,
+            ),
+            event_sample_indices=np.array(
+                [index for event in cut.events for index in event.sample_indices],
+                dtype=np.int64,
+            ),
+            event_marginal_points=np.array(
+                [point for event in cut.events for point in event.marginal_points],
+                dtype=np.float64,
+            ).reshape(-1, 3),
+            event_unresolved=np.array(
+                [event.unresolved for event in cut.events], dtype=bool
+            ),
         )
 
 
 def load_cut_surface(path: str | Path) -> CutSurface:
     """Load a cut topology written by :func:`save_cut_surface`."""
     with np.load(Path(path), allow_pickle=False) as payload:
-        if payload["schema_version"].tolist() != [2]:
+        version = payload["schema_version"].tolist()
+        if version not in ([2], [3]):
             raise ValueError("unsupported cut-surface schema version")
         surface = SurfaceMesh(
             level=float(payload["level"][0]),
@@ -1870,6 +2496,22 @@ def load_cut_surface(path: str | Path) -> CutSurface:
                     payload["port_action_values"][start:stop],
                 )
             )
+        events = []
+        if version == [3]:
+            for index, event_id in enumerate(payload["event_ids"]):
+                start, stop = payload["event_offsets"][index : index + 2]
+                point_start, point_stop = payload["event_point_offsets"][
+                    index : index + 2
+                ]
+                events.append(
+                    CutEvent(
+                        int(event_id),
+                        payload["event_marginal_points"][point_start:point_stop],
+                        payload["event_port_indices"][start:stop],
+                        payload["event_sample_indices"][start:stop],
+                        bool(payload["event_unresolved"][index]),
+                    )
+                )
         return CutSurface(
             surface,
             payload["action_values"],
@@ -1878,4 +2520,74 @@ def load_cut_surface(path: str | Path) -> CutSurface:
             tuple(ports),
             payload["unresolved_transition_ids"],
             tuple(map(str, payload["unresolved_transition_reasons"])),
+            tuple(events),
+            int(payload["corridor_count"][0]) if "corridor_count" in payload else 0,
+            (
+                int(payload["max_corridor_faces_used"][0])
+                if "max_corridor_faces_used" in payload
+                else 0
+            ),
+            (
+                payload["unresolved_event_action_vertex_ids"]
+                if "unresolved_event_action_vertex_ids" in payload
+                else np.empty(0, dtype=np.int64)
+            ),
         )
+
+
+def cut_surface_at_transition_arcs(surface, action_values, arrangement, **kwargs):
+    """Cut regular arcs while retaining arbitrary-port nongeneric event nodes.
+
+    Event endpoints are inserted jointly; global sheet incidence is determined
+    after all regular arc constraints exist. An event is not permission to
+    guess missing branches: any arc that cannot be cut retains unresolved
+    ports, and each event preserves every incident arc's port endpoints.
+    """
+    endpoints = {
+        arc.curve.transition_id: tuple(
+            index
+            for index, event_id in zip(
+                (0, len(arc.curve.u) - 1), arc.endpoint_event_ids
+            )
+            if event_id >= 0
+        )
+        for arc in arrangement.arcs
+        if any(event_id >= 0 for event_id in arc.endpoint_event_ids)
+    }
+    cut = cut_surface_at_transitions(
+        surface,
+        action_values,
+        tuple(arc.curve for arc in arrangement.arcs),
+        _event_endpoints=endpoints,
+        _event_marginal_points=tuple(
+            event.marginal_points for event in arrangement.events
+        ),
+        _arc_unresolved_reasons={
+            arc.curve.transition_id: arc.unresolved_reason for arc in arrangement.arcs
+        },
+        **kwargs,
+    )
+    events = []
+    for event in arrangement.events:
+        port_indices = []
+        sample_indices = []
+        for arc in arrangement.arcs:
+            for end, event_id in zip((0, -1), arc.endpoint_event_ids):
+                if event_id != event.event_id:
+                    continue
+                for index, port in enumerate(cut.ports):
+                    if port.transition_id == arc.curve.transition_id:
+                        port_indices.append(index)
+                        sample_indices.append(
+                            0 if end == 0 else len(port.action_values) - 1
+                        )
+        events.append(
+            CutEvent(
+                event.event_id,
+                event.marginal_points,
+                np.array(port_indices, dtype=np.int64),
+                np.array(sample_indices, dtype=np.int64),
+                event.unresolved,
+            )
+        )
+    return replace(cut, events=tuple(events))

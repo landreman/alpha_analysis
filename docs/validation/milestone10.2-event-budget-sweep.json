@@ -1,0 +1,262 @@
+{
+  "source_sha256": {
+    "alpha_analysis/j_connectivity/mesh_cut.py": "da2289cf650c5f06bf6f2a59b42d67ae78fdb43c75e114828d51ae37cb294021",
+    "alpha_analysis/j_connectivity/transition_events.py": "81920473150a82c24cfda25602ad2b1b79584c912bdf29f40f6a776cd0c620e9"
+  },
+  "cases": [
+    {
+      "budget": 8,
+      "source_samples_used": [
+        3,
+        4
+      ],
+      "additional_source_samples": 9,
+      "source_total_u": [
+        4.493115443419553,
+        4.489912504756309
+      ],
+      "arcs": [
+        {
+          "id": 0,
+          "certified": false,
+          "status": "BUDGET_INSUFFICIENT",
+          "reason": "source sampling budget exhausted on this arc"
+        },
+        {
+          "id": 1,
+          "certified": false,
+          "status": "BUDGET_INSUFFICIENT",
+          "reason": "source sampling budget exhausted on this arc"
+        },
+        {
+          "id": 2,
+          "certified": false,
+          "status": "BUDGET_INSUFFICIENT",
+          "reason": "source sampling budget exhausted on this arc"
+        },
+        {
+          "id": 3,
+          "certified": false,
+          "status": "BUDGET_INSUFFICIENT",
+          "reason": "source sampling budget exhausted on this arc"
+        }
+      ],
+      "seconds": 8.110024040972348,
+      "point_count": 575,
+      "triangle_count": 908,
+      "sheet_count": 3,
+      "cut_edge_count": 0,
+      "valid_port_count": 0,
+      "unresolved_transition_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "unresolved_transition_reasons": [
+        "source sampling budget exhausted on this arc",
+        "source sampling budget exhausted on this arc",
+        "source sampling budget exhausted on this arc",
+        "source sampling budget exhausted on this arc"
+      ],
+      "invalid_port_incidence_count": 0,
+      "triangles_spanning_parent_child_jump": 0,
+      "max_port_action_error": null,
+      "serialization_round_trip": true,
+      "event_count": 2,
+      "unresolved_port_action_sample_count": 0,
+      "unresolved_event_action_vertex_ids": [],
+      "corridor_count": 0,
+      "max_corridor_faces_used": 0,
+      "unresolved_action_triangle_count": 908
+    },
+    {
+      "budget": 10,
+      "source_samples_used": [
+        3,
+        4
+      ],
+      "additional_source_samples": 13,
+      "source_total_u": [
+        4.493115443419553,
+        4.489912504756309
+      ],
+      "arcs": [
+        {
+          "id": 0,
+          "certified": false,
+          "status": "BUDGET_INSUFFICIENT",
+          "reason": "source sampling budget exhausted on this arc"
+        },
+        {
+          "id": 1,
+          "certified": false,
+          "status": "BUDGET_INSUFFICIENT",
+          "reason": "source sampling budget exhausted on this arc"
+        },
+        {
+          "id": 2,
+          "certified": false,
+          "status": "BUDGET_INSUFFICIENT",
+          "reason": "source sampling budget exhausted on this arc"
+        },
+        {
+          "id": 3,
+          "certified": false,
+          "status": "BUDGET_INSUFFICIENT",
+          "reason": "source sampling budget exhausted on this arc"
+        }
+      ],
+      "seconds": 7.881601499975659,
+      "point_count": 575,
+      "triangle_count": 908,
+      "sheet_count": 3,
+      "cut_edge_count": 0,
+      "valid_port_count": 0,
+      "unresolved_transition_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "unresolved_transition_reasons": [
+        "source sampling budget exhausted on this arc",
+        "source sampling budget exhausted on this arc",
+        "source sampling budget exhausted on this arc",
+        "source sampling budget exhausted on this arc"
+      ],
+      "invalid_port_incidence_count": 0,
+      "triangles_spanning_parent_child_jump": 0,
+      "max_port_action_error": null,
+      "serialization_round_trip": true,
+      "event_count": 2,
+      "unresolved_port_action_sample_count": 0,
+      "unresolved_event_action_vertex_ids": [],
+      "corridor_count": 0,
+      "max_corridor_faces_used": 0,
+      "unresolved_action_triangle_count": 908
+    },
+    {
+      "budget": 16,
+      "source_samples_used": [
+        3,
+        4
+      ],
+      "additional_source_samples": 25,
+      "source_total_u": [
+        4.493115443419553,
+        4.489912504756309
+      ],
+      "arcs": [
+        {
+          "id": 0,
+          "certified": true,
+          "status": "REGULAR",
+          "reason": ""
+        },
+        {
+          "id": 1,
+          "certified": false,
+          "status": "BUDGET_INSUFFICIENT",
+          "reason": "source sampling budget exhausted on this arc"
+        },
+        {
+          "id": 2,
+          "certified": true,
+          "status": "REGULAR",
+          "reason": ""
+        },
+        {
+          "id": 3,
+          "certified": false,
+          "status": "BUDGET_INSUFFICIENT",
+          "reason": "source sampling budget exhausted on this arc"
+        }
+      ],
+      "seconds": 9.772626958030742,
+      "point_count": 672,
+      "triangle_count": 1080,
+      "sheet_count": 3,
+      "cut_edge_count": 0,
+      "valid_port_count": 0,
+      "unresolved_transition_ids": [
+        0,
+        1,
+        3,
+        2
+      ],
+      "unresolved_transition_reasons": [
+        "companion T doubles back on itself at samples 2->3->4 with strand separation 3.381e-09, below the local resolution requirement 2.040e-02; the strip between the strands cannot be represented at this sampling",
+        "source sampling budget exhausted on this arc",
+        "source sampling budget exhausted on this arc",
+        "a generic companion cut must have exactly two incident triangle sides; found [0]"
+      ],
+      "invalid_port_incidence_count": 0,
+      "triangles_spanning_parent_child_jump": 0,
+      "max_port_action_error": null,
+      "serialization_round_trip": true,
+      "event_count": 2,
+      "unresolved_port_action_sample_count": 0,
+      "unresolved_event_action_vertex_ids": [],
+      "corridor_count": 0,
+      "max_corridor_faces_used": 0,
+      "unresolved_action_triangle_count": 1080
+    },
+    {
+      "budget": null,
+      "source_samples_used": [
+        71,
+        69
+      ],
+      "additional_source_samples": 0,
+      "source_total_u": [
+        4.493115443419553,
+        4.489912504756309
+      ],
+      "arcs": [
+        {
+          "id": 0,
+          "certified": true,
+          "status": "REGULAR",
+          "reason": ""
+        },
+        {
+          "id": 1,
+          "certified": true,
+          "status": "REGULAR",
+          "reason": ""
+        },
+        {
+          "id": 2,
+          "certified": true,
+          "status": "REGULAR",
+          "reason": ""
+        },
+        {
+          "id": 3,
+          "certified": true,
+          "status": "REGULAR",
+          "reason": ""
+        }
+      ],
+      "seconds": 18.7225474579609,
+      "point_count": 1546,
+      "triangle_count": 1887,
+      "sheet_count": 6,
+      "cut_edge_count": 910,
+      "valid_port_count": 12,
+      "unresolved_transition_ids": [],
+      "unresolved_transition_reasons": [],
+      "invalid_port_incidence_count": 0,
+      "triangles_spanning_parent_child_jump": 0,
+      "max_port_action_error": 8.881784197001252e-15,
+      "serialization_round_trip": true,
+      "event_count": 2,
+      "unresolved_port_action_sample_count": 0,
+      "unresolved_event_action_vertex_ids": [],
+      "corridor_count": 13,
+      "max_corridor_faces_used": 13,
+      "unresolved_action_triangle_count": 1671
+    }
+  ]
+}

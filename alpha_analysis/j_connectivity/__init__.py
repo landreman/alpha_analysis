@@ -45,8 +45,10 @@ from .mesh_cut import (
     ConstrainedCutConfig,
     ConstrainedCutError,
     CutSurface,
+    CutEvent,
     CutTransitionPort,
     cut_surface_at_transitions,
+    cut_surface_at_transition_arcs,
     load_cut_surface,
     save_cut_surface,
 )
@@ -102,8 +104,26 @@ from .well_trace import (
     sample_well_profile,
     trace_regular_well,
 )
+from .transition_events import (
+    ContactLocalizationConfig,
+    ContactBracket,
+    TransitionEvent,
+    TransitionArc,
+    LocalizedTransitions,
+    localize_transition_contacts,
+    build_transition_arcs,
+)
 
 __all__ = [
+    "ContactLocalizationConfig",
+    "ContactBracket",
+    "TransitionEvent",
+    "TransitionArc",
+    "LocalizedTransitions",
+    "localize_transition_contacts",
+    "build_transition_arcs",
+    "CutEvent",
+    "cut_surface_at_transition_arcs",
     "BackgroundMesh",
     "BackgroundMeshConfig",
     "ConnectivityConfig",

@@ -1,9 +1,11 @@
-"""Exercise Milestones 10--10.1 cuts on the five required real equilibria.
+"""Exercise Milestones 10--10.2 cuts on the five required real equilibria.
 
 The matrix and mesh controls match the Milestone 9 validation driver.
 Transition mapping uses a bounded adaptive certification budget: uncertified,
 failed, or bracketed nongeneric curves are passed through the cut stage and
-must remain explicit unresolved hyperedges.
+must remain explicit unresolved hyperedges. With --localize-events, localize
+contacts and certify/cut individual arcs; skip surface-wide actions and use
+production side probes, retaining all unknown-action measure explicitly.
 Only cases containing a fully generic transition pay for surface-wide well
 traces; those topology-sensitive cases retain the authoritative extracted
 mesh. Every case performs a pickle-free topology serialization round trip.
@@ -18,6 +20,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import asdict
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -44,7 +47,14 @@ from alpha_analysis.j_connectivity import (
     load_cut_surface,
     map_transitions,
     save_cut_surface,
+    surface_flux,
 )
+from alpha_analysis.j_connectivity.transition_events import (
+    ContactLocalizationConfig,
+    localize_transition_contacts,
+    build_transition_arcs,
+)
+from alpha_analysis.j_connectivity.mesh_cut import cut_surface_at_transition_arcs
 
 FILES = (
     "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_"
@@ -102,10 +112,13 @@ def _cut_summary(cut) -> dict:
     valid_ports = [port for port in cut.ports if port.sheet_id >= 0]
     port_action_error = []
     invalid_incidence = 0
+    unknown_port_samples = 0
     for port in valid_ports:
-        port_action_error.extend(
-            np.abs(cut.action_values[port.polyline_vertex_ids] - port.action_values)
+        errors = np.abs(
+            cut.action_values[port.polyline_vertex_ids] - port.action_values
         )
+        unknown_port_samples += int(np.count_nonzero(~np.isfinite(errors)))
+        port_action_error.extend(errors[np.isfinite(errors)])
         for vertex in port.polyline_vertex_ids:
             incident = np.flatnonzero(
                 np.any(cut.surface.triangles == int(vertex), axis=1)
@@ -141,6 +154,16 @@ def _cut_summary(cut) -> dict:
             float(np.max(port_action_error)) if port_action_error else None
         ),
         "serialization_round_trip": _round_trip(cut),
+        "event_count": len(cut.events),
+        "unresolved_port_action_sample_count": unknown_port_samples,
+        "unresolved_event_action_vertex_ids": cut.unresolved_event_action_vertex_ids.tolist(),
+        "corridor_count": cut.corridor_count,
+        "max_corridor_faces_used": cut.max_corridor_faces_used,
+        "unresolved_action_triangle_count": int(
+            np.count_nonzero(
+                np.any(~np.isfinite(cut.action_values[cut.surface.triangles]), axis=1)
+            )
+        ),
     }
 
 
@@ -180,6 +203,11 @@ def _parse_args() -> argparse.Namespace:
         help="adaptive transition-mapping work budget per critical curve",
     )
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--localize-events",
+        action="store_true",
+        help="exercise milestone 10.2 contact localization and per-arc cutting",
+    )
     return parser.parse_args()
 
 
@@ -204,6 +232,17 @@ def main() -> None:
         "transition": asdict(transition_config),
         "cut": asdict(cut_config),
     }
+    if args.localize_events:
+        controls["contact_localization"] = asdict(ContactLocalizationConfig())
+        root = Path(__file__).resolve().parents[1]
+        controls["implementation_sha256"] = {
+            name: hashlib.sha256((root / name).read_bytes()).hexdigest()
+            for name in (
+                "alpha_analysis/j_connectivity/mesh_cut.py",
+                "alpha_analysis/j_connectivity/transition_events.py",
+                "alpha_analysis/j_connectivity/critical_curves.py",
+            )
+        }
     if args.resume and args.output.exists():
         payload = json.loads(args.output.read_text())
         if payload["controls"] != controls:
@@ -252,8 +291,62 @@ def main() -> None:
                         transitions = map_transitions(
                             field, critical, transition_config
                         )
-                        needs_actions = any(
-                            _needs_action_data(transition) for transition in transitions
+                        event_summary = {}
+                        if args.localize_events:
+                            localized = localize_transition_contacts(
+                                field, critical, transitions
+                            )
+                            arrangement = build_transition_arcs(
+                                field, critical, localized
+                            )
+                            event_summary = {
+                                "event_count": len(arrangement.events),
+                                "event_occurrences": [
+                                    {
+                                        "event_id": event.event_id,
+                                        "source_transition_id": occurrence.source_transition_id,
+                                        "source_pair": occurrence.source_sample_pair,
+                                        "u_interval": occurrence.u_interval.tolist(),
+                                        "localized": bool(occurrence.localized),
+                                        "reason": occurrence.reason,
+                                        "retained_traces": len(occurrence.samples),
+                                        "scan_refinement_samples": len(
+                                            occurrence.scan_samples
+                                        ),
+                                    }
+                                    for event in arrangement.events
+                                    for occurrence in event.occurrences
+                                ],
+                                "scan_artifacts": [
+                                    {
+                                        "source_id": item.source_transition_id,
+                                        "source_pair": item.source_sample_pair,
+                                        "u_interval": item.u_interval.tolist(),
+                                        "retained_traces": len(item.samples),
+                                        "reason": item.reason,
+                                    }
+                                    for item in arrangement.scan_artifacts
+                                ],
+                                "arcs": [
+                                    {
+                                        "arc_id": arc.curve.transition_id,
+                                        "source_id": arc.source_transition_id,
+                                        "endpoints": arc.endpoint_event_ids,
+                                        "status": arc.curve.status.name,
+                                        "certified": arc.curve.sampling_certified,
+                                        "additional_source_samples": arc.additional_source_samples,
+                                        "reason": arc.unresolved_reason,
+                                        "unresolved_source_intervals": arc.unresolved_source_intervals,
+                                    }
+                                    for arc in arrangement.arcs
+                                ],
+                            }
+                        needs_actions = (
+                            any(
+                                _needs_action_data(transition)
+                                for transition in transitions
+                            )
+                            and not args.localize_events
                         )
                         if needs_actions:
                             # A generic transition is the topology-sensitive
@@ -272,13 +365,29 @@ def main() -> None:
                             action = np.full(len(surface.points), np.nan)
                             downsampling = None
                             regular_action_count = 0
-                        cut = cut_surface_at_transitions(
+                        cutter = (
+                            cut_surface_at_transition_arcs
+                            if args.localize_events
+                            else cut_surface_at_transitions
+                        )
+                        cut = cutter(
                             surface,
                             action,
-                            transitions,
+                            arrangement if args.localize_events else transitions,
                             field=field,
                             config=cut_config,
                         )
+                        cut_summary = _cut_summary(cut)
+                        if args.localize_events:
+                            cut_summary.update(
+                                {
+                                    "source_flux": surface_flux(surface, field),
+                                    "cut_flux": surface_flux(cut.surface, field),
+                                    "unresolved_action_flux": cut.unresolved_action_flux(
+                                        field
+                                    ),
+                                }
+                            )
                         result = {
                             "outcome": "completed",
                             "surface_status": extraction.status.name,
@@ -321,7 +430,8 @@ def main() -> None:
                             "needed_surface_actions": needs_actions,
                             "regular_action_count": regular_action_count,
                             "downsampling": downsampling,
-                            "cut": _cut_summary(cut),
+                            "cut": cut_summary,
+                            "contact_localization": event_summary,
                         }
                     except Exception as error:
                         result = {

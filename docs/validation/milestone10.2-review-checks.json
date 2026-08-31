@@ -1,0 +1,965 @@
+{
+  "implementation_sha256": {
+    "alpha_analysis/j_connectivity/critical_curves.py": "7599b22e73793e7ba9abd865f29ae01148d3a5bfc3f5fa1a602d2de924e16939",
+    "alpha_analysis/j_connectivity/mesh_cut.py": "da2289cf650c5f06bf6f2a59b42d67ae78fdb43c75e114828d51ae37cb294021",
+    "alpha_analysis/j_connectivity/transition_events.py": "7c0bf8b2d7c27aa5ac88518df18e7fd4fb0411d8c30d29a4c67c3fdae81b12de"
+  },
+  "matrix_cases": [
+    {
+      "arc_summary_unchanged": true,
+      "case": "0:0.5:gmsh:marching_tetrahedra",
+      "cut": {
+        "corridor_count": 0,
+        "cut_edge_count": 0,
+        "cut_flux": 5.232443133601155,
+        "event_count": 21,
+        "invalid_port_incidence_count": 0,
+        "max_corridor_faces_used": 0,
+        "max_port_action_error": null,
+        "point_count": 249,
+        "serialization_round_trip": true,
+        "sheet_count": 1,
+        "source_flux": 5.232939133117843,
+        "triangle_count": 377,
+        "triangles_spanning_parent_child_jump": 0,
+        "unresolved_action_flux": 5.232443133601155,
+        "unresolved_action_triangle_count": 377,
+        "unresolved_event_action_vertex_ids": [],
+        "unresolved_port_action_sample_count": 0,
+        "unresolved_transition_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26
+        ],
+        "unresolved_transition_reasons": [
+          "certification interrupted by mapped sample failure; regular, source_classification",
+          "certification interrupted by mapped sample failure; regular, source_classification",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "certification interrupted by mapped sample failure; regular, source_classification",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "companion T doubles back on itself at samples 7->8->9 with strand separation 7.054e-04, below the local resolution requirement 2.725e-02; the strip between the strands cannot be represented at this sampling",
+          "event geometry remains unresolved: localized count-change interval; equal-height event not certified",
+          "event geometry remains unresolved: localized count-change interval; equal-height event not certified",
+          "event geometry remains unresolved: localized count-change interval; equal-height event not certified"
+        ],
+        "valid_port_count": 0
+      },
+      "cut_summary_unchanged": true,
+      "elapsed_seconds": 118.59041391697247
+    },
+    {
+      "arc_summary_unchanged": true,
+      "case": "3:0.5:gmsh:marching_tetrahedra",
+      "cut": {
+        "corridor_count": 0,
+        "cut_edge_count": 0,
+        "cut_flux": 4.590251717860019,
+        "event_count": 4,
+        "invalid_port_incidence_count": 0,
+        "max_corridor_faces_used": 0,
+        "max_port_action_error": null,
+        "point_count": 199,
+        "serialization_round_trip": true,
+        "sheet_count": 1,
+        "source_flux": 4.590433303959426,
+        "triangle_count": 305,
+        "triangles_spanning_parent_child_jump": 0,
+        "unresolved_action_flux": 4.590251717860019,
+        "unresolved_action_triangle_count": 305,
+        "unresolved_event_action_vertex_ids": [],
+        "unresolved_port_action_sample_count": 0,
+        "unresolved_transition_ids": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "unresolved_transition_reasons": [
+          "an open companion T endpoint is 7.055e-02 from the EDGE boundary (snap tolerance 4.004e-02), so its cut cannot terminate on the surface edge; refine the background mesh until the endpoint reaches EDGE",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified"
+        ],
+        "valid_port_count": 0
+      },
+      "cut_summary_unchanged": true,
+      "elapsed_seconds": 14.516058000037447
+    },
+    {
+      "arc_summary_unchanged": true,
+      "case": "3:0.5:gmsh:pyvista",
+      "cut": {
+        "corridor_count": 0,
+        "cut_edge_count": 0,
+        "cut_flux": 4.586925021426159,
+        "event_count": 4,
+        "invalid_port_incidence_count": 0,
+        "max_corridor_faces_used": 0,
+        "max_port_action_error": null,
+        "point_count": 199,
+        "serialization_round_trip": true,
+        "sheet_count": 1,
+        "source_flux": 4.587238341675614,
+        "triangle_count": 304,
+        "triangles_spanning_parent_child_jump": 0,
+        "unresolved_action_flux": 4.586925021426159,
+        "unresolved_action_triangle_count": 304,
+        "unresolved_event_action_vertex_ids": [],
+        "unresolved_port_action_sample_count": 0,
+        "unresolved_transition_ids": [
+          1,
+          2,
+          3,
+          4,
+          0
+        ],
+        "unresolved_transition_reasons": [
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "a generic companion cut must have exactly two incident triangle sides; found [0]"
+        ],
+        "valid_port_count": 0
+      },
+      "cut_summary_unchanged": true,
+      "elapsed_seconds": 13.210960542026442
+    },
+    {
+      "arc_summary_unchanged": true,
+      "case": "3:0.5:structured:marching_tetrahedra",
+      "cut": {
+        "corridor_count": 0,
+        "cut_edge_count": 0,
+        "cut_flux": 4.5951887698956275,
+        "event_count": 1,
+        "invalid_port_incidence_count": 0,
+        "max_corridor_faces_used": 0,
+        "max_port_action_error": null,
+        "point_count": 553,
+        "serialization_round_trip": true,
+        "sheet_count": 1,
+        "source_flux": 4.593747943421818,
+        "triangle_count": 964,
+        "triangles_spanning_parent_child_jump": 0,
+        "unresolved_action_flux": 4.5951887698956275,
+        "unresolved_action_triangle_count": 964,
+        "unresolved_event_action_vertex_ids": [],
+        "unresolved_port_action_sample_count": 0,
+        "unresolved_transition_ids": [
+          1,
+          2,
+          0
+        ],
+        "unresolved_transition_reasons": [
+          "additional nongeneric or failed sample in arc",
+          "source sampling budget exhausted on this arc",
+          "a generic companion cut must have exactly two incident triangle sides; found [0]"
+        ],
+        "valid_port_count": 0
+      },
+      "cut_summary_unchanged": true,
+      "elapsed_seconds": 11.35520833398914
+    },
+    {
+      "arc_summary_unchanged": true,
+      "case": "3:0.5:structured:pyvista",
+      "cut": {
+        "corridor_count": 0,
+        "cut_edge_count": 0,
+        "cut_flux": 4.596030653911285,
+        "event_count": 1,
+        "invalid_port_incidence_count": 0,
+        "max_corridor_faces_used": 0,
+        "max_port_action_error": null,
+        "point_count": 554,
+        "serialization_round_trip": true,
+        "sheet_count": 1,
+        "source_flux": 4.594590010590262,
+        "triangle_count": 966,
+        "triangles_spanning_parent_child_jump": 0,
+        "unresolved_action_flux": 4.596030653911285,
+        "unresolved_action_triangle_count": 966,
+        "unresolved_event_action_vertex_ids": [],
+        "unresolved_port_action_sample_count": 0,
+        "unresolved_transition_ids": [
+          1,
+          2,
+          0
+        ],
+        "unresolved_transition_reasons": [
+          "additional nongeneric or failed sample in arc",
+          "source sampling budget exhausted on this arc",
+          "a generic companion cut must have exactly two incident triangle sides; found [0]"
+        ],
+        "valid_port_count": 0
+      },
+      "cut_summary_unchanged": true,
+      "elapsed_seconds": 11.06360766699072
+    },
+    {
+      "arc_summary_unchanged": true,
+      "case": "4:0.9:gmsh:pyvista",
+      "cut": {
+        "corridor_count": 0,
+        "cut_edge_count": 0,
+        "cut_flux": 0.24004387716057254,
+        "event_count": 75,
+        "invalid_port_incidence_count": 0,
+        "max_corridor_faces_used": 0,
+        "max_port_action_error": null,
+        "point_count": 156,
+        "serialization_round_trip": true,
+        "sheet_count": 3,
+        "source_flux": 0.24015702391926436,
+        "triangle_count": 195,
+        "triangles_spanning_parent_child_jump": 0,
+        "unresolved_action_flux": 0.24004387716057254,
+        "unresolved_action_triangle_count": 195,
+        "unresolved_event_action_vertex_ids": [],
+        "unresolved_port_action_sample_count": 0,
+        "unresolved_transition_ids": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          80,
+          81,
+          79
+        ],
+        "unresolved_transition_reasons": [
+          "event interval has no regular arc sample",
+          "event geometry remains unresolved: midpoint trace: forward_max_periods; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event interval has no regular arc sample",
+          "event geometry remains unresolved: midpoint trace: backward_max_periods; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: localized count-change interval; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "mapped every authoritative critical-curve vertex; regular, source_classification",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: contact localization budget exhausted; equal-height event not certified",
+          "event geometry remains unresolved: localized count-change interval; equal-height event not certified",
+          "event geometry remains unresolved: localized count-change interval; equal-height event not certified",
+          "a generic companion cut must have exactly two incident triangle sides; found [0]"
+        ],
+        "valid_port_count": 0
+      },
+      "cut_summary_unchanged": true,
+      "elapsed_seconds": 331.8606715420028
+    }
+  ],
+  "matrix_controls": {
+    "bounds": {
+      "absolute_margin": 0.0,
+      "candidate_count": 8,
+      "n_s": 17,
+      "n_theta": 32,
+      "n_zeta": 32,
+      "safety_factor": 2.0,
+      "user_b_max": null,
+      "user_b_min": null
+    },
+    "contact_localization": {
+      "event_tolerance": 1e-07,
+      "max_bisections": 20,
+      "scan_refinement_factor": 2,
+      "u_tolerance": 1e-05
+    },
+    "cut": {
+      "B_tolerance": 1e-09,
+      "max_corridor_faces": 64,
+      "max_surface_distance_ratio": 0.5,
+      "min_transition_strip_edge_ratio": 0.1,
+      "path_anchor_count": 8,
+      "side_assignment_margin_ratio": 0.1,
+      "snap_tolerance": 1e-10
+    },
+    "gmsh_background": {
+      "axis_gradient_radius": 1e-06,
+      "axis_radius": 0.2,
+      "axis_size": null,
+      "critical_points": [],
+      "critical_radius": 0.2,
+      "critical_size": null,
+      "low_gradient_size": null,
+      "low_gradient_threshold": null,
+      "target_size": 0.3
+    },
+    "implementation_sha256": {
+      "alpha_analysis/j_connectivity/critical_curves.py": "7599b22e73793e7ba9abd865f29ae01148d3a5bfc3f5fa1a602d2de924e16939",
+      "alpha_analysis/j_connectivity/mesh_cut.py": "da2289cf650c5f06bf6f2a59b42d67ae78fdb43c75e114828d51ae37cb294021",
+      "alpha_analysis/j_connectivity/transition_events.py": "7c0bf8b2d7c27aa5ac88518df18e7fd4fb0411d8c30d29a4c67c3fdae81b12de"
+    },
+    "structured_background": {
+      "n_poloidal": 24,
+      "n_radial": 6,
+      "n_zeta": 12
+    },
+    "transition": {
+      "D2_tolerance": 1e-10,
+      "action_quadrature_atol": 1e-11,
+      "action_quadrature_order": 32,
+      "action_quadrature_rtol": 1e-11,
+      "additivity_atol": 1e-08,
+      "additivity_rtol": 1e-07,
+      "curve_action_atol": 1e-08,
+      "curve_action_rtol": 0.02,
+      "curve_edge_proximity": 0.02,
+      "curve_geometry_atol": 1e-08,
+      "curve_geometry_rtol": 0.2,
+      "curve_self_contact_ratio": 0.1,
+      "field_identity_tolerance": 1e-08,
+      "max_action_quadrature_order": 512,
+      "max_curve_samples": 8,
+      "max_field_periods": 128,
+      "root_atol_B": 1e-10,
+      "root_atol_zeta": 1e-12,
+      "root_rtol": 1e-12,
+      "samples_per_field_period": 64,
+      "samples_per_wavelength": 24,
+      "tangent_atol_B": 1e-09,
+      "tangent_slope_tolerance": 1e-08
+    }
+  },
+  "mutations": [
+    {
+      "change": "unknown-action triangle selection: any to all",
+      "failure": "zero instead of analytic incident flux 1.37452523e-7",
+      "test": "test_uncut_incident_arc_preserves_distinct_event_limits"
+    },
+    {
+      "change": "omit event-arc interior-maximum-count guard",
+      "failure": "no explicitly unresolved arc after an unexplained count change with stale source certification",
+      "test": "test_contact_arcs_share_physical_events_and_have_one_sided_actions"
+    }
+  ],
+  "purpose": "Review follow-up: event-arc count guard and independently measured unknown-action flux; original matrix outcomes unchanged",
+  "synthetic_cases": [
+    {
+      "max_corridor_faces_used": 13,
+      "port_sheet_ids": [
+        [
+          0,
+          "parent",
+          2
+        ],
+        [
+          0,
+          "child_1",
+          1
+        ],
+        [
+          0,
+          "child_3",
+          3
+        ],
+        [
+          1,
+          "parent",
+          0
+        ],
+        [
+          1,
+          "child_1",
+          1
+        ],
+        [
+          1,
+          "child_3",
+          4
+        ],
+        [
+          2,
+          "parent",
+          0
+        ],
+        [
+          2,
+          "child_1",
+          2
+        ],
+        [
+          2,
+          "child_3",
+          5
+        ],
+        [
+          3,
+          "parent",
+          4
+        ],
+        [
+          3,
+          "child_1",
+          3
+        ],
+        [
+          3,
+          "child_3",
+          5
+        ]
+      ],
+      "resolution": [
+        4,
+        16,
+        36
+      ],
+      "sheet_count": 6,
+      "total_seconds": 15.07432641700143,
+      "unresolved_arc_ids": []
+    },
+    {
+      "max_corridor_faces_used": 25,
+      "port_sheet_ids": [
+        [
+          0,
+          "parent",
+          2
+        ],
+        [
+          0,
+          "child_1",
+          1
+        ],
+        [
+          0,
+          "child_3",
+          3
+        ],
+        [
+          1,
+          "parent",
+          0
+        ],
+        [
+          1,
+          "child_1",
+          1
+        ],
+        [
+          1,
+          "child_3",
+          4
+        ],
+        [
+          2,
+          "parent",
+          0
+        ],
+        [
+          2,
+          "child_1",
+          2
+        ],
+        [
+          2,
+          "child_3",
+          5
+        ],
+        [
+          3,
+          "parent",
+          4
+        ],
+        [
+          3,
+          "child_1",
+          3
+        ],
+        [
+          3,
+          "child_3",
+          5
+        ]
+      ],
+      "resolution": [
+        4,
+        16,
+        48
+      ],
+      "sheet_count": 6,
+      "total_seconds": 30.628717874991708,
+      "unresolved_arc_ids": []
+    },
+    {
+      "max_corridor_faces_used": 16,
+      "port_sheet_ids": [
+        [
+          0,
+          "parent",
+          2
+        ],
+        [
+          0,
+          "child_1",
+          1
+        ],
+        [
+          0,
+          "child_3",
+          3
+        ],
+        [
+          1,
+          "parent",
+          0
+        ],
+        [
+          1,
+          "child_1",
+          1
+        ],
+        [
+          1,
+          "child_3",
+          4
+        ],
+        [
+          2,
+          "parent",
+          0
+        ],
+        [
+          2,
+          "child_1",
+          2
+        ],
+        [
+          2,
+          "child_3",
+          5
+        ],
+        [
+          3,
+          "parent",
+          4
+        ],
+        [
+          3,
+          "child_1",
+          3
+        ],
+        [
+          3,
+          "child_3",
+          5
+        ]
+      ],
+      "resolution": [
+        4,
+        24,
+        36
+      ],
+      "sheet_count": 6,
+      "total_seconds": 33.31095841701608,
+      "unresolved_arc_ids": []
+    },
+    {
+      "max_corridor_faces_used": 16,
+      "port_sheet_ids": [
+        [
+          0,
+          "parent",
+          2
+        ],
+        [
+          0,
+          "child_1",
+          1
+        ],
+        [
+          0,
+          "child_3",
+          3
+        ],
+        [
+          1,
+          "parent",
+          0
+        ],
+        [
+          1,
+          "child_1",
+          1
+        ],
+        [
+          1,
+          "child_3",
+          4
+        ],
+        [
+          2,
+          "parent",
+          0
+        ],
+        [
+          2,
+          "child_1",
+          2
+        ],
+        [
+          2,
+          "child_3",
+          5
+        ],
+        [
+          3,
+          "parent",
+          4
+        ],
+        [
+          3,
+          "child_1",
+          3
+        ],
+        [
+          3,
+          "child_3",
+          5
+        ]
+      ],
+      "resolution": [
+        4,
+        24,
+        54
+      ],
+      "sheet_count": 6,
+      "total_seconds": 24.406946833012626,
+      "unresolved_arc_ids": []
+    },
+    {
+      "max_corridor_faces_used": 2,
+      "port_sheet_ids": [
+        [
+          0,
+          "parent",
+          2
+        ],
+        [
+          0,
+          "child_1",
+          1
+        ],
+        [
+          0,
+          "child_3",
+          4
+        ],
+        [
+          1,
+          "parent",
+          0
+        ],
+        [
+          1,
+          "child_1",
+          1
+        ],
+        [
+          1,
+          "child_3",
+          3
+        ],
+        [
+          2,
+          "parent",
+          3
+        ],
+        [
+          2,
+          "child_1",
+          4
+        ],
+        [
+          2,
+          "child_3",
+          5
+        ],
+        [
+          3,
+          "parent",
+          0
+        ],
+        [
+          3,
+          "child_1",
+          2
+        ],
+        [
+          3,
+          "child_3",
+          5
+        ]
+      ],
+      "resolution": [
+        6,
+        24,
+        54
+      ],
+      "sheet_count": 6,
+      "total_seconds": 32.29017033299897,
+      "unresolved_arc_ids": []
+    },
+    {
+      "max_corridor_faces_used": 25,
+      "port_sheet_ids": [
+        [
+          0,
+          "parent",
+          2
+        ],
+        [
+          0,
+          "child_1",
+          1
+        ],
+        [
+          0,
+          "child_3",
+          3
+        ],
+        [
+          1,
+          "parent",
+          0
+        ],
+        [
+          1,
+          "child_1",
+          1
+        ],
+        [
+          1,
+          "child_3",
+          4
+        ],
+        [
+          2,
+          "parent",
+          0
+        ],
+        [
+          2,
+          "child_1",
+          2
+        ],
+        [
+          2,
+          "child_3",
+          5
+        ],
+        [
+          3,
+          "parent",
+          4
+        ],
+        [
+          3,
+          "child_1",
+          3
+        ],
+        [
+          3,
+          "child_3",
+          5
+        ]
+      ],
+      "resolution": [
+        4,
+        16,
+        45
+      ],
+      "sheet_count": 6,
+      "total_seconds": 15.616880082990974,
+      "unresolved_arc_ids": []
+    }
+  ]
+}

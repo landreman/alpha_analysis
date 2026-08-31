@@ -26,7 +26,7 @@ lowest-numbered unchecked row.
 | 9 | Transition mapping and action additivity | Construct \(T\) and matched parent/child ports without yet cutting the full mesh | [x] | #14 |
 | 10 | Constrained cuts and sheet IDs | Insert \(T\), duplicate vertices, and make \(A\) continuous on each sheet | [x] | #19 |
 | 10.1 | Sampling-robust cut geometry | Make the sheet graph invariant to the transition sample budget, or explicitly budget-limited | [x] | #21 |
-| 10.2 | Contact localization and segment-level cutting | Cut the resolved arcs of curves with localized §5.4 events instead of vetoing whole curves | [ ] | |
+| 10.2 | Contact localization and segment-level cutting | Cut the resolved arcs of curves with localized §5.4 events instead of vetoing whole curves | [x] | #22 |
 | 10.3 | Failure-directed refinement and matrix convergence | Converge the five-equilibrium matrix unattended via per-failure-class remediation | [ ] | |
 | 11 | Direct contour tracer | Build the correctness oracle | [ ] | |
 | 12 | Interval primitives and bounded ordinary flood fill | Classify edge-connected action ranges without transitions using a finite algorithm with lower and upper bounds | [ ] | |
@@ -43,6 +43,31 @@ Anything a later milestone needs to know that is not already in `docs/DESIGN.md`
 here — a convention settled during implementation, a data file that has to be
 regenerated, a known-shaky tolerance. Keep it short; when an entry becomes permanent,
 move it into `docs/DESIGN.md` and delete it here.
+
+- Milestone 10.2 is complete in PR #22 under **accepted ADR 0006**, with its six-sheet
+  acceptance unchanged. Bounded insertion through adjacent triangle faces now
+  completes the synthetic arrangement; the DMerc sampling regression is fixed.
+  Event vertices carrying incompatible one-sided limits in a partially cut
+  arrangement remain explicit unknown action, with all port limits preserved.
+  Local validation passes: 174 tests, four mutation checks, all six ADR grids, and the
+  100-case matrix (explicit unresolved outcomes, not matrix convergence).
+  Reports are in `docs/validation/milestone10.2-*.md`. GitHub
+  [Tests](https://github.com/landreman/alpha_analysis/actions/runs/33379169289)
+  passed on implementation commit `e39c5a1` (lint, Python 3.10–3.12, and full suite).
+
+- Keep milestone 10.3 within the existing test budget: the W7-X event fixture and
+  test together cost about 95 s locally, and the existing bounce-point plot is
+  about 20 s. Event insertion's existing-vertex snap has a chord-scaled allowance
+  (DESIGN §10.3), so it is still a surface-resolution control. Critical-curve
+  projection now uses a centered `1e-6` Jacobian step to avoid relative-step
+  stagnation near `zeta=0`; accepted `B` and `g` residual tolerances are unchanged.
+- A `CutEvent.sample_indices` entry denotes a one-sided event limit only when its
+  referenced port has `sheet_id >= 0`. An unresolved port may retain the full
+  source mapping for diagnosis; its indexed finite action is not an event limit.
+  Keep that port's connectivity unresolved when 10.3 consumes event incidence.
+- The legacy (non-event) `constrain_edge` path also gains safety checks: existing
+  vertex snaps are component-scoped and bounded in full 3-D, and the common-component
+  endpoint check runs before the snap shortcut. Existing mesh-cut tests pass unchanged.
 
 - Milestone 0 established base-only `j_connectivity` imports; optional features must use `optional_import()` so missing extras provide an install command.
 - Milestone 1's `BoozerFieldLike.B()` uses pointwise NumPy broadcasting; legacy `compute_B()` retains its outer-`s` grid semantics.
@@ -104,3 +129,4 @@ Design decisions taken during implementation that differ from `docs/DESIGN.md` l
 - ADR 0003 — a `GAMMA_MAX` curve whose sampling steps over a nongeneric event is `MULTIWAY` even when every sample is `REGULAR`, and keeps its finite port actions for Milestone 10 to subdivide. (ADRs 0001 and 0002 predate this list and are not repeated here.)
 - ADR 0004 — an open companion-cut endpoint within the local surface-distance allowance (`max_surface_distance_ratio` × local edge scale) is extended to the nearest `EDGE` boundary edge, splitting it, with the extension's `u`/action clamped to the endpoint sample; beyond that allowance the transition stays an explicit geometry-unresolved hyperedge.
 - ADR 0005 — a critical polyline reversal at sub-resolution strand separation is reordered by arc length along the true `B=b, g=0` curve only when a bounded certification walk confirms one simple arc; uncertified reversals stay as extracted and counted, the cut-time double-back guard is permanent, and wide reversals are genuine geometry that is never touched.
+- ADR 0006 — bounded robust event-junction insertion belongs in milestone 10.2 with the six-sheet acceptance unchanged; milestone 10.3 coordinates matrix-level refinement. Failed incident arcs and unknown action measure remain explicit.
