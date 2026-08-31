@@ -2493,6 +2493,26 @@ def cut_surface_at_transitions(
                         pre_duplicate_labels[:] = saved
                 demoted = (inserted, str(conflict))
                 break
+            # The child-3 return curve must border exactly one sheet; after
+            # neighboring cuts an under-resolved junction can leave it
+            # straddling two, which is ambiguous incidence to demote, not a
+            # dead slice (§21.2).
+            gamma_incidence = {
+                component
+                for index, vertex in enumerate(inserted.gamma_ids)
+                if index not in inserted.event_endpoint_indices
+                for component in _incident_components(
+                    mesh.triangles, base_labels, int(vertex)
+                )
+            }
+            if len(gamma_incidence) != 1:
+                demoted = (
+                    inserted,
+                    "child-3 curve is incident to more than one sheet after "
+                    "neighboring cuts; its return-sheet incidence is ambiguous "
+                    "at this resolution",
+                )
+                break
         if demoted is None:
             break
         # Side assignment for this transition is not trustworthy: withdraw

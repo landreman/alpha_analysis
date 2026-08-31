@@ -148,6 +148,8 @@ def classify_failure_reason(reason: str) -> str:
         return "background_geometry"
     if "below the authoritative vertex resolution" in reason:
         return "background_geometry"
+    if "incident to more than one sheet" in reason:
+        return "background_geometry"
     if "sampling budget" in reason:
         return "source_budget"
     if "localization budget" in reason or "geometry remains unresolved" in reason:
