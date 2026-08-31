@@ -34,8 +34,9 @@ def main() -> None:
         elif payload["controls"] != merged["controls"]:
             raise ValueError(f"{shard} controls disagree with the first shard")
         overlap = set(payload["cases"]) & set(merged["cases"])
-        if overlap:
-            raise ValueError(f"{shard} repeats cases {sorted(overlap)[:3]}...")
+        for key in sorted(overlap):
+            if payload["cases"][key] != merged["cases"][key]:
+                raise ValueError(f"{shard} disagrees on case {key}")
         merged["files"].update(payload["files"])
         merged["cases"].update(payload["cases"])
     classifications = Counter(
