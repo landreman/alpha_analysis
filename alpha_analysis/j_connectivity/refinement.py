@@ -46,7 +46,6 @@ from .transition_events import (
     ContactLocalizationConfig,
     build_transition_arcs,
     localize_transition_contacts,
-    _map_point,
 )
 from .transitions import (
     TransitionMappingConfig,
@@ -744,6 +743,12 @@ def converge_transitions(
             or arc.unresolved_reason
             == "unexplained interior-maximum count change within arc"
             or arc.unresolved_reason == "additional nongeneric or failed sample in arc"
+            # A nongeneric sample adjacent to an event (or an interval with
+            # no regular sample) also needs more retained source vertices, so
+            # the nongeneric structure becomes source-level brackets and
+            # sampled events that localization can make explicit.
+            or arc.unresolved_reason == "event has no regular one-sided sample"
+            or arc.unresolved_reason == "source arc contains a failed trace"
         ] + [
             transition.transition_id
             for transition in transitions

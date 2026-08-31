@@ -113,13 +113,29 @@ from .transition_events import (
     localize_transition_contacts,
     build_transition_arcs,
 )
+from .refinement import (
+    CaseResolution,
+    RefinementBudgets,
+    RemediationRecord,
+    classify_failure_reason,
+    converge_case,
+    converge_cut,
+    converge_transitions,
+)
 
 __all__ = [
+    "CaseResolution",
     "ContactLocalizationConfig",
     "ContactBracket",
+    "RefinementBudgets",
+    "RemediationRecord",
     "TransitionEvent",
     "TransitionArc",
     "LocalizedTransitions",
+    "classify_failure_reason",
+    "converge_case",
+    "converge_cut",
+    "converge_transitions",
     "localize_transition_contacts",
     "build_transition_arcs",
     "CutEvent",

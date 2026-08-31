@@ -557,6 +557,107 @@ def test_thin_strip_local_refinement_enables_the_cut_and_preserves_topology(
     assert _multi_arc_signature(remediated.cut) == _multi_arc_signature(reference.cut)
 
 
+def test_degenerate_endpoint_arms_certify_their_regular_interior():
+    from alpha_analysis import DATA_DIR, BoozerField
+    from alpha_analysis.j_connectivity import (
+        BoundsConfig,
+        CriticalKind,
+        find_global_B_bounds,
+    )
+
+    # PCA at radially global lambda_n=0.1: every GAMMA_MAX polyline is an
+    # open arm whose terminal vertices classify DEGENERATE (the milestone 8
+    # junction solves put them on D_parallel^2 B = 0), which used to veto the
+    # whole curve.  ADR 0008: the endpoints become explicit events, the
+    # 6-vertex arm cuts its regular interior between them, and the 3-vertex
+    # arms dissolve entirely into their endpoint events — never a silent
+    # truncation and never an invented cut.
+    field = BoozerField.from_boozmn(
+        Path(DATA_DIR) / "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_"
+        "eval000290_low_resolution.nc"
+    )
+    bounds = find_global_B_bounds(field, BoundsConfig(17, 32, 32))
+    b = bounds.refined_min + 0.1 * (bounds.refined_max - bounds.refined_min)
+    background = StructuredPrismMeshBackend(BackgroundMeshConfig(6, 24, 12)).build(
+        field
+    )
+    extraction = MarchingTetrahedraExtractor().extract(background, field, b)
+    critical = extract_critical_curves(extraction, field, b)
+    maxima = [p for p in critical.polylines if p.kind is CriticalKind.GAMMA_MAX]
+    assert maxima and all(not p.closed for p in maxima)
+    degenerate_ends = [
+        critical.points[p.vertex_ids[index]] for p in maxima for index in (0, -1)
+    ]
+    assert all(
+        critical.point_kind[p.vertex_ids[index]] == CriticalKind.DEGENERATE.value
+        for p in maxima
+        for index in (0, -1)
+    )
+
+    resolution = converge_transitions(
+        field,
+        extraction,
+        critical,
+        budgets=RefinementBudgets(
+            source_sample_budgets=(8, 16),
+            max_field_period_caps=(128,),
+            localization_bisections=(20,),
+            background_levels=0,
+            local_refinement_rounds=1,
+        ),
+        transition_config=TransitionMappingConfig(),
+    )
+    arrangement = resolution.arrangement
+    endpoint_events = [
+        event for event in arrangement.events if event.kind == "degenerate_endpoint"
+    ]
+    assert len(endpoint_events) == 2 * len(maxima)
+    for event in endpoint_events:
+        point = event.marginal_points[0]
+        s = float(np.sum(point[:2] ** 2))
+        theta = float(np.arctan2(point[1], point[0]))
+        # The event sits on a solved degenerate marginal point of the field
+        # itself: B = b and D_parallel^2 B = 0 to solver accuracy.
+        assert abs(float(field.B(s, theta, point[2])) - b) < 1e-8
+        assert abs(float(field.D2_B(s, theta, point[2]))) < 1e-6
+        assert (
+            min(np.linalg.norm(point - end) for end in degenerate_ends) < 1e-9
+        ), "endpoint events must sit on the classified terminal vertices"
+    # The one arm with interior vertices certifies its regular interior
+    # between its two endpoint events — the degenerate endpoints no longer
+    # veto the curve.  At this coarse background its slit does not yet
+    # separate the surface (the junction complex is under-resolved), so the
+    # cut demotes it with the explicit background-refinement reason instead
+    # of guessing a one-sheet duplication or truncating silently (§21.2).
+    certified_arcs = [
+        arc
+        for arc in arrangement.arcs
+        if arc.curve.status is TransitionStatus.REGULAR and arc.curve.sampling_certified
+    ]
+    assert certified_arcs
+    assert all(
+        event_id >= 0 for arc in certified_arcs for event_id in arc.endpoint_event_ids
+    )
+    assert resolution.failure_class_counts == {"background_geometry": 1}
+    assert any(
+        "does not separate the surface" in reason
+        for reason in resolution.terminal_reasons
+    )
+    unresolved_ports = [port for port in resolution.cut.ports if port.sheet_id < 0]
+    assert unresolved_ports, "the demoted slit keeps its ports (§21.2)"
+    # Sources fully dissolved into endpoint events stay visible as events
+    # with no incident arc, never as silently absent transitions (§21.2).
+    sources_with_arcs = {arc.source_transition_id for arc in arrangement.arcs}
+    dissolved = set(range(len(maxima))) - sources_with_arcs
+    assert dissolved, "the sub-vertex-resolution arms dissolve into events"
+    for source_id in dissolved:
+        assert any(
+            occurrence.source_transition_id == source_id
+            for event in endpoint_events
+            for occurrence in event.occurrences
+        )
+
+
 def test_local_refinement_refines_near_the_curve_not_globally():
     from test_mesh_cut import _grid_component
     from alpha_analysis.j_connectivity.surface_refine import (

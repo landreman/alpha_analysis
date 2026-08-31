@@ -1213,17 +1213,28 @@ def _combine_arc(field, source, samples, period, arc_id, certified, parameters):
     )
 
 
-def _certify_arc_samples(field, critical, polyline, source, values, parameters, budget):
+def _certify_arc_samples(
+    field, critical, polyline, source, values, parameters, budget, bounds=None
+):
     """Certify one arc using remaining authoritative-vertex work (§10.2).
 
     Every existing trace is retained. Only original critical-curve vertices
     can consume the remaining source budget; contact-localization traces have
     their separate explicit bisection budget. Unknown intervals and new
     physical failures remain unresolved, independently of other arcs.
+
+    ``bounds`` supplies the arc's true parameter span when the retained
+    samples do not already sit on it — an arc stunted by failed curve
+    endpoints can hold fewer than two retained samples, and certification
+    then seeds itself from the authoritative vertices nearest the bounds
+    before the usual adaptive midpoint refinement.
     """
     if source.sampling_certified:
         return values, parameters, True, [], "", 0
-    low, high = parameters[0], parameters[-1]
+    if bounds is not None:
+        low, high = float(bounds[0]), float(bounds[1])
+    else:
+        low, high = parameters[0], parameters[-1]
     known = dict(zip(map(float, parameters), values))
     candidates = {u: (sample.marginal_points[0], -1) for u, sample in known.items()}
     for index, original_u in enumerate(polyline.u):
@@ -1272,6 +1283,35 @@ def _certify_arc_samples(field, critical, polyline, source, values, parameters, 
                 (a + cycle * polyline.total_length, b + cycle * polyline.total_length)
             )
     selected = sorted(cache)
+    added = 0
+    if bounds is not None and len(selected) < 2:
+        # An arc stunted by failed curve endpoints can arrive with fewer than
+        # two retained samples; seed the adaptive refinement from the
+        # authoritative vertices nearest each bound before any interval
+        # exists to refine.
+        for target in (low, high):
+            order = np.argsort(np.abs(coordinates - target))
+            for index in map(int, order):
+                if index in cache:
+                    break
+                original_index = candidates[float(coordinates[index])][1]
+                if original_index < 0:
+                    continue
+                if budget[0] is not None and budget[0] <= 0:
+                    break
+                cache[index] = _map_polyline_samples(
+                    field,
+                    critical,
+                    polyline,
+                    source.transition_id,
+                    source.controls,
+                    np.asarray([original_index], dtype=np.int64),
+                )
+                if budget[0] is not None:
+                    budget[0] -= 1
+                added += 1
+                break
+        selected = sorted(cache)
     pending = [
         (a, b)
         for a, b in zip(selected[:-1], selected[1:])
@@ -1281,7 +1321,6 @@ def _certify_arc_samples(field, critical, polyline, source, values, parameters, 
             or any(coordinates[a] < y and coordinates[b] > x for x, y in uncertain)
         )
     ]
-    added = 0
     failures = []
     while pending:
         interval = max(
@@ -1571,6 +1610,31 @@ def build_transition_arcs(field, critical, localized, extra_samples=None):
                         raise ValueError(
                             "event geometry remains unresolved: " + occurrence.reason
                         )
+                seed_added = 0
+                if len(rows) < 2:
+                    # A source mapping stunted by failed curve endpoints can
+                    # retain almost no samples inside this arc; densify from
+                    # the authoritative vertices first so the event limits
+                    # below have a regular sample to continue from.
+                    seeded, seeded_parameters, _, _, _, seed_added = (
+                        _certify_arc_samples(
+                            field,
+                            critical,
+                            polyline,
+                            source,
+                            [sample for _, sample in rows],
+                            [u for u, _ in rows],
+                            remaining_budget,
+                            bounds=(low, high),
+                        )
+                    )
+                    rows = [
+                        (u, sample)
+                        for u, sample in zip(seeded_parameters, seeded)
+                        if low < u < high
+                    ]
+                    if not rows:
+                        raise ValueError("event interval has no regular arc sample")
                 values = [sample for _, sample in rows]
                 parameters = [u for u, _ in rows]
                 # A degenerate curve endpoint has no traceable limiting well:
@@ -1630,8 +1694,10 @@ def build_transition_arcs(field, critical, localized, extra_samples=None):
                         values,
                         parameters,
                         remaining_budget,
+                        bounds=(low, high),
                     )
                 )
+                added += seed_added
                 regular = all(
                     sample.status is TransitionStatus.REGULAR for sample in values
                 )
