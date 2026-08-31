@@ -797,27 +797,52 @@ class LocalRefinementConfig:
     ``radius_edge_ratio`` scales each triangle's own edge length: a triangle
     within that many local edge lengths of a curve sample is refined.  This
     keeps the operation local (DESIGN.md §23 milestone 10.3), never a global
-    remesh.
+    remesh.  ``B_tolerance`` accepts a projected interior midpoint on the
+    ``B=b`` level, in field units.
     """
 
     radius_edge_ratio: float = 1.5
+    B_tolerance: float = 1.0e-9
 
     def __post_init__(self) -> None:
         if not np.isfinite(self.radius_edge_ratio) or self.radius_edge_ratio <= 0:
             raise ValueError("radius_edge_ratio must be finite and positive")
+        if not np.isfinite(self.B_tolerance) or self.B_tolerance <= 0:
+            raise ValueError("B_tolerance must be finite and positive")
 
 
 @dataclass(frozen=True)
 class LocalRefinementReport:
-    """Split and rejection counts for one local refinement pass."""
+    """Split and rejection counts for one local refinement pass.
+
+    ``new_vertex_edges`` records, per created vertex in creation order, the
+    original-surface vertex pair whose edge was split, so the caller can
+    extend point-aligned arrays.  A refined vertex never invents data the
+    edge did not carry (§21.2): the caller must treat any per-vertex quantity
+    that differs between the parents as explicitly unknown.
+    """
 
     input_triangle_count: int
     output_triangle_count: int
     edges_split: int
     projection_rejections: int = 0
-    face_validity_rejections: int = 0
     boundary_edges_split: int = 0
     seam_edges_skipped: int = 0
+    new_vertex_edges: np.ndarray = None
+
+    def __post_init__(self) -> None:
+        edges = (
+            np.empty((0, 2), dtype=np.int64)
+            if self.new_vertex_edges is None
+            else np.asarray(self.new_vertex_edges, dtype=np.int64).reshape(-1, 2)
+        )
+        object.__setattr__(self, "new_vertex_edges", edges)
+
+
+def _periodic_edge_delta(first, second, period):
+    delta = np.asarray(second, dtype=float) - np.asarray(first, dtype=float)
+    delta[2] -= period * np.round(delta[2] / period)
+    return delta
 
 
 def refine_surface_near_curves(
@@ -826,10 +851,188 @@ def refine_surface_near_curves(
     field: BoozerFieldLike | None = None,
     config: LocalRefinementConfig | None = None,
 ) -> tuple[SurfaceMesh, LocalRefinementReport]:
-    """Split triangle edges near the given curves (unimplemented stub)."""
+    """Split every splittable edge of the triangles near the given curves.
+
+    Local (not global) surface refinement for §23 milestone 10.3: a triangle
+    is refined when a curve sample lies within ``radius_edge_ratio`` of its
+    own longest edge length, so the halving is confined to the companion
+    neighborhood whose ``min_transition_strip_edge_ratio`` requirement failed.
+
+    Interior midpoints are projected to ``B=b`` along the local gradient with
+    a bounded displacement (§8.4); a failed projection leaves that edge
+    unsplit and is counted, never replaced by a distant root (§21.2).
+    Boundary midpoints stay exactly on the PL boundary polyline — ``EDGE``,
+    ``G_ZERO``, and unresolved boundaries are geometric provenance the
+    refinement must not move — and carry the exact field value at the PL
+    midpoint, which differs from the level by the boundary polyline's own
+    discretization error.  Periodic-seam and axis edges are never split here
+    because their twins live on the other seam copy; they are counted as
+    skipped.  Without a field (analytic PL fixtures) every midpoint is the PL
+    midpoint, matching the cut's own analytic insertion behavior.
+    """
     config = config or LocalRefinementConfig()
-    return surface, LocalRefinementReport(
-        input_triangle_count=len(surface.triangles),
-        output_triangle_count=len(surface.triangles),
-        edges_split=0,
+    points = [row.copy() for row in np.asarray(surface.points, dtype=float)]
+    triangles = np.asarray(surface.triangles, dtype=np.int64)
+    tags = np.asarray(surface.boundary_tags, dtype=np.int64)
+    period = float(surface.period)
+    samples = (
+        np.vstack([np.asarray(curve, dtype=float) for curve in curves])
+        if len(curves)
+        else np.empty((0, 3))
     )
+
+    edge_triangles: dict[tuple[int, int], list[int]] = {}
+    for triangle_id, triangle in enumerate(triangles):
+        for local in range(3):
+            edge = tuple(sorted((int(triangle[local]), int(triangle[(local + 1) % 3]))))
+            edge_triangles.setdefault(edge, []).append(triangle_id)
+
+    near_triangles = []
+    for triangle_id, triangle in enumerate(triangles):
+        vertices = np.asarray([points[index] for index in triangle])
+        edge_scale = max(
+            np.linalg.norm(
+                _periodic_edge_delta(vertices[i], vertices[(i + 1) % 3], period)
+            )
+            for i in range(3)
+        )
+        if not len(samples):
+            continue
+        deltas = samples[:, np.newaxis, :] - vertices[np.newaxis, :, :]
+        deltas[:, :, 2] -= period * np.round(deltas[:, :, 2] / period)
+        distance = float(np.min(np.linalg.norm(deltas, axis=2)))
+        # A point within radius*scale of the triangle is within
+        # (radius+1)*scale of one of its vertices, so this vertex test never
+        # under-selects the true neighborhood.
+        if distance <= (config.radius_edge_ratio + 1.0) * edge_scale:
+            near_triangles.append(triangle_id)
+
+    target_edges = set()
+    for triangle_id in near_triangles:
+        triangle = triangles[triangle_id]
+        for local in range(3):
+            target_edges.add(
+                tuple(sorted((int(triangle[local]), int(triangle[(local + 1) % 3]))))
+            )
+
+    B = list(map(float, surface.B))
+    g = list(map(float, surface.g))
+    tag_list = list(map(int, tags))
+    new_vertex_edges = []
+    midpoint_ids: dict[tuple[int, int], int] = {}
+    seam_skipped = 0
+    projection_rejections = 0
+    boundary_split = 0
+    for edge in sorted(target_edges):
+        first, second = edge
+        joint = tags[first] & tags[second]
+        if joint & (SurfaceMesh.PERIODIC_SEAM | SurfaceMesh.AXIS):
+            seam_skipped += 1
+            continue
+        boundary = len(edge_triangles[edge]) == 1
+        if boundary and (joint & (SurfaceMesh.G_JUMP,)[0]):
+            # An unresolved sheet-bridging boundary needs background
+            # refinement, not a midpoint on an unknown curve (ADR 0001).
+            continue
+        delta = _periodic_edge_delta(points[first], points[second], period)
+        length = float(np.linalg.norm(delta))
+        midpoint = np.asarray(points[first], dtype=float) + 0.5 * delta
+        midpoint[2] %= period
+        if field is not None and not boundary:
+            projected = _project_to_level_near(
+                midpoint,
+                field,
+                float(surface.level),
+                SurfaceExtractionConfig(B_tolerance=config.B_tolerance),
+                0.5 * length,
+            )
+            if projected is None:
+                projection_rejections += 1
+                continue
+            midpoint = projected
+        if field is not None:
+            midpoint_B = float(_evaluate_B(field, midpoint[np.newaxis, :])[0])
+            midpoint_g = float(_physical_g(field, midpoint[np.newaxis, :])[0])
+        else:
+            midpoint_B = 0.5 * (B[first] + B[second])
+            midpoint_g = 0.5 * (g[first] + g[second])
+        points.append(midpoint)
+        B.append(midpoint_B)
+        g.append(midpoint_g)
+        tag_list.append(int(joint) if boundary else 0)
+        midpoint_ids[edge] = len(points) - 1
+        new_vertex_edges.append(edge)
+        boundary_split += int(boundary)
+
+    new_triangles = []
+    new_components = []
+    new_parents = []
+    for triangle_id, triangle in enumerate(triangles):
+        corner_ids = list(map(int, triangle))
+        split = [
+            midpoint_ids.get(
+                tuple(sorted((corner_ids[local], corner_ids[(local + 1) % 3])))
+            )
+            for local in range(3)
+        ]
+        present = [local for local in range(3) if split[local] is not None]
+        if not present:
+            children = [corner_ids]
+        elif len(present) == 3:
+            children = [
+                [corner_ids[0], split[0], split[2]],
+                [split[0], corner_ids[1], split[1]],
+                [split[2], split[1], corner_ids[2]],
+                [split[0], split[1], split[2]],
+            ]
+        elif len(present) == 2:
+            missing = ({0, 1, 2} - set(present)).pop()
+            a = (missing + 1) % 3
+            b = (missing + 2) % 3
+            # Edges a (between corners a, b) and b (between corners b,
+            # missing) are split; corner b touches both midpoints.
+            children = [
+                [corner_ids[a], split[a], corner_ids[missing]],
+                [split[a], corner_ids[b], split[b]],
+                [split[a], split[b], corner_ids[missing]],
+            ]
+        else:
+            local = present[0]
+            a, b, c = local, (local + 1) % 3, (local + 2) % 3
+            children = [
+                [corner_ids[a], split[local], corner_ids[c]],
+                [split[local], corner_ids[b], corner_ids[c]],
+            ]
+        for child in children:
+            new_triangles.append(child)
+            new_components.append(int(surface.component_ids[triangle_id]))
+            new_parents.append(int(surface.triangle_parent_tetrahedra[triangle_id]))
+
+    parent_edges = np.vstack(
+        (
+            np.asarray(surface.point_parent_edges, dtype=np.int64),
+            np.full((len(new_vertex_edges), 2), -1, dtype=np.int64),
+        )
+    )
+    refined = SurfaceMesh(
+        level=float(surface.level),
+        period=period,
+        points=np.asarray(points, dtype=float),
+        triangles=np.asarray(new_triangles, dtype=np.int64),
+        B=np.asarray(B, dtype=float),
+        g=np.asarray(g, dtype=float),
+        boundary_tags=np.asarray(tag_list, dtype=np.int64),
+        point_parent_edges=parent_edges,
+        triangle_parent_tetrahedra=np.asarray(new_parents, dtype=np.int64),
+        component_ids=np.asarray(new_components, dtype=np.int64),
+    )
+    report = LocalRefinementReport(
+        input_triangle_count=len(triangles),
+        output_triangle_count=len(new_triangles),
+        edges_split=len(new_vertex_edges),
+        projection_rejections=projection_rejections,
+        boundary_edges_split=boundary_split,
+        seam_edges_skipped=seam_skipped,
+        new_vertex_edges=np.asarray(new_vertex_edges, dtype=np.int64).reshape(-1, 2),
+    )
+    return refined, report

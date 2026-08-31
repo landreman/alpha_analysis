@@ -789,5 +789,53 @@ def _periodic_plot_segments(curve):
 
 
 def plot_local_refinement(surface, refined, curves, path=None):
-    """Diagnostic for §23.10.3 local refinement (unimplemented stub)."""
-    raise NotImplementedError("plot_local_refinement is milestone 10.3 work")
+    """Before/after view of §23.10.3 local refinement near companion curves.
+
+    Both triangulations are drawn edge-by-edge in the logical ``(x, y)``
+    projection with the companion polylines overlaid, so the locality of the
+    refinement — near-curve triangles halved, far triangles untouched — is
+    visible and the drawn vertex counts equal the meshes' real counts
+    (DESIGN.md §17.1).  Logical coordinates are dimensionless.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import LineCollection
+
+    figure, axes_pair = plt.subplots(
+        1, 2, figsize=(11, 5), sharex=True, sharey=True, constrained_layout=True
+    )
+
+    def edge_segments(mesh):
+        segments = set()
+        for triangle in mesh.triangles:
+            for local in range(3):
+                segments.add(
+                    tuple(
+                        sorted((int(triangle[local]), int(triangle[(local + 1) % 3])))
+                    )
+                )
+        return [
+            (mesh.points[first][:2], mesh.points[second][:2])
+            for first, second in sorted(segments)
+        ]
+
+    for axes, mesh, title in (
+        (axes_pair[0], surface, f"before: {len(surface.triangles)} triangles"),
+        (axes_pair[1], refined, f"after: {len(refined.triangles)} triangles"),
+    ):
+        axes.add_collection(
+            LineCollection(edge_segments(mesh), colors="0.6", linewidths=0.6)
+        )
+        for curve in curves:
+            curve = np.asarray(curve, dtype=float)
+            axes.plot(curve[:, 0], curve[:, 1], "r.-", linewidth=1.4, markersize=5)
+        axes.set_title(title)
+        axes.set_xlabel("x [dimensionless]")
+        axes.set_ylabel("y [dimensionless]")
+        axes.set_aspect("equal")
+        axes.autoscale_view()
+    figure.suptitle(
+        "Local surface refinement near companion curves (DESIGN.md §23.10.3)"
+    )
+    if path is not None:
+        figure.savefig(path, dpi=150)
+    return figure

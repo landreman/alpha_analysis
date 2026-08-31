@@ -166,7 +166,9 @@ def main() -> None:
     # The endpoints are excluded: B = min(B) and B = max(B) are attained at
     # isolated points, not on a surface.
     levels = np.linspace(B_min, B_max, args.n_surfaces + 2)[1:-1]
-    print(f"Bmin: {B_min:.6g}, Bmax: {B_max:.6g}, levels: {levels}, lowest B surface: {levels[0]:.6g}")
+    print(
+        f"Bmin: {B_min:.6g}, Bmax: {B_max:.6g}, levels: {levels}, lowest B surface: {levels[0]:.6g}"
+    )
     extractor = (
         PyVistaSurfaceExtractor()
         if args.extractor == "pyvista"

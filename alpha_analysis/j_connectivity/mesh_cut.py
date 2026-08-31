@@ -385,6 +385,12 @@ class _MutableMesh:
         self.constrained_edges: set[tuple[int, int]] = set()
         self.corridor_count = 0
         self.max_corridor_faces_used = 0
+        # Component-provenance enforcement (DESIGN.md §23 milestone 10.3):
+        # while set, every location, vertex snap, and insertion is restricted
+        # to triangles of this surface component, so an off-surface projection
+        # can never jump to a disconnected sheet that happens to be nearer in
+        # Euclidean coordinates (§21.2).
+        self.active_component: int | None = None
 
     def _unwrapped_triangle(self, triangle_id, point):
         ids = self.triangles[triangle_id]
@@ -394,11 +400,22 @@ class _MutableMesh:
         )
         return ids, vertices
 
-    def _nearest_location(self, point):
+    def _nearest_location(self, point, component=None):
+        if component is None:
+            component = self.active_component
         if not self.triangles:
             raise ConstrainedCutError("cannot insert a curve into an empty surface")
+        triangle_ids = np.arange(len(self.triangles), dtype=np.int64)
+        if component is not None:
+            triangle_ids = triangle_ids[
+                np.asarray(self.component_ids, dtype=np.int64) == int(component)
+            ]
+            if not len(triangle_ids):
+                raise ConstrainedCutError(
+                    f"surface has no triangles on component {component}"
+                )
         vertices = np.asarray(self.points, dtype=float)[
-            np.asarray(self.triangles, dtype=np.int64)
+            np.asarray(self.triangles, dtype=np.int64)[triangle_ids]
         ]
         vertices[:, :, 2] += self.period * np.round(
             (float(point[2]) - vertices[:, :, 2]) / self.period
@@ -413,10 +430,12 @@ class _MutableMesh:
             np.maximum(vertices.min(axis=1) - point, point - vertices.max(axis=1)),
             0.0,
         )
-        candidates = np.flatnonzero(
-            np.linalg.norm(box_delta, axis=1)
-            <= upper_bound + self.config.snap_tolerance
-        )
+        candidates = triangle_ids[
+            np.flatnonzero(
+                np.linalg.norm(box_delta, axis=1)
+                <= upper_bound + self.config.snap_tolerance
+            )
+        ]
         best = None
         for triangle_id in candidates:
             ids, vertices = self._unwrapped_triangle(triangle_id, point)
@@ -583,16 +602,29 @@ class _MutableMesh:
         self.component_ids.extend(component_additions)
         return new_id
 
+    def _component_vertices(self, component):
+        return {
+            int(vertex)
+            for triangle, owner in zip(self.triangles, self.component_ids)
+            if owner == component
+            for vertex in triangle
+        }
+
     def insert_point(self, point, *, tag=0, preserve=True):
         point = np.asarray(point, dtype=float)
+        snap_candidates = (
+            range(len(self.points))
+            if self.active_component is None
+            else sorted(self._component_vertices(self.active_component))
+        )
         distances = np.array(
             [
-                np.linalg.norm(_periodic_delta(point, existing, self.period))
-                for existing in self.points
+                np.linalg.norm(_periodic_delta(point, self.points[index], self.period))
+                for index in snap_candidates
             ]
         )
-        nearest = int(np.argmin(distances))
-        if distances[nearest] <= self.config.snap_tolerance:
+        nearest = int(snap_candidates[int(np.argmin(distances))])
+        if distances.min() <= self.config.snap_tolerance:
             self.tags[nearest] |= int(tag)
             return nearest
         distance, triangle_id, ids, closest, barycentric, edge_scale = (
@@ -699,15 +731,10 @@ class _MutableMesh:
         harmless offset from turning a boundary curve into an interior cut.
         """
         point = np.asarray(point, dtype=float)
+        if component is None:
+            component = self.active_component
         allowed_vertices = (
-            None
-            if component is None
-            else {
-                vertex
-                for triangle, owner in zip(self.triangles, self.component_ids)
-                if owner == component
-                for vertex in triangle
-            }
+            None if component is None else self._component_vertices(component)
         )
         tagged_vertices = [
             index
@@ -1822,15 +1849,63 @@ def _nearest_edge_boundary_point(mesh, point, component=None):
     return best_distance, best_point
 
 
+def _consistent_curve_component(mesh, points):
+    """Locate one whole curve on a single surface component, or explain why not.
+
+    Component-provenance enforcement (DESIGN.md §23 milestone 10.3): an
+    off-surface projection may be Euclidean-nearest to a disconnected sheet,
+    but a transition curve lives on one connected component.  The curve's
+    component is the unique component containing *every* sample within the
+    local surface-distance allowance.  No unique component means the curve
+    cannot be trustworthily placed: cutting anyway would bridge disconnected
+    geometry (§21.2), so the caller must keep the transition explicitly
+    unresolved.
+    """
+    components = set()
+    for point in points:
+        _, triangle_id, *_ = mesh._nearest_location(point)
+        components.add(int(mesh.component_ids[triangle_id]))
+    if len(components) == 1:
+        return next(iter(components)), None
+    viable = []
+    for component in sorted(components):
+        for point in points:
+            distance, _, _, _, _, edge_scale = mesh._nearest_location(
+                point, component=component
+            )
+            allowed = mesh.config.max_surface_distance_ratio * max(
+                edge_scale, mesh.config.snap_tolerance
+            )
+            if distance > allowed:
+                break
+        else:
+            viable.append(component)
+    if len(viable) == 1:
+        return viable[0], None
+    if not viable:
+        return None, (
+            f"companion T samples locate on disconnected surface components "
+            f"{sorted(components)} and no single component contains the whole "
+            "curve within the surface-distance allowance"
+        )
+    return None, (
+        f"companion T locates within the surface-distance allowance on "
+        f"multiple disconnected components {viable}; the assignment is "
+        "ambiguous"
+    )
+
+
 def _geometry_resolution_issue(mesh, transition, event_endpoint_indices=()):
     """Return why the current surface cannot represent ``T``, or ``None``."""
     parent = next(port for port in transition.ports if port.role == "parent")
     closed = _curve_is_closed(transition)
     edge_scales = []
-    curve_component = None
+    curve_component, component_issue = _consistent_curve_component(mesh, parent.points)
+    if component_issue is not None:
+        return component_issue
     for index, point in enumerate(parent.points):
         distance, triangle_id, ids, _, barycentric, edge_scale = mesh._nearest_location(
-            point
+            point, component=curve_component
         )
         allowed = mesh.config.max_surface_distance_ratio * max(
             edge_scale, mesh.config.snap_tolerance
@@ -1839,18 +1914,6 @@ def _geometry_resolution_issue(mesh, transition, event_endpoint_indices=()):
             return (
                 f"companion T is {distance:.3e} from the nearest surface "
                 f"triangle (allowed {allowed:.3e})"
-            )
-        component = int(mesh.component_ids[triangle_id])
-        if curve_component is None:
-            curve_component = component
-        elif component != curve_component:
-            # T lives on one connected sheet of the incoming surface; samples
-            # locating on two disconnected components mean the projection
-            # jumped components, and cutting across that jump would merge
-            # geometry §21.2 forbids merging.
-            return (
-                f"companion T samples locate on disconnected surface "
-                f"components {curve_component} and {component}"
             )
         distances = np.array(
             [
@@ -2026,6 +2089,27 @@ def cut_surface_at_transitions(
         for transition in transitions
         if event_endpoints and _is_resolvable(transition)
     }
+    # Component-provenance enforcement: every insertion of one curve is
+    # restricted to the single component that holds the whole curve within
+    # the surface-distance allowance (§23 milestone 10.3, §21.2).
+    curve_components = {}
+    for transition in transitions:
+        if not _is_resolvable(transition) or preflight_issues.get(
+            transition.transition_id
+        ):
+            continue
+        assignments = {}
+        for role in ("parent", "child_3"):
+            port = next(port for port in transition.ports if port.role == role)
+            component, issue = _consistent_curve_component(mesh, port.points)
+            if issue is not None:
+                preflight_issues[transition.transition_id] = (
+                    issue if role == "parent" else f"{role}: {issue}"
+                )
+                break
+            assignments[role] = component
+        else:
+            curve_components[transition.transition_id] = assignments
     if event_endpoints:
         # All event anchors enter before constraints, so later incidence at a
         # true junction does not split/destroy an already constrained chain.
@@ -2039,11 +2123,17 @@ def cut_surface_at_transitions(
                 ):
                     continue
                 port = next(port for port in transition.ports if port.role == role)
-                for point in port.points:
-                    if port.role == "child_3":
-                        mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
-                    else:
-                        mesh.insert_point(point, preserve=True)
+                mesh.active_component = curve_components[transition.transition_id][
+                    "parent" if role == "parent" else "child_3"
+                ]
+                try:
+                    for point in port.points:
+                        if port.role == "child_3":
+                            mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
+                        else:
+                            mesh.insert_point(point, preserve=True)
+                finally:
+                    mesh.active_component = None
     inserted_transitions = []
     unresolved = []
     unresolved_reasons = []
@@ -2099,7 +2189,9 @@ def cut_surface_at_transitions(
         ):
             raise ConstrainedCutError("parent and child-1 do not share one companion T")
         closed = _curve_is_closed(transition)
+        components = curve_components.get(transition.transition_id, {})
         try:
+            mesh.active_component = components.get("parent")
             sample_ids, path_edges, vertex_u = _insert_curve(
                 mesh,
                 parent.points,
@@ -2110,6 +2202,7 @@ def cut_surface_at_transitions(
                 event_endpoint_indices=endpoint_indices,
                 adaptive_anchors=bool(event_endpoints),
             )
+            mesh.active_component = components.get("child_3")
             gamma_ids, _, gamma_vertex_u = _insert_curve(
                 mesh,
                 child_3.points,
@@ -2137,6 +2230,8 @@ def cut_surface_at_transitions(
                     )
                 )
             continue
+        finally:
+            mesh.active_component = None
         inserted_transitions.append(
             _InsertedTransition(
                 transition,

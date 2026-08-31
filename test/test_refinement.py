@@ -193,16 +193,52 @@ def fold_pipeline():
 
 
 @pytest.fixture(scope="module")
+def fold_resolution(fold_pipeline):
+    field, extraction, critical = fold_pipeline
+    return converge_transitions(
+        field,
+        extraction,
+        critical,
+        budgets=RefinementBudgets(
+            source_sample_budgets=(8, 16),
+            max_field_period_caps=(128,),
+            localization_bisections=(20, 60),
+            background_levels=0,
+            local_refinement_rounds=1,
+        ),
+        transition_config=TransitionMappingConfig(),
+    )
+
+
+@pytest.fixture(scope="module")
 def two_barrier_pipeline():
     field = _two_barrier_field()
     zeta = np.arccos(-np.sqrt(7 / 30))
     b = float(field.B(0.5, 0, zeta))
-    background = StructuredPrismMeshBackend(BackgroundMeshConfig(4, 16, 36)).build(
+    background = StructuredPrismMeshBackend(BackgroundMeshConfig(4, 12, 24)).build(
         field
     )
     extraction = MarchingTetrahedraExtractor().extract(background, field, b)
     critical = extract_critical_curves(extraction, field, b)
     return field, b, extraction, critical
+
+
+@pytest.fixture(scope="module")
+def two_barrier_full(two_barrier_pipeline):
+    field, b, extraction, critical = two_barrier_pipeline
+    return converge_transitions(
+        field,
+        extraction,
+        critical,
+        budgets=RefinementBudgets(
+            source_sample_budgets=(None,),
+            max_field_period_caps=(128,),
+            localization_bisections=(20,),
+            background_levels=0,
+            local_refinement_rounds=1,
+        ),
+        transition_config=TransitionMappingConfig(),
+    )
 
 
 def _multi_arc_signature(cut):
@@ -319,9 +355,7 @@ def test_unresolvable_cap_terminates_bounded_with_recorded_attempts(
     assert not resolution.resolved
     # The ladder is bounded: exactly one cap escalation (2 -> 4) was tried per
     # affected transition, and the terminal state names the cap ceiling.
-    cap_records = [
-        r for r in resolution.attempts if r.failure_class == "max_periods"
-    ]
+    cap_records = [r for r in resolution.attempts if r.failure_class == "max_periods"]
     assert cap_records
     assert {(r.previous, r.requested) for r in cap_records} == {("2", "4")}
     assert resolution.failure_class_counts.get("max_periods", 0) > 0
@@ -337,23 +371,31 @@ def test_unresolvable_cap_terminates_bounded_with_recorded_attempts(
         assert len(resolution.cut.cut_edges) == 0
 
 
+@pytest.mark.slow
 def test_source_budget_escalation_certifies_and_matches_full_budget_topology(
-    two_barrier_pipeline,
+    two_barrier_pipeline, two_barrier_full
 ):
+    # This doubles as the milestone 10.1 invariance carried through
+    # remediation: the escalated run starts from an insufficient budget of 3
+    # and its final sheet graph must equal the full-budget coordinator's —
+    # never a silent function of the starting budget.  It is `slow` as a cost
+    # control only: the same source-budget escalation keeps fast
+    # production-path coverage in the fold test (which certifies through the
+    # (8, 16) ladder and records it), and the six-sheet contact topology
+    # keeps fast coverage in the localization test below.
     field, b, extraction, critical = two_barrier_pipeline
-    config = TransitionMappingConfig()
     escalated = converge_transitions(
         field,
         extraction,
         critical,
         budgets=RefinementBudgets(
-            source_sample_budgets=(3, 16, None),
+            source_sample_budgets=(3, None),
             max_field_period_caps=(128,),
             localization_bisections=(20,),
             background_levels=0,
             local_refinement_rounds=1,
         ),
-        transition_config=config,
+        transition_config=TransitionMappingConfig(),
     )
     assert escalated.resolved, escalated.terminal_reasons
     budget_records = [
@@ -362,22 +404,8 @@ def test_source_budget_escalation_certifies_and_matches_full_budget_topology(
     assert budget_records, "budget escalation must be recorded"
     assert all(r.control == "max_curve_samples" for r in budget_records)
 
-    full = converge_transitions(
-        field,
-        extraction,
-        critical,
-        budgets=RefinementBudgets(
-            source_sample_budgets=(None,),
-            max_field_period_caps=(128,),
-            localization_bisections=(20,),
-            background_levels=0,
-            local_refinement_rounds=1,
-        ),
-        transition_config=config,
-    )
+    full = two_barrier_full
     assert full.resolved, full.terminal_reasons
-    # Milestone 10.1's invariance, carried through remediation: the final
-    # sheet graph must not be a silent function of the starting budget.
     assert _multi_arc_signature(escalated.cut) == _multi_arc_signature(full.cut)
     # Two equal-height contacts inside one ordinary well give exactly six
     # limiting trapped branches (the 10.2 acceptance topology).
@@ -412,9 +440,17 @@ def test_contact_localization_budget_escalates_until_events_localize(
     assert resolution.resolved, resolution.terminal_reasons
     assert len(np.unique(resolution.cut.sheet_ids)) == 6
     assert len(resolution.cut.events) == 2
+    # Equal-height contacts must never be certified as folds: each event
+    # keeps two marginal maxima and its equal-height kind.
+    assert {event.kind for event in resolution.arrangement.events} == {"equal_height"}
+    assert all(
+        len(event.marginal_points) == 2 for event in resolution.arrangement.events
+    )
 
 
-def test_below_b_fold_event_certifies_and_cuts_with_continuous_limits(fold_pipeline):
+def test_below_b_fold_event_certifies_and_cuts_with_continuous_limits(
+    fold_pipeline, fold_resolution
+):
     field, extraction, critical = fold_pipeline
     # Independent fold location: bisect the interior-maximum count computed
     # from the field alone, far from the production scan and solver.
@@ -429,19 +465,7 @@ def test_below_b_fold_event_certifies_and_cuts_with_continuous_limits(fold_pipel
             high = middle
     theta_fold = 0.5 * (low + high)
 
-    resolution = converge_transitions(
-        field,
-        extraction,
-        critical,
-        budgets=RefinementBudgets(
-            source_sample_budgets=(8, 16),
-            max_field_period_caps=(128,),
-            localization_bisections=(20, 60),
-            background_levels=0,
-            local_refinement_rounds=1,
-        ),
-        transition_config=TransitionMappingConfig(),
-    )
+    resolution = fold_resolution
     assert resolution.resolved, resolution.terminal_reasons
     arrangement = resolution.arrangement
     # Two fold events on the closed curve (mirror images), each with one
@@ -457,9 +481,7 @@ def test_below_b_fold_event_certifies_and_cuts_with_continuous_limits(fold_pipel
         )
         for event in arrangement.events
     )
-    np.testing.assert_allclose(
-        angles, [theta_fold, 2 * np.pi - theta_fold], atol=2e-3
-    )
+    np.testing.assert_allclose(angles, [theta_fold, 2 * np.pi - theta_fold], atol=2e-3)
     # Across a below-b fold every port action is continuous: the one-sided
     # limits of the two incident arcs agree. A solver that flipped the
     # curvature test or accepted a height at b would move or break this.
@@ -479,81 +501,112 @@ def test_below_b_fold_event_certifies_and_cuts_with_continuous_limits(fold_pipel
     assert len(cut.unresolved_transition_ids) == 0
     assert len(cut.events) == 2
     assert all(port.sheet_id >= 0 for port in cut.ports)
+    # The (8, 16) ladder is the fast production-path evidence for
+    # source-budget escalation: certification needed and used the recorded
+    # second rung.
+    budget_records = [
+        r for r in resolution.attempts if r.failure_class == "source_budget"
+    ]
+    assert budget_records, "source-budget escalation must be recorded"
+    assert all(r.control == "max_curve_samples" for r in budget_records)
 
 
-def test_equal_height_contacts_are_never_certified_as_folds(two_barrier_pipeline):
-    field, b, extraction, critical = two_barrier_pipeline
-    resolution = converge_transitions(
+def test_thin_strip_local_refinement_enables_the_cut_and_preserves_topology(
+    fold_pipeline, fold_resolution
+):
+    # Under a stricter strip-resolution requirement the fold field's coarse
+    # surface genuinely cannot hold the companion-to-EDGE strip, which is the
+    # real-matrix failure the §23.10.3 local refinement remedies.  The
+    # remediated cut must reproduce, sheet for sheet and event for event, the
+    # cut the default requirement accepts directly: refinement may only make
+    # the same topology representable, never a different one.
+    field, extraction, critical = fold_pipeline
+    budgets = RefinementBudgets(
+        source_sample_budgets=(8, 16),
+        max_field_period_caps=(128,),
+        localization_bisections=(20, 60),
+        background_levels=0,
+        local_refinement_rounds=0,
+    )
+    strict = ConstrainedCutConfig(min_transition_strip_edge_ratio=0.8)
+    base = converge_transitions(
         field,
         extraction,
         critical,
-        budgets=RefinementBudgets(
-            source_sample_budgets=(None,),
-            max_field_period_caps=(128,),
-            localization_bisections=(20,),
-            background_levels=0,
-            local_refinement_rounds=1,
-        ),
+        budgets=budgets,
         transition_config=TransitionMappingConfig(),
+        cut_config=strict,
     )
-    assert resolution.resolved
-    assert {event.kind for event in resolution.arrangement.events} == {
-        "equal_height"
-    }
-    assert all(
-        len(event.marginal_points) == 2 for event in resolution.arrangement.events
-    )
+    assert not base.resolved
+    assert any("strip width" in reason for reason in base.terminal_reasons)
+    assert base.failure_class_counts.get("thin_strip", 0) > 0
 
-
-def test_thin_strip_local_refinement_is_local_and_enables_the_cut():
-    surface, action = _surface_and_action()
-    transition = _transition()
-    companion = np.column_stack(([-0.4, 0.0, 0.4], [0.19, 0.19, 0.19], np.zeros(3)))
-    ports = tuple(
-        replace(port, points=companion) if port.role in {"parent", "child_1"} else port
-        for port in transition.ports
+    remediated = converge_transitions(
+        field,
+        extraction,
+        critical,
+        budgets=replace(budgets, local_refinement_rounds=2),
+        transition_config=TransitionMappingConfig(),
+        cut_config=strict,
     )
-    transition = replace(transition, ports=ports)
-
-    cut, records = converge_cut(
-        surface,
-        action,
-        (transition,),
-        budgets=RefinementBudgets(local_refinement_rounds=2),
-    )
-    strip_records = [r for r in records if r.failure_class == "thin_strip"]
+    assert remediated.resolved, remediated.terminal_reasons
+    strip_records = [r for r in remediated.attempts if r.failure_class == "thin_strip"]
     assert strip_records, "the strip remediation must be recorded"
-    assert cut.unresolved_transition_ids.size == 0
-    assert len(cut.cut_edges) > 0
-    by_role = {port.role: port for port in cut.ports}
-    assert len({port.sheet_id for port in cut.ports}) == 3
-    np.testing.assert_allclose(
-        cut.surface.points[by_role["parent"].polyline_vertex_ids],
-        companion,
-        atol=1e-12,
+    reference = fold_resolution
+    assert reference.resolved
+    assert _multi_arc_signature(remediated.cut) == _multi_arc_signature(reference.cut)
+
+
+def test_local_refinement_refines_near_the_curve_not_globally():
+    from test_mesh_cut import _grid_component
+    from alpha_analysis.j_connectivity.surface_refine import (
+        refine_surface_near_curves,
     )
-    np.testing.assert_allclose(
-        cut.action_values[by_role["parent"].polyline_vertex_ids],
-        by_role["parent"].action_values,
+
+    xs = np.linspace(-0.8, 0.8, 17)
+    ys = np.linspace(-0.2, 0.2, 5)
+    points, triangles, components = _grid_component(
+        list(xs), list(ys), point_offset=0, component_id=0
     )
-    np.testing.assert_allclose(
-        cut.action_values[by_role["child_1"].polyline_vertex_ids],
-        by_role["child_1"].action_values,
+    surface = SurfaceMesh(
+        level=1.0,
+        period=2.0 * np.pi,
+        points=points,
+        triangles=triangles,
+        B=np.ones(len(points)),
+        g=-np.ones(len(points)),
+        boundary_tags=np.zeros(len(points), dtype=np.int64),
+        point_parent_edges=np.full((len(points), 2), -1, dtype=np.int64),
+        triangle_parent_tetrahedra=np.full(len(triangles), -1, dtype=np.int64),
+        component_ids=components,
     )
-    # Locality: refinement may not touch the far half of the surface (§23
-    # 10.3 requires local, not global, refinement).
-    far = cut.surface.points[:, 1] < -0.05
-    original_far = surface.points[surface.points[:, 1] < -0.05]
-    assert np.count_nonzero(far) == len(original_far)
+    curve = np.column_stack((np.full(3, -0.7), [-0.1, 0.0, 0.1], np.zeros(3)))
+    refined, report = refine_surface_near_curves(surface, (curve,))
+    assert report.edges_split > 0
+    # Local, not global (§23 10.3): the far side of the surface is untouched
+    # — same vertices, same triangles.
+    far_original = {
+        tuple(np.round(point, 12)) for point in surface.points if point[0] > 0.0
+    }
+    far_refined = {
+        tuple(np.round(point, 12)) for point in refined.points if point[0] > 0.0
+    }
+    assert far_original == far_refined
+    near_refined = [point for point in refined.points if point[0] <= -0.55]
+    assert len(near_refined) > np.count_nonzero(surface.points[:, 0] <= -0.55)
 
 
 def test_zero_width_strip_reports_refinement_bound_not_a_cut():
     surface, action = _surface_and_action()
     transition = _transition()
-    # The companion lies exactly on the EDGE boundary: no refinement level can
-    # represent an intervening strip, so the coordinator must stop at its
-    # bound with the explicit reason, never cut, and never loosen the check.
-    companion = np.column_stack(([-0.4, 0.0, 0.4], [0.2, 0.2, 0.2], np.zeros(3)))
+    # The companion leaves a strip far below any reachable local resolution:
+    # bounded refinement must stop at its bound with the explicit terminal
+    # reason, never cut, and never loosen the strip check itself.
+    companion = np.column_stack(
+        ([-0.8, 0.0, 0.8], [0.19999, 0.19999, 0.19999], np.zeros(3))
+    )
+    action = np.where(surface.points[:, 1] < 0.19999, 3.0, 1.0)
+    action[9:] = np.nan
     ports = tuple(
         replace(port, points=companion) if port.role in {"parent", "child_1"} else port
         for port in transition.ports
@@ -573,16 +626,51 @@ def test_zero_width_strip_reports_refinement_bound_not_a_cut():
     assert all(port.sheet_id == -1 for port in cut.ports)
 
 
-def test_component_enforcement_keeps_curve_on_its_own_component():
+def _surface_with_distractor():
+    """The two-component cut fixture plus a fine foreign sheet at zeta=0.25.
+
+    The distractor grid sits directly over the companion path but displaced
+    in zeta, the geometry the real matrix shows when a nearby ``B=b`` sheet
+    is Euclidean-closer than the curve's own component.  Its fine edges make
+    its own surface-distance allowance small, so it can never legitimately
+    host the whole companion curve.
+    """
+    from test_mesh_cut import _grid_component
+
     surface, action = _surface_and_action()
+    offset = len(surface.points)
+    extra_points, extra_triangles, extra_components = _grid_component(
+        [-0.1, 0.0, 0.1, 0.2], [-0.1, 0.0, 0.1], point_offset=offset, component_id=2
+    )
+    extra_points[:, 2] = 0.25
+    points = np.vstack((surface.points, extra_points))
+    triangles = np.vstack((surface.triangles, extra_triangles))
+    surface = SurfaceMesh(
+        level=surface.level,
+        period=surface.period,
+        points=points,
+        triangles=triangles,
+        B=np.ones(len(points)),
+        g=-np.ones(len(points)),
+        boundary_tags=np.concatenate(
+            (surface.boundary_tags, np.zeros(len(extra_points), dtype=np.int64))
+        ),
+        point_parent_edges=np.full((len(points), 2), -1, dtype=np.int64),
+        triangle_parent_tetrahedra=np.full(len(triangles), -1, dtype=np.int64),
+        component_ids=np.concatenate((surface.component_ids, extra_components)),
+    )
+    action = np.concatenate((action, np.full(len(extra_points), 2.0)))
+    return surface, action
+
+
+def test_component_enforcement_keeps_curve_on_its_own_component():
+    surface, action = _surface_with_distractor()
     transition = _transition()
-    # The middle sample sits between the two disconnected components but
-    # nearer to the foreign child-3 sheet at y=0.5.  Nearest-triangle
-    # location alone would report a component jump; provenance enforcement
-    # must locate the whole curve on its own component 0, which contains
-    # every sample within the surface-distance allowance.
-    companion = np.column_stack((np.full(3, 0.1), [-0.2, 0.35, -0.2], np.zeros(3)))
-    companion[::2, 1] = [-0.2, 0.2]
+    # The middle sample is Euclidean-nearer to the foreign zeta=0.25 sheet
+    # than to its own component 0.  Nearest-triangle location alone reports a
+    # component jump; provenance enforcement must find the one component that
+    # holds the whole curve within the surface-distance allowance.
+    companion = np.column_stack((np.full(3, 0.1), [-0.2, 0.0, 0.2], [0.0, 0.13, 0.0]))
     ports = tuple(
         replace(port, points=companion) if port.role in {"parent", "child_1"} else port
         for port in transition.ports
@@ -597,18 +685,18 @@ def test_component_enforcement_keeps_curve_on_its_own_component():
         for triangle_id, triangle in enumerate(cut.surface.triangles):
             if int(vertex) in set(map(int, triangle)):
                 incident_components.add(int(cut.surface.component_ids[triangle_id]))
-    # Cutting across the two original disconnected components would merge
-    # them (§21.2); the cut must live entirely on component 0's descendants.
+    # Cutting on the foreign sheet would merge disconnected components in all
+    # but name (§21.2); the cut must live entirely on component 0.
     assert incident_components == {0}
 
 
 def test_genuinely_off_component_curve_stays_explicitly_unresolved():
-    surface, action = _surface_and_action()
+    surface, action = _surface_with_distractor()
     transition = _transition()
-    # The middle sample lies on the far component itself, beyond component
-    # 0's allowance: no consistent single component exists and enforcement
-    # must refuse to cut rather than bridge the gap (§21.2).
-    companion = np.column_stack((np.full(3, 0.0), [-0.2, 0.6, 0.2], np.zeros(3)))
+    # The middle sample is beyond component 0's allowance and the foreign
+    # sheet cannot hold the endpoints: no consistent single component exists
+    # and enforcement must refuse to cut rather than bridge the gap (§21.2).
+    companion = np.column_stack((np.full(3, 0.1), [-0.2, 0.0, 0.2], [0.0, 0.45, 0.0]))
     ports = tuple(
         replace(port, points=companion) if port.role in {"parent", "child_1"} else port
         for port in transition.ports
@@ -619,31 +707,7 @@ def test_genuinely_off_component_curve_stays_explicitly_unresolved():
     assert np.array_equal(cut.unresolved_transition_ids, [7])
     assert "component" in cut.unresolved_transition_reasons[0]
     assert len(cut.cut_edges) == 0
-    assert len(np.unique(cut.sheet_ids)) == 2
-
-
-def test_coordinator_final_topology_is_invariant_to_starting_budget(
-    two_barrier_pipeline,
-):
-    field, b, extraction, critical = two_barrier_pipeline
-    signatures = []
-    for ladder in ((4, None), (None,)):
-        resolution = converge_transitions(
-            field,
-            extraction,
-            critical,
-            budgets=RefinementBudgets(
-                source_sample_budgets=ladder,
-                max_field_period_caps=(128,),
-                localization_bisections=(20,),
-                background_levels=0,
-                local_refinement_rounds=1,
-            ),
-            transition_config=TransitionMappingConfig(),
-        )
-        assert resolution.resolved, resolution.terminal_reasons
-        signatures.append(_multi_arc_signature(resolution.cut))
-    assert signatures[0] == signatures[1]
+    assert len(np.unique(cut.sheet_ids)) == 3
 
 
 def test_degenerate_source_classification_is_terminal_after_background_ladder():
@@ -662,7 +726,7 @@ def test_degenerate_source_classification_is_terminal_after_background_ladder():
         G_coefficients=np.array([3.0]),
         I_coefficients=np.array([0.0]),
     )
-    b = float(field.B(0.5, 0.0, np.pi))
+    b = float(field.B(0.5, 0.0, 0.0))
     levels = [(3, 8, 16), (4, 10, 20)]
     built = []
 
@@ -737,9 +801,9 @@ def test_matrix_report_meets_milestone_10_3_acceptance():
         # No per-case tuning: cases carry recorded attempts, never their own
         # control overrides.  The single controls block is global.
         assert "controls" not in case, key
-    assert resolved_count >= 0.95 * len(cases), (
-        f"only {resolved_count} of {len(cases)} cases resolved"
-    )
+    assert resolved_count >= 0.95 * len(
+        cases
+    ), f"only {resolved_count} of {len(cases)} cases resolved"
     assert "controls" in payload
     assert "budgets" in payload["controls"]
 
@@ -760,6 +824,4 @@ def test_local_refinement_diagnostic_writes_png(tmp_path):
     # The drawn geometry is the asserted geometry: both triangulations and
     # the companion polyline appear with their real vertex counts.
     axes = figure.axes[0]
-    assert any(
-        len(line.get_xdata()) == len(companion) for line in axes.get_lines()
-    )
+    assert any(len(line.get_xdata()) == len(companion) for line in axes.get_lines())

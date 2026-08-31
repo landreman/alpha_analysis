@@ -31,26 +31,32 @@ from .types import TransitionStatus
 
 @dataclass(frozen=True)
 class ContactLocalizationConfig:
-    """Bounded refinement controls for milestone 10.2.
+    """Bounded refinement controls for milestones 10.2 and 10.3.
 
     ``u_tolerance`` bounds the remaining logical curve-parameter interval.
     ``max_bisections`` counts additional transition traces per bracket.
     ``event_tolerance`` bounds logical displacement when recognizing the same
-    independently solved event from two source-curve occurrences. None of these
-    controls relaxes a field residual or accepts a failed transition trace.
+    independently solved event from two source-curve occurrences.
+    ``fold_height_margin`` is the minimum relative height deficit
+    ``(b - B_fold)/|b|`` for certifying a localized count change as a
+    below-``b`` fold (ADR 0003, ADR 0007): closer to ``b`` than this, the
+    fold cannot be distinguished from an equal-height contact and the event
+    stays explicitly uncertified. None of these controls relaxes a field
+    residual or accepts a failed transition trace.
     """
 
     u_tolerance: float = 1.0e-5
     max_bisections: int = 20
     event_tolerance: float = 1.0e-7
     scan_refinement_factor: int = 2
+    fold_height_margin: float = 1.0e-6
 
     def __post_init__(self):
         if self.max_bisections < 1:
             raise ValueError("max_bisections must be positive")
         if self.scan_refinement_factor < 2:
             raise ValueError("scan_refinement_factor must be at least two")
-        for name in ("u_tolerance", "event_tolerance"):
+        for name in ("u_tolerance", "event_tolerance", "fold_height_margin"):
             if not np.isfinite(getattr(self, name)) or getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be finite and positive")
 
@@ -92,6 +98,7 @@ class TransitionEvent:
     field_line_identity: np.ndarray | None = None
     zeta_unwrapped: np.ndarray | None = None
     kind: str = "equal_height"
+    fold_points: np.ndarray | None = None
 
 
 @dataclass(frozen=True)
@@ -312,6 +319,212 @@ def _solve_equal_height(field, left, right, period, config):
     return candidates[0] if len(candidates) == 1 else None
 
 
+def _fold_seeds(field, sample, period):
+    """Interior extrema offsets and adjacent midpoints as fold-solve seeds."""
+    s, alpha = sample.field_line_identity[0]
+    zeta_m = sample.event_zeta_unwrapped[0, 1]
+    iota = float(field.iota(s))
+    theta = alpha + iota * zeta_m
+    seeds = []
+    for direction in (-1.0, 1.0):
+        trace = _directional_crossing(
+            field,
+            b=sample.b,
+            s=s,
+            theta_m=theta,
+            zeta_m=zeta_m,
+            direction=direction,
+            iota=iota,
+            period=period,
+            config=sample.controls,
+        )
+        interior = sorted(
+            distance
+            for distance in trace.extrema_distances
+            if distance < trace.distance
+        )
+        seeds.extend(direction * distance for distance in interior)
+        seeds.extend(
+            direction * 0.5 * (first + second)
+            for first, second in zip(interior[:-1], interior[1:])
+        )
+    return seeds
+
+
+def _solve_fold(field, left, right, period, config, bracket):
+    """Certify a below-``b`` interior fold on the marginal field line.
+
+    ADR 0003's first case: the bracketed count change is an interior
+    maximum--minimum pair annihilating strictly below ``b``, so every port
+    action is continuous across the event.  The solve requires the marginal
+    maximum (``B=b``, ``D_parallel B=0``, negative curvature) and, at lifted
+    offset ``tau`` on the same field line, ``D_parallel B=D_parallel^2 B=0``
+    with ``B`` at least ``fold_height_margin |b|`` below ``b`` and the fold
+    inside the parent well.  Exactly one local root is accepted; ambiguity
+    remains uncertified (§5.4, ADR 0007).
+
+    ``bracket`` holds the original count-change samples: near the fold the
+    annihilating pair is shallower than the root scan's grid, so the scan
+    flips the count a blind-zone distance from the true fold (ADR 0003's
+    resolution caveat).  The solved event must lie within the original
+    sample bracket — the resolution detection actually has — while the
+    bisected micro-interval localizes only the scan's own flip point.
+    """
+    sample = max((left, right), key=lambda item: item.interior_maximum_count[0])
+    s, alpha = sample.field_line_identity[0]
+    zeta_m = sample.event_zeta_unwrapped[0, 1]
+    iota0 = float(field.iota(s))
+    theta_m = alpha + iota0 * zeta_m
+    entry_offset = sample.event_zeta_unwrapped[0, 0] - zeta_m
+    exit_offset = sample.event_zeta_unwrapped[0, 2] - zeta_m
+    low_offset = min(entry_offset, exit_offset)
+    high_offset = max(entry_offset, exit_offset)
+    first = bracket[0].marginal_points[0]
+    chord = _periodic_delta(first, bracket[1].marginal_points[0], period)
+    length = np.linalg.norm(chord)
+    controls = sample.controls
+    candidates = []
+    for tau in _fold_seeds(field, sample, period):
+
+        def residual(values):
+            ss, theta, zeta, offset = values
+            fold_theta = theta + float(field.iota(ss)) * offset
+            return np.array(
+                [
+                    float(field.B(ss, theta, zeta)) - sample.b,
+                    float(field.D_B(ss, theta, zeta)),
+                    float(field.D_B(ss, fold_theta, zeta + offset)),
+                    float(field.D2_B(ss, fold_theta, zeta + offset)),
+                ]
+            )
+
+        with np.errstate(invalid="ignore", over="ignore"):
+            solved = root(residual, [s, theta_m, zeta_m, tau], tol=1.0e-11)
+        ss, theta, zeta, offset = solved.x
+        if not np.all(np.isfinite(solved.x)) or not 0 < ss <= 1:
+            continue
+        values = residual(solved.x)
+        if (
+            not np.all(np.isfinite(values))
+            or abs(values[0]) > controls.root_atol_B
+            or np.max(np.abs(values[1:3])) > controls.tangent_atol_B
+            or abs(values[3]) > controls.D2_tolerance
+        ):
+            continue
+        marginal_curvature = float(field.D2_B(ss, theta, zeta))
+        if (
+            not np.isfinite(marginal_curvature)
+            or marginal_curvature >= -controls.D2_tolerance
+        ):
+            continue
+        fold_theta = theta + float(field.iota(ss)) * offset
+        fold_height = float(field.B(ss, fold_theta, zeta + offset))
+        if not np.isfinite(fold_height) or sample.b - fold_height < (
+            config.fold_height_margin * abs(sample.b)
+        ):
+            continue
+        if (
+            abs(offset) <= controls.root_atol_zeta
+            or not low_offset < offset < high_offset
+        ):
+            continue
+        point = np.array(
+            [np.sqrt(ss) * np.cos(theta), np.sqrt(ss) * np.sin(theta), zeta % period]
+        )
+        delta = _periodic_delta(first, point, period)
+        along = float(np.dot(delta, chord) / length**2) if length else np.inf
+        if not -1.0e-3 <= along <= 1.0 + 1.0e-3:
+            continue
+        if np.linalg.norm(delta - along * chord) > max(length, config.event_tolerance):
+            continue
+        fold_point = np.array(
+            [
+                np.sqrt(ss) * np.cos(fold_theta),
+                np.sqrt(ss) * np.sin(fold_theta),
+                (zeta + offset) % period,
+            ]
+        )
+        if not any(
+            np.linalg.norm(_periodic_delta(item[4][0], fold_point, period))
+            <= config.event_tolerance
+            for item in candidates
+        ):
+            candidates.append(
+                (
+                    np.array([point]),
+                    np.array([ss, theta - float(field.iota(ss)) * zeta]),
+                    np.array([zeta]),
+                    "fold",
+                    np.array([fold_point]),
+                )
+            )
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _fold_parameter(samples, point, period):
+    """Bisection-coordinate ``u`` of a solved fold, or ``None``.
+
+    Probe ``u`` values are recursive midpoints of the bracket samples'
+    parameters, so the fold's position on that same coordinate comes from
+    linear extrapolation off the two geometrically nearest probes — local
+    enough that chord sag is negligible, unlike a projection onto the
+    bracket chord or the coarse polyline, whose parameter error is
+    comparable to the scan blind zone being measured.  ``None`` (no
+    well-conditioned probe pair) leaves the interval unwidened.
+    """
+    rows = sorted(
+        {
+            float(sample.u[0]): np.asarray(sample.marginal_points[0], dtype=float)
+            for sample in samples
+        }.items()
+    )
+    if len(rows) < 2:
+        return None
+    distances = [
+        float(np.linalg.norm(_periodic_delta(row[1], point, period))) for row in rows
+    ]
+    nearest = int(np.argmin(distances))
+    u0, p0 = rows[nearest]
+    gap = distances[nearest]
+    partner = None
+    for index in np.argsort(distances):
+        if index == nearest:
+            continue
+        separation = float(
+            np.linalg.norm(_periodic_delta(rows[int(index)][1], p0, period))
+        )
+        if separation >= 0.25 * max(gap, 1.0e-12):
+            partner = int(index)
+            break
+    if partner is None:
+        return None
+    u1, p1 = rows[partner]
+    chord = _periodic_delta(p0, p1, period)
+    denominator = float(np.dot(chord, chord))
+    if denominator == 0.0 or u1 == u0:
+        return None
+    along = float(np.dot(_periodic_delta(p0, point, period), chord) / denominator)
+    return u0 + along * (u1 - u0)
+
+
+def _certify_count_change_geometry(field, left, right, period, config, bracket):
+    """Certify one localized count change as equal-height or fold, never both.
+
+    The two §5.4 certifications describe mutually exclusive geometries: a
+    second marginal maximum at ``b`` versus an annihilating pair strictly
+    below it.  If both solves accept a candidate inside one localized
+    interval, the classification is ambiguous and the event stays explicitly
+    uncertified rather than picking a decomposition (§5.4).
+    """
+    equal_height = _solve_equal_height(field, left, right, period, config)
+    fold = _solve_fold(field, left, right, period, config, bracket)
+    if equal_height is not None and fold is not None:
+        return None
+    if equal_height is not None:
+        return (*equal_height, "equal_height", None)
+    return fold
+
+
 def _sampled_event_geometry(field, sample, period, config):
     """Recover the marginal points of an exactly sampled tangent contact.
 
@@ -361,17 +574,24 @@ def _sampled_event_geometry(field, sample, period, config):
         maxima.append(zeta)
     if len(points) < 2:
         return None
-    return np.asarray(points), np.array([s, alpha]), np.asarray(maxima)
+    return (
+        np.asarray(points),
+        np.array([s, alpha]),
+        np.asarray(maxima),
+        ("equal_height"),
+        None,
+    )
 
 
 def _register_event(events, geometry, occurrence, period, tolerance):
     """Match all marginal points and their lifted separations, not proximity alone."""
     if geometry is not None:
-        points, identity, lift = geometry
+        points, identity, lift, kind, fold_points = geometry
         for index, event in enumerate(events):
             if (
                 len(event.marginal_points) != len(points)
                 or event.zeta_unwrapped is None
+                or event.kind != kind
             ):
                 continue
             distances = np.array(
@@ -408,6 +628,8 @@ def _register_event(events, geometry, occurrence, period, tolerance):
             (occurrence,),
             field_line_identity=None if geometry is None else geometry[1],
             zeta_unwrapped=None if geometry is None else geometry[2],
+            kind="equal_height" if geometry is None else geometry[3],
+            fold_points=None if geometry is None else geometry[4],
         )
     )
 
@@ -607,6 +829,7 @@ def localize_transition_contacts(field, critical, transitions, config=None):
                     )
                 )
                 continue
+            bracket = (left, right)
             intervals, samples = _localization_intervals(
                 field, critical, polyline, transition, left, right, config
             )
@@ -617,20 +840,43 @@ def localize_transition_contacts(field, critical, transitions, config=None):
                     geometry = (
                         _sampled_event_geometry(field, left, critical.period, config)
                         if left is right
-                        else _solve_equal_height(
-                            field, left, right, critical.period, config
+                        else _certify_count_change_geometry(
+                            field, left, right, critical.period, config, bracket
                         )
                     )
+                u_interval = np.array([left.u[0], right.u[0]])
+                if geometry is not None and geometry[3] == "fold":
+                    # Near a fold the annihilating pair is shallower than the
+                    # root scan resolves, so the scanned count flips a blind
+                    # zone away from the solved fold (ADR 0003's resolution
+                    # caveat).  The event's honest uncertainty interval spans
+                    # the bisected flip point and the certified fold; probes
+                    # inside it carry blind scanned counts and belong to the
+                    # event, not to either regular arc (ADR 0007).
+                    solved_u = _fold_parameter(samples, geometry[0][0], critical.period)
+                    span = abs(float(bracket[1].u[0]) - float(bracket[0].u[0]))
+                    if solved_u is not None and (
+                        min(u_interval) - 0.25 * span
+                        <= solved_u
+                        <= max(u_interval) + 0.25 * span
+                    ):
+                        u_interval = np.array(
+                            [
+                                min(float(u_interval[0]), solved_u),
+                                max(float(u_interval[1]), solved_u),
+                            ]
+                        )
                 occurrence = ContactBracket(
                     transition.transition_id,
                     (first_index, second_index),
-                    np.array([left.u[0], right.u[0]]),
+                    u_interval,
                     samples,
                     localized and geometry is not None,
                     (
                         reason
                         if geometry is not None
-                        else reason + "; equal-height event not certified"
+                        else reason + "; neither equal-height nor fold geometry "
+                        "certified"
                     ),
                     tuple(scan_samples),
                 )
@@ -1058,13 +1304,20 @@ def _certify_arc_samples(field, critical, polyline, source, values, parameters, 
     )
 
 
-def build_transition_arcs(field, critical, localized):
+def build_transition_arcs(field, critical, localized, extra_samples=None):
     """Construct one-sided regular arcs without resolving the event hyperedges.
 
     Regular intervals retain every source and localized midpoint sample. The
     small final event bracket is replaced by its independently solved endpoint
     and limiting actions; event incidence remains unresolved. Unsupported
     events and source sampling failures cannot be promoted to regular cuts.
+
+    ``extra_samples`` maps a source ``transition_id`` to additional traced
+    single-vertex samples on the same authoritative curve — the milestone
+    10.3 coordinator's remedy for an event interval that retained no regular
+    sample.  They enter the shared sample table exactly like localization
+    probes: retained, certified with everything else, never trusted merely
+    for existing.
     """
     arcs = []
     wells = {}
@@ -1081,7 +1334,28 @@ def build_transition_arcs(field, critical, localized):
         ]
         occurrences = sorted(
             [
-                (float(np.mean(occurrence.u_interval)), event, occurrence)
+                (
+                    float(np.mean(occurrence.u_interval)),
+                    # An equal-height event splits its arcs at the localized
+                    # micro-bracket's midpoint (milestone 10.2, unchanged).
+                    # A certified fold's interval also spans the root scan's
+                    # blind zone, whose probes carry blind interior-maximum
+                    # counts: its incident arcs start at the interval bounds
+                    # and the blind zone stays inside the event (ADR 0007).
+                    *(
+                        (
+                            float(np.min(occurrence.u_interval)),
+                            float(np.max(occurrence.u_interval)),
+                        )
+                        if event.kind == "fold" and occurrence.localized
+                        else (
+                            float(np.mean(occurrence.u_interval)),
+                            float(np.mean(occurrence.u_interval)),
+                        )
+                    ),
+                    event,
+                    occurrence,
+                )
                 for event in localized.events
                 for occurrence in event.occurrences
                 if occurrence.source_transition_id == source.transition_id
@@ -1112,12 +1386,14 @@ def build_transition_arcs(field, critical, localized):
         samples = {
             float(u): _single_sample(source, index) for index, u in enumerate(source.u)
         }
-        for _, event, occurrence in occurrences:
+        for *_, occurrence in occurrences:
             for sample in occurrence.samples:
                 samples[float(sample.u[0])] = sample
         for artifact in artifacts:
             for sample in artifact.samples:
                 samples[float(sample.u[0])] = sample
+        for sample in (extra_samples or {}).get(source.transition_id, ()):
+            samples[float(sample.u[0])] = sample
         # Closed source curves can have a bracket straddling u=total_length.
         length = source.total_u_length
         samples = {
@@ -1125,7 +1401,16 @@ def build_transition_arcs(field, critical, localized):
             for u, sample in samples.items()
         }
         occurrences = sorted(
-            [(u % length if polyline.closed else u, e, o) for u, e, o in occurrences],
+            [
+                (
+                    u % length if polyline.closed else u,
+                    low + ((u % length) - u if polyline.closed else 0.0),
+                    high + ((u % length) - u if polyline.closed else 0.0),
+                    e,
+                    o,
+                )
+                for u, low, high, e, o in occurrences
+            ],
             key=lambda item: item[0],
         )
         if not occurrences:
@@ -1180,17 +1465,29 @@ def build_transition_arcs(field, critical, localized):
             continue
         intervals = list(zip(occurrences[:-1], occurrences[1:]))
         if polyline.closed:
-            u, event, occurrence = occurrences[0]
-            intervals.append((occurrences[-1], (u + length, event, occurrence)))
+            u, low, high, event, occurrence = occurrences[0]
+            intervals.append(
+                (
+                    occurrences[-1],
+                    (u + length, low + length, high + length, event, occurrence),
+                )
+            )
         else:
-            intervals.insert(0, ((0.0, None, None), occurrences[0]))
-            intervals.append((occurrences[-1], (length, None, None)))
+            intervals.insert(0, ((0.0, 0.0, 0.0, None, None), occurrences[0]))
+            intervals.append((occurrences[-1], (length, length, length, None, None)))
         for left, right in intervals:
-            low, left_event, left_occurrence = left
-            high, right_event, right_occurrence = right
+            # An arc spans the gap between the two events' uncertainty
+            # intervals.  For an equal-height contact that interval is the
+            # bisected micro-bracket; for a certified fold it also covers the
+            # root scan's blind zone, whose probes carry blind counts and
+            # belong to the event rather than to either regular arc.
+            low, left_event, left_occurrence = left[2], left[3], left[4]
+            high, right_event, right_occurrence = right[1], right[3], right[4]
             if high <= low:
                 # A sampled event at an open source endpoint has only its
-                # interior incident arc, not a fictitious zero-length arc.
+                # interior incident arc, not a fictitious zero-length arc;
+                # overlapping event intervals leave no certifiable arc
+                # between them and the region stays inside the events.
                 continue
             rows = sorted(
                 [
