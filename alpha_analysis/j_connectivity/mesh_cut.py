@@ -1650,18 +1650,43 @@ def _incident_components(triangles, labels, vertex):
     )
 
 
-def _traced_side_action(mesh, component, triangle_labels, sample_ids):
+def _traced_side_action(mesh, component, triangle_labels, inserted):
     """Trace one well just inside ``component`` next to the inserted cut.
 
-    Returns ``(sample_index, action)`` from the first adjacent triangle whose
+    Returns ``(parameter, action)`` from the first adjacent triangle whose
     projected centroid yields a regular trace, or ``None``. This generates the
     same half-bounce action that ``evaluate_surface_data`` would have put on
     the surface, so side assignment stays data-driven even when the caller
-    skipped the surface-wide traces (ADR 0004).
+    skipped the surface-wide traces (ADR 0004). Candidates cover the mapped
+    samples and the chain's own split vertices, tried middle-of-arc first —
+    an arc's ends sit at events or annihilations where a probe well is
+    likeliest to be nongeneric.
     """
     if mesh.field is None:
         return None
-    for sample_index, vertex in enumerate(sample_ids):
+    # The mapped samples first, in order (their probes separated the sides in
+    # every previously green configuration), then the chain's own interior
+    # split vertices nearest the arc middle — the extension that keeps a
+    # probe available when every sample sits on an event or annihilation.
+    candidates = [
+        (int(vertex), float(inserted.vertex_u[int(vertex)]))
+        for vertex in inserted.sample_ids
+        if int(vertex) in inserted.vertex_u
+    ]
+    parameters = list(map(float, inserted.vertex_u.values()))
+    middle = 0.5 * (min(parameters) + max(parameters)) if parameters else 0.0
+    seen = {vertex for vertex, _ in candidates}
+    candidates.extend(
+        sorted(
+            (
+                (int(vertex), float(value))
+                for vertex, value in inserted.vertex_u.items()
+                if int(vertex) not in seen
+            ),
+            key=lambda item: abs(item[1] - middle),
+        )
+    )
+    for vertex, parameter in candidates:
         for triangle_id, triangle in enumerate(mesh.triangles):
             if triangle_labels[triangle_id] != component or vertex not in triangle:
                 continue
@@ -1696,7 +1721,7 @@ def _traced_side_action(mesh, component, triangle_labels, sample_ids):
                 mesh.trace_config or WellTraceConfig(),
             )
             if np.isfinite(trace.action_length):
-                return sample_index, float(trace.action_length)
+                return parameter, float(trace.action_length)
     return None
 
 
@@ -1807,17 +1832,19 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
             # No finite pre-cut action neighbors this side (e.g. the caller
             # skipped the surface-wide traces). Generate one datum by tracing
             # a well just inside the side instead of guessing (ADR 0004).
-            traced = _traced_side_action(
-                mesh, component, triangle_labels, inserted.sample_ids
-            )
+            traced = _traced_side_action(mesh, component, triangle_labels, inserted)
             if traced is None:
                 raise _TransitionCutConflict(
                     "a cut side has no finite neighboring action data and no "
                     "traceable probe point"
                 )
-            sample_index, value = traced
-            parent_errors.append(abs(value - parent.action_values[sample_index]))
-            child_errors.append(abs(value - child.action_values[sample_index]))
+            parameter, value = traced
+            parent_errors.append(
+                abs(value - _interpolate_port_action(transition, parent, parameter))
+            )
+            child_errors.append(
+                abs(value - _interpolate_port_action(transition, child, parameter))
+            )
         costs[component_index] = (np.mean(parent_errors), np.mean(child_errors))
     direct = costs[0, 0] + costs[1, 1]
     swapped = costs[0, 1] + costs[1, 0]
