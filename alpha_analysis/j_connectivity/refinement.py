@@ -72,6 +72,7 @@ class RefinementBudgets:
     source_sample_budgets: tuple[int | None, ...] = (8, 16, 32, None)
     max_field_period_caps: tuple[int, ...] = (128, 256, 1024)
     localization_bisections: tuple[int, ...] = (20, 80, 320)
+    scan_resolution_factors: tuple[int, ...] = (1, 2, 4)
     background_levels: int = 2
     local_refinement_rounds: int = 2
     empty_interval_samples: int = 2
@@ -79,7 +80,11 @@ class RefinementBudgets:
     def __post_init__(self) -> None:
         if not self.source_sample_budgets:
             raise ValueError("source_sample_budgets must not be empty")
-        for name in ("max_field_period_caps", "localization_bisections"):
+        for name in (
+            "max_field_period_caps",
+            "localization_bisections",
+            "scan_resolution_factors",
+        ):
             values = getattr(self, name)
             if not values or any(v < 1 for v in values):
                 raise ValueError(f"{name} must be a nonempty positive ladder")
@@ -152,6 +157,8 @@ def classify_failure_reason(reason: str) -> str:
         return "background_geometry"
     if "sampling budget" in reason:
         return "source_budget"
+    if "neither equal-height nor fold geometry certified" in reason:
+        return "event_geometry"
     if "localization budget" in reason or "geometry remains unresolved" in reason:
         return "contact_localization"
     if "not certified" in reason and "geometry" in reason:
@@ -585,6 +592,7 @@ def converge_transitions(
     source_rung = 0
     cap_rung = 0
     localization_rung = 0
+    scan_rung = 0
     records: list[RemediationRecord] = []
     maxima = _gamma_max_polylines(critical)
     caches = [dict() for _ in maxima]
@@ -624,10 +632,13 @@ def converge_transitions(
         )
 
     def config():
+        factor = budgets.scan_resolution_factors[scan_rung]
         return replace(
             base,
             max_curve_samples=budgets.source_sample_budgets[source_rung],
             max_field_periods=budgets.max_field_period_caps[cap_rung],
+            samples_per_field_period=base.samples_per_field_period * factor,
+            samples_per_wavelength=base.samples_per_wavelength * factor,
         )
 
     def localization():
@@ -644,6 +655,7 @@ def converge_transitions(
         len(budgets.source_sample_budgets)
         + len(budgets.max_field_period_caps)
         + len(budgets.localization_bisections)
+        + len(budgets.scan_resolution_factors)
         + budgets.empty_interval_samples * 8
         + 4
     )
@@ -730,6 +742,41 @@ def converge_transitions(
                     requested=str(budgets.localization_bisections[localization_rung]),
                     outcome="reran contact localization",
                 )
+            )
+            localized = None
+            arrangement = None
+            continue
+        # 3b. A localized count change that certifies as neither equal-height
+        # nor fold is the signature of a root-scan alias too stubborn for the
+        # bracket-level dissolution (§21.3 dimension 5): escalate the scan
+        # resolution for the whole case and retrace.  Cached samples are
+        # scan-resolution dependent, so the caches reset — this is a full,
+        # recorded retrace, not a silent mix of resolutions.
+        uncertified = [
+            (occurrence.source_transition_id, occurrence.source_sample_pair)
+            for event in localized.events
+            for occurrence in event.occurrences
+            if not occurrence.localized
+            and "neither equal-height nor fold geometry certified" in occurrence.reason
+        ]
+        if uncertified and scan_rung + 1 < len(budgets.scan_resolution_factors):
+            previous = budgets.scan_resolution_factors[scan_rung]
+            scan_rung += 1
+            records.append(
+                RemediationRecord(
+                    round=round_number,
+                    failure_class="scan_resolution",
+                    target=f"uncertified localized events {sorted(set(uncertified))}",
+                    control="scan_resolution_factor",
+                    previous=str(previous),
+                    requested=str(budgets.scan_resolution_factors[scan_rung]),
+                    outcome="reset trace caches and retraced at the finer scan",
+                )
+            )
+            for cache in caches:
+                cache.clear()
+            transitions = map_transitions(
+                field, critical, config(), _sample_caches=caches
             )
             localized = None
             arrangement = None
