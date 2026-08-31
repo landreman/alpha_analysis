@@ -788,3 +788,48 @@ def _edge_component_count(edges: list[tuple[int, int]]) -> int:
     for first, second in edges:
         union(first, second)
     return len({find(vertex) for vertex in parent})
+
+
+@dataclass(frozen=True)
+class LocalRefinementConfig:
+    """Controls for local edge-split refinement near companion curves.
+
+    ``radius_edge_ratio`` scales each triangle's own edge length: a triangle
+    within that many local edge lengths of a curve sample is refined.  This
+    keeps the operation local (DESIGN.md §23 milestone 10.3), never a global
+    remesh.
+    """
+
+    radius_edge_ratio: float = 1.5
+
+    def __post_init__(self) -> None:
+        if not np.isfinite(self.radius_edge_ratio) or self.radius_edge_ratio <= 0:
+            raise ValueError("radius_edge_ratio must be finite and positive")
+
+
+@dataclass(frozen=True)
+class LocalRefinementReport:
+    """Split and rejection counts for one local refinement pass."""
+
+    input_triangle_count: int
+    output_triangle_count: int
+    edges_split: int
+    projection_rejections: int = 0
+    face_validity_rejections: int = 0
+    boundary_edges_split: int = 0
+    seam_edges_skipped: int = 0
+
+
+def refine_surface_near_curves(
+    surface: SurfaceMesh,
+    curves,
+    field: BoozerFieldLike | None = None,
+    config: LocalRefinementConfig | None = None,
+) -> tuple[SurfaceMesh, LocalRefinementReport]:
+    """Split triangle edges near the given curves (unimplemented stub)."""
+    config = config or LocalRefinementConfig()
+    return surface, LocalRefinementReport(
+        input_triangle_count=len(surface.triangles),
+        output_triangle_count=len(surface.triangles),
+        edges_split=0,
+    )

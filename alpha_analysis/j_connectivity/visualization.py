@@ -786,3 +786,8 @@ def _periodic_plot_segments(curve):
             points[:, 2] -= curve.period
         segments.append(points)
     return np.asarray(segments, dtype=float).reshape(-1, 2, 3)
+
+
+def plot_local_refinement(surface, refined, curves, path=None):
+    """Diagnostic for §23.10.3 local refinement (unimplemented stub)."""
+    raise NotImplementedError("plot_local_refinement is milestone 10.3 work")

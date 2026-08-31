@@ -76,6 +76,13 @@ class TransitionEvent:
     field line, reduced to the periodic logical domain. An unresolved bracket
     without an established common event keeps an empty point array instead of
     manufacturing an incidence. ``occurrences`` preserves source provenance.
+
+    ``kind`` distinguishes the two §5.4 count-change certifications of ADR
+    0003: an ``"equal_height"`` event has two or more marginal maxima at
+    height ``b`` and discontinuous port actions, while a ``"fold"`` event has
+    one marginal point and an interior maximum--minimum pair annihilating
+    strictly below ``b``, with continuous port actions.  Both remain explicit
+    hyperedge nodes; the kind never resolves multiway connectivity.
     """
 
     event_id: int
@@ -84,6 +91,7 @@ class TransitionEvent:
     unresolved: bool = True
     field_line_identity: np.ndarray | None = None
     zeta_unwrapped: np.ndarray | None = None
+    kind: str = "equal_height"
 
 
 @dataclass(frozen=True)
