@@ -1385,10 +1385,25 @@ def _insert_curve(
     adaptive_anchors=False,
 ):
     tag = SurfaceMesh.G_ZERO if tagged else 0
+
+    def insert_tagged(point):
+        try:
+            return mesh.insert_tagged_point(point, tag)
+        except ConstrainedCutError:
+            if float(point[0] ** 2 + point[1] ** 2) < 1.0 - 1.0e-3:
+                raise
+            # A boundary-exit critical point (ADR 0001 EDGE|G_ZERO
+            # provenance) lives on the EDGE ring where the extracted g=0
+            # polyline ends; place it on the EDGE boundary and keep both
+            # provenance bits.
+            vertex = mesh.insert_tagged_point(point, SurfaceMesh.EDGE)
+            mesh.tags[vertex] |= tag
+            return vertex
+
     sample_ids = np.array(
         [
             (
-                mesh.insert_tagged_point(point, tag)
+                insert_tagged(point)
                 if tagged
                 else mesh.insert_point(point, preserve=True)
             )
