@@ -131,10 +131,15 @@ fixture setup 79.17 s, the existing bounce-point plot 17.55 s, W7-X cutting and
 persistence 16.21 s, and the new six-sheet test 10.23 s. Setup and call durations
 are listed separately as pytest reports them; the W7-X test including setup is
 about 95 s. Both global tier budgets are met without changing numerical inputs.
-The publication/CI gate is still pending; the milestone row stays unchecked.
+GitHub [Tests](https://github.com/landreman/alpha_analysis/actions/runs/33379169289)
+passed on implementation commit `e39c5a1`: lint, all three fast-suite Python
+versions (3.10–3.12), and the full suite. The
+[pull-request run](https://github.com/landreman/alpha_analysis/actions/runs/33379194403)
+also passed. Milestone 10.2 is marked complete in PR #22.
 
 The completed 100-case matrix and diagnosed backend/extractor differences are in
 `milestone10.2-real-equilibria.md` and its JSON companion. It reproduces 164 source
 curves, retains 951 unresolved arcs without exceptions, and makes no real-matrix
 convergence claim. All cases affected by the endpoint fixes were rerun on the
-final core. GitHub publication and its Tests gate remain pending.
+final core. The implementation and reports are published in
+[PR #22](https://github.com/landreman/alpha_analysis/pull/22).

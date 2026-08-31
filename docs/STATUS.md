@@ -26,7 +26,7 @@ lowest-numbered unchecked row.
 | 9 | Transition mapping and action additivity | Construct \(T\) and matched parent/child ports without yet cutting the full mesh | [x] | #14 |
 | 10 | Constrained cuts and sheet IDs | Insert \(T\), duplicate vertices, and make \(A\) continuous on each sheet | [x] | #19 |
 | 10.1 | Sampling-robust cut geometry | Make the sheet graph invariant to the transition sample budget, or explicitly budget-limited | [x] | #21 |
-| 10.2 | Contact localization and segment-level cutting | Cut the resolved arcs of curves with localized §5.4 events instead of vetoing whole curves | [ ] | |
+| 10.2 | Contact localization and segment-level cutting | Cut the resolved arcs of curves with localized §5.4 events instead of vetoing whole curves | [x] | #22 |
 | 10.3 | Failure-directed refinement and matrix convergence | Converge the five-equilibrium matrix unattended via per-failure-class remediation | [ ] | |
 | 11 | Direct contour tracer | Build the correctness oracle | [ ] | |
 | 12 | Interval primitives and bounded ordinary flood fill | Classify edge-connected action ranges without transitions using a finite algorithm with lower and upper bounds | [ ] | |
@@ -44,15 +44,16 @@ here — a convention settled during implementation, a data file that has to be
 regenerated, a known-shaky tolerance. Keep it short; when an entry becomes permanent,
 move it into `docs/DESIGN.md` and delete it here.
 
-- Milestone 10.2 continues under **accepted ADR 0006**, with its six-sheet
+- Milestone 10.2 is complete in PR #22 under **accepted ADR 0006**, with its six-sheet
   acceptance unchanged. Bounded insertion through adjacent triangle faces now
   completes the synthetic arrangement; the DMerc sampling regression is fixed.
   Event vertices carrying incompatible one-sided limits in a partially cut
   arrangement remain explicit unknown action, with all port limits preserved.
   Local validation passes: 174 tests, both mutations, all six ADR grids, and the
   100-case matrix (explicit unresolved outcomes, not matrix convergence).
-  Reports are in `docs/validation/milestone10.2-*.md`. Publication and the required
-  GitHub Tests gate remain pending, so the milestone row is not yet marked complete.
+  Reports are in `docs/validation/milestone10.2-*.md`. GitHub
+  [Tests](https://github.com/landreman/alpha_analysis/actions/runs/33379169289)
+  passed on implementation commit `e39c5a1` (lint, Python 3.10–3.12, and full suite).
 
 - Milestone 0 established base-only `j_connectivity` imports; optional features must use `optional_import()` so missing extras provide an install command.
 - Milestone 1's `BoozerFieldLike.B()` uses pointwise NumPy broadcasting; legacy `compute_B()` retains its outer-`s` grid semantics.
