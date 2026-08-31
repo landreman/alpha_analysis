@@ -1,0 +1,3535 @@
+{
+  "cases": {
+    "0:0.8:gmsh:marching_tetrahedra": {
+      "b": 11.167688974652414,
+      "backend": "gmsh",
+      "critical": {
+        "point_count": 60,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 3,
+          "GAMMA_MIN": 2
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 2.889972498232484,
+          "GAMMA_MIN": 0.17362626000592052
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.19990079886900822,
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 4,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 4,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 59,
+        "status": "DEGENERATE"
+      },
+      "extractor": "marching_tetrahedra",
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 56,
+        "g_zero_segment_count": 55,
+        "point_count": 120,
+        "status": "REGULAR",
+        "triangle_count": 180,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.06292931699999826,
+        "case_total": 9.339622137999868,
+        "critical_curves": 2.2386112230001345,
+        "surface_extraction": 0.45952309499989497,
+        "transition_mapping": 6.641452139999956
+      },
+      "transition_status_counts": {
+        "UNRESOLVED": 3
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 23.892523664151035,
+              "max_quadrature_error": 2.4868995751603507e-14,
+              "min": 16.614523374825424
+            },
+            "child_3": {
+              "max": 8.20541485901621,
+              "max_quadrature_error": 1.9539925233402755e-14,
+              "min": 7.550952777472155
+            },
+            "parent": {
+              "max": 31.443476441623133,
+              "max_quadrature_error": 8.265154974518635e-11,
+              "min": 24.819938233841526
+            }
+          },
+          "authoritative_sample_count": 19,
+          "max_abs_additivity_residual": 1.0835776720341528e-13,
+          "max_additivity_tolerance_ratio": 4.348235785603367e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.32010746500104753,
+          "s_range": [
+            0.5044413570163612,
+            0.9655349336873748
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              18
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.8678572829473203,
+          "transition_id": 0
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 8.186901017350504,
+              "max_quadrature_error": 5.3290705182007514e-14,
+              "min": 7.559091293479998
+            },
+            "child_3": {
+              "max": 23.96010994050409,
+              "max_quadrature_error": 4.263256414560601e-14,
+              "min": 16.604850104860553
+            },
+            "parent": {
+              "max": 31.519201233984063,
+              "max_quadrature_error": 6.27305540235536e-11,
+              "min": 24.79175112221099
+            }
+          },
+          "authoritative_sample_count": 19,
+          "max_abs_additivity_residual": 6.750155989720952e-14,
+          "max_additivity_tolerance_ratio": 2.7118043871560995e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 0.0,
+          "max_quadrature_tolerance_ratio": 0.2432194453424768,
+          "s_range": [
+            0.504441357016365,
+            0.9573708328340063
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              18
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.8329670053999533,
+          "transition_id": 1
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 31.45453255445898,
+              "max_quadrature_error": 1.5631940186722204e-13,
+              "min": 31.45453255445898
+            },
+            "child_3": {
+              "max": 31.45453446770228,
+              "max_quadrature_error": 1.3145040611561853e-13,
+              "min": 31.45453446770228
+            },
+            "parent": {
+              "max": 62.90906702216097,
+              "max_quadrature_error": 7.656872119967686e-11,
+              "min": 62.90906702216097
+            }
+          },
+          "authoritative_sample_count": 20,
+          "max_abs_additivity_residual": 2.913225216616411e-13,
+          "max_additivity_tolerance_ratio": 4.6235015915912513e-08,
+          "max_port_alpha_identity_error": 8.881784197001252e-16,
+          "max_port_s_identity_error": 0.0,
+          "max_quadrature_tolerance_ratio": 0.11980885462328227,
+          "s_range": [
+            0.4535271688831214,
+            0.5085329513820496
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 1,
+            "source_classification": 2
+          },
+          "sample_status_counts": {
+            "REGULAR": 1,
+            "UNRESOLVED": 2
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              19
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 1.1891482098852106,
+          "transition_id": 2
+        }
+      ]
+    },
+    "0:0.8:gmsh:pyvista": {
+      "b": 11.167688974652414,
+      "backend": "gmsh",
+      "critical": {
+        "point_count": 58,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 3,
+          "GAMMA_MIN": 2
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 2.8900187799141817,
+          "GAMMA_MIN": 0.17362626000592046
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.19990079886900822,
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 4,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 6,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 57,
+        "status": "DEGENERATE"
+      },
+      "extractor": "pyvista",
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 54,
+        "g_zero_segment_count": 53,
+        "point_count": 120,
+        "status": "REGULAR",
+        "triangle_count": 180,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.06292931699999826,
+        "case_total": 9.82841042699988,
+        "critical_curves": 3.151400328000136,
+        "surface_extraction": 0.5339652330001172,
+        "transition_mapping": 6.143013842000073
+      },
+      "transition_status_counts": {
+        "UNRESOLVED": 3
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 23.892523664151035,
+              "max_quadrature_error": 2.4868995751603507e-14,
+              "min": 16.614523374825424
+            },
+            "child_3": {
+              "max": 8.20541485901621,
+              "max_quadrature_error": 1.9539925233402755e-14,
+              "min": 7.550952777472155
+            },
+            "parent": {
+              "max": 31.443476441623133,
+              "max_quadrature_error": 8.265154974518635e-11,
+              "min": 24.819938233841526
+            }
+          },
+          "authoritative_sample_count": 18,
+          "max_abs_additivity_residual": 1.0835776720341528e-13,
+          "max_additivity_tolerance_ratio": 4.348235785603367e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.32010746500104753,
+          "s_range": [
+            0.5044413570163612,
+            0.9655349336873748
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              17
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.8667363485479053,
+          "transition_id": 0
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 8.186901017350504,
+              "max_quadrature_error": 5.3290705182007514e-14,
+              "min": 7.559091293479998
+            },
+            "child_3": {
+              "max": 23.96010994050409,
+              "max_quadrature_error": 4.263256414560601e-14,
+              "min": 16.604850104860553
+            },
+            "parent": {
+              "max": 31.519201233984063,
+              "max_quadrature_error": 6.27305540235536e-11,
+              "min": 24.79175112221099
+            }
+          },
+          "authoritative_sample_count": 18,
+          "max_abs_additivity_residual": 6.750155989720952e-14,
+          "max_additivity_tolerance_ratio": 2.7118043871560995e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 0.0,
+          "max_quadrature_tolerance_ratio": 0.2432194453424768,
+          "s_range": [
+            0.504441357016365,
+            0.9573708328340063
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              17
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.8325465413686254,
+          "transition_id": 1
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 31.454532554458996,
+              "max_quadrature_error": 1.4566126083082054e-13,
+              "min": 31.454532554458996
+            },
+            "child_3": {
+              "max": 31.454534467702302,
+              "max_quadrature_error": 1.1723955140041653e-13,
+              "min": 31.454534467702302
+            },
+            "parent": {
+              "max": 62.909067022161025,
+              "max_quadrature_error": 7.656786724314874e-11,
+              "min": 62.909067022161025
+            }
+          },
+          "authoritative_sample_count": 20,
+          "max_abs_additivity_residual": 2.7355895326763857e-13,
+          "max_additivity_tolerance_ratio": 4.341580762835684e-08,
+          "max_port_alpha_identity_error": 8.881784197001252e-16,
+          "max_port_s_identity_error": 5.551115123125783e-17,
+          "max_quadrature_tolerance_ratio": 0.11980751841768895,
+          "s_range": [
+            0.4535271688831211,
+            0.5085329513820496
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 1,
+            "source_classification": 2
+          },
+          "sample_status_counts": {
+            "REGULAR": 1,
+            "UNRESOLVED": 2
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              19
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 1.1907358899976508,
+          "transition_id": 2
+        }
+      ]
+    },
+    "0:0.8:structured:marching_tetrahedra": {
+      "b": 11.167688974652414,
+      "backend": "structured",
+      "critical": {
+        "point_count": 73,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 3,
+          "GAMMA_MIN": 2
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 2.857527870654134,
+          "GAMMA_MIN": 0.1741165299857993
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.18393212520286767,
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 4,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 72,
+        "status": "DEGENERATE"
+      },
+      "extractor": "marching_tetrahedra",
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 69,
+        "g_zero_segment_count": 68,
+        "point_count": 264,
+        "status": "REGULAR",
+        "triangle_count": 472,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.22827595700005077,
+        "case_total": 7.1854349660000025,
+        "critical_curves": 0.11382391000006464,
+        "surface_extraction": 0.7486690830000953,
+        "transition_mapping": 6.32290702399996
+      },
+      "transition_status_counts": {
+        "UNRESOLVED": 3
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 8.202369302416171,
+              "max_quadrature_error": 8.526512829121202e-14,
+              "min": 7.565598078776741
+            },
+            "child_3": {
+              "max": 23.993274019345467,
+              "max_quadrature_error": 3.552713678800501e-14,
+              "min": 16.612886090648473
+            },
+            "parent": {
+              "max": 31.55887209812213,
+              "max_quadrature_error": 7.577035137854317e-11,
+              "min": 24.815255393064632
+            }
+          },
+          "authoritative_sample_count": 13,
+          "max_abs_additivity_residual": 7.815970093361102e-14,
+          "max_additivity_tolerance_ratio": 2.4688087652448972e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.2935099816943867,
+          "s_range": [
+            0.50444135701636,
+            0.9641847406802218
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              12
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.8402768412971786,
+          "transition_id": 0
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 24.032240510516736,
+              "max_quadrature_error": 2.842170943040401e-14,
+              "min": 16.612886090648473
+            },
+            "child_3": {
+              "max": 8.202369302416137,
+              "max_quadrature_error": 4.618527782440651e-14,
+              "min": 7.5757953067104635
+            },
+            "parent": {
+              "max": 31.60803581722717,
+              "max_quadrature_error": 7.576976542975591e-11,
+              "min": 24.815255393064565
+            }
+          },
+          "authoritative_sample_count": 23,
+          "max_abs_additivity_residual": 4.618527782440651e-14,
+          "max_additivity_tolerance_ratio": 1.8536947382551292e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 3.3306690738754696e-16,
+          "max_quadrature_tolerance_ratio": 0.2935077119171633,
+          "s_range": [
+            0.5044413570163626,
+            0.964184740680199
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              22
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.8416304108140836,
+          "transition_id": 1
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 31.45453351091763,
+              "max_quadrature_error": 3.552713678800501e-14,
+              "min": 31.45453351091763
+            },
+            "child_3": {
+              "max": 31.454533510917635,
+              "max_quadrature_error": 3.552713678800501e-14,
+              "min": 31.454533510917635
+            },
+            "parent": {
+              "max": 62.9090670218355,
+              "max_quadrature_error": 7.657593730053312e-11,
+              "min": 62.9090670218355
+            }
+          },
+          "authoritative_sample_count": 31,
+          "max_abs_additivity_residual": 2.3092638912203256e-13,
+          "max_additivity_tolerance_ratio": 3.664970773841265e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.11982014582433162,
+          "s_range": [
+            0.4535271689049765,
+            0.5085329513820498
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 1,
+            "source_classification": 2
+          },
+          "sample_status_counts": {
+            "REGULAR": 1,
+            "UNRESOLVED": 2
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              30
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 1.1756206185428715,
+          "transition_id": 2
+        }
+      ]
+    },
+    "0:0.8:structured:pyvista": {
+      "b": 11.167688974652414,
+      "backend": "structured",
+      "critical": {
+        "point_count": 77,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 3,
+          "GAMMA_MIN": 2
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 2.8586811840259356,
+          "GAMMA_MIN": 0.17413012811673728
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.18393212520286767,
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 4,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 76,
+        "status": "DEGENERATE"
+      },
+      "extractor": "pyvista",
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 73,
+        "g_zero_segment_count": 72,
+        "point_count": 264,
+        "status": "REGULAR",
+        "triangle_count": 472,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.22827595700005077,
+        "case_total": 7.0548181229999045,
+        "critical_curves": 0.10462703200005308,
+        "surface_extraction": 0.9237554559999808,
+        "transition_mapping": 6.0264008540000304
+      },
+      "transition_status_counts": {
+        "UNRESOLVED": 3
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 8.202369302416171,
+              "max_quadrature_error": 8.526512829121202e-14,
+              "min": 7.565598078776741
+            },
+            "child_3": {
+              "max": 23.993274019345467,
+              "max_quadrature_error": 3.552713678800501e-14,
+              "min": 16.612886090648473
+            },
+            "parent": {
+              "max": 31.55887209812213,
+              "max_quadrature_error": 7.577035137854317e-11,
+              "min": 24.815255393064632
+            }
+          },
+          "authoritative_sample_count": 15,
+          "max_abs_additivity_residual": 7.815970093361102e-14,
+          "max_additivity_tolerance_ratio": 2.4688087652448972e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.2935099816943867,
+          "s_range": [
+            0.5044413570163638,
+            0.9641847406802218
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              14
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.8414244521046202,
+          "transition_id": 0
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 24.032240510516736,
+              "max_quadrature_error": 2.842170943040401e-14,
+              "min": 16.612886090648473
+            },
+            "child_3": {
+              "max": 8.202369302416137,
+              "max_quadrature_error": 4.618527782440651e-14,
+              "min": 7.5757953067104635
+            },
+            "parent": {
+              "max": 31.60803581722717,
+              "max_quadrature_error": 7.576976542975591e-11,
+              "min": 24.815255393064565
+            }
+          },
+          "authoritative_sample_count": 23,
+          "max_abs_additivity_residual": 4.618527782440651e-14,
+          "max_additivity_tolerance_ratio": 1.8536947382551292e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 3.3306690738754696e-16,
+          "max_quadrature_tolerance_ratio": 0.2935077119171633,
+          "s_range": [
+            0.5044413570163626,
+            0.964184740680199
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              22
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.8416347847170028,
+          "transition_id": 1
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 31.45453351091763,
+              "max_quadrature_error": 3.552713678800501e-14,
+              "min": 31.45453351091763
+            },
+            "child_3": {
+              "max": 31.454533510917635,
+              "max_quadrature_error": 3.552713678800501e-14,
+              "min": 31.454533510917635
+            },
+            "parent": {
+              "max": 62.9090670218355,
+              "max_quadrature_error": 7.657593730053312e-11,
+              "min": 62.9090670218355
+            }
+          },
+          "authoritative_sample_count": 32,
+          "max_abs_additivity_residual": 2.3092638912203256e-13,
+          "max_additivity_tolerance_ratio": 3.664970773841265e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.11982014582433162,
+          "s_range": [
+            0.4535271689049765,
+            0.5085329513820498
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 1,
+            "source_classification": 2
+          },
+          "sample_status_counts": {
+            "REGULAR": 1,
+            "UNRESOLVED": 2
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              31
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 1.1756219472043128,
+          "transition_id": 2
+        }
+      ]
+    },
+    "1:0.8:gmsh:marching_tetrahedra": {
+      "b": 11.09443403011491,
+      "backend": "gmsh",
+      "critical": {
+        "point_count": 91,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 3,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 4.429678193499202,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 1,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 88,
+        "status": "REGULAR"
+      },
+      "extractor": "marching_tetrahedra",
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 3,
+        "g_zero_point_count": 91,
+        "g_zero_segment_count": 88,
+        "point_count": 205,
+        "status": "REGULAR",
+        "triangle_count": 311,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.05668023900011576,
+        "case_total": 8.08063066800014,
+        "critical_curves": 0.3173378330000105,
+        "surface_extraction": 0.8902041989999816,
+        "transition_mapping": 6.873053764999895
+      },
+      "transition_status_counts": {
+        "MULTIWAY": 2,
+        "REGULAR": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 13.938891097114265,
+              "max_quadrature_error": 4.973799150320701e-14,
+              "min": 7.05567065855608
+            },
+            "child_3": {
+              "max": 7.126074950894848,
+              "max_quadrature_error": 4.4728665216098307e-11,
+              "min": 6.627901029843686
+            },
+            "parent": {
+              "max": 20.56679212695795,
+              "max_quadrature_error": 1.722808282723805e-11,
+              "min": 14.072282822532356
+            }
+          },
+          "authoritative_sample_count": 11,
+          "max_abs_additivity_residual": 8.881784197001252e-14,
+          "max_additivity_tolerance_ratio": 6.26701026801427e-08,
+          "max_port_alpha_identity_error": 1.1102230246251565e-16,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.586382348710349,
+          "s_range": [
+            0.549967294706613,
+            0.7449466772176256
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 3.0671402376419064,
+          "sampling_max_geometry_error": 0.41652306294232627,
+          "sampling_reason": "certification interrupted by an interior-maximum count change",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              10
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "MULTIWAY",
+          "total_u_length": 0.5994887221795682,
+          "transition_id": 0
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 7.126191720246318,
+              "max_quadrature_error": 5.1514348342607263e-14,
+              "min": 7.0985051328982784
+            },
+            "child_3": {
+              "max": 7.127158225258492,
+              "max_quadrature_error": 8.348877145181177e-14,
+              "min": 7.100152663481579
+            },
+            "parent": {
+              "max": 14.228669534234577,
+              "max_quadrature_error": 5.161803094621809e-13,
+              "min": 14.225663358156773
+            }
+          },
+          "authoritative_sample_count": 5,
+          "max_abs_additivity_residual": 4.085620730620576e-14,
+          "max_additivity_tolerance_ratio": 2.8515102330392745e-08,
+          "max_port_alpha_identity_error": 1.1102230246251565e-16,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.003390199148109039,
+          "s_range": [
+            0.7622780814593676,
+            0.7663201268644146
+          ],
+          "sample_count": 5,
+          "sample_failure_reason_counts": {
+            "regular": 5
+          },
+          "sample_status_counts": {
+            "REGULAR": 5
+          },
+          "sampling_certified": true,
+          "sampling_error_scope": "not measured; every authoritative vertex mapped",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "mapped every authoritative critical-curve vertex",
+          "sampling_samples_used": 5,
+          "sampling_unresolved_intervals": [],
+          "source_critical_status": "REGULAR",
+          "status": "REGULAR",
+          "total_u_length": 0.25858928795150443,
+          "transition_id": 1
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 13.901588620001169,
+              "max_quadrature_error": 3.934630399271555e-13,
+              "min": 6.419659682571922
+            },
+            "child_3": {
+              "max": 33.09588350000796,
+              "max_quadrature_error": 7.72999442233413e-11,
+              "min": 6.532845670232392
+            },
+            "parent": {
+              "max": 39.515543182579876,
+              "max_quadrature_error": 5.712901502831133e-11,
+              "min": 14.206252552499933
+            }
+          },
+          "authoritative_sample_count": 75,
+          "max_abs_additivity_residual": 9.592326932761353e-14,
+          "max_additivity_tolerance_ratio": 6.704989232896739e-08,
+          "max_port_alpha_identity_error": 1.1102230246251565e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.9955631155720486,
+          "s_range": [
+            0.3874578253127935,
+            0.7453096884202924
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 26.280038642630362,
+          "sampling_max_geometry_error": 1.4659183550493866,
+          "sampling_reason": "certification interrupted by an interior-maximum count change",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              74
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "MULTIWAY",
+          "total_u_length": 3.5716001833681297,
+          "transition_id": 2
+        }
+      ]
+    },
+    "1:0.8:gmsh:pyvista": {
+      "b": 11.09443403011491,
+      "backend": "gmsh",
+      "critical": {
+        "point_count": 86,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 3,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 4.429534325324489,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 1,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 83,
+        "status": "REGULAR"
+      },
+      "extractor": "pyvista",
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 3,
+        "g_zero_point_count": 86,
+        "g_zero_segment_count": 83,
+        "point_count": 205,
+        "status": "REGULAR",
+        "triangle_count": 311,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.05668023900011576,
+        "case_total": 7.88123762500004,
+        "critical_curves": 0.28220776200009823,
+        "surface_extraction": 0.8880405790000623,
+        "transition_mapping": 6.710957437000161
+      },
+      "transition_status_counts": {
+        "MULTIWAY": 2,
+        "REGULAR": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 13.938891097114265,
+              "max_quadrature_error": 4.973799150320701e-14,
+              "min": 7.05567065855608
+            },
+            "child_3": {
+              "max": 7.126074950894848,
+              "max_quadrature_error": 4.4728665216098307e-11,
+              "min": 6.627901029843686
+            },
+            "parent": {
+              "max": 20.56679212695795,
+              "max_quadrature_error": 1.722808282723805e-11,
+              "min": 14.072282822532356
+            }
+          },
+          "authoritative_sample_count": 11,
+          "max_abs_additivity_residual": 8.881784197001252e-14,
+          "max_additivity_tolerance_ratio": 6.26701026801427e-08,
+          "max_port_alpha_identity_error": 1.1102230246251565e-16,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.586382348710349,
+          "s_range": [
+            0.549967294706613,
+            0.7449466772176256
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 3.06715156431207,
+          "sampling_max_geometry_error": 0.4165237914738919,
+          "sampling_reason": "certification interrupted by an interior-maximum count change",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              10
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "MULTIWAY",
+          "total_u_length": 0.5994871735940053,
+          "transition_id": 0
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 7.126191720246318,
+              "max_quadrature_error": 5.1514348342607263e-14,
+              "min": 7.0985051328982784
+            },
+            "child_3": {
+              "max": 7.127158225258492,
+              "max_quadrature_error": 8.348877145181177e-14,
+              "min": 7.100152663481579
+            },
+            "parent": {
+              "max": 14.228669534234577,
+              "max_quadrature_error": 5.161803094621809e-13,
+              "min": 14.225663358156773
+            }
+          },
+          "authoritative_sample_count": 5,
+          "max_abs_additivity_residual": 4.085620730620576e-14,
+          "max_additivity_tolerance_ratio": 2.8515102330392745e-08,
+          "max_port_alpha_identity_error": 1.1102230246251565e-16,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.003390199148109039,
+          "s_range": [
+            0.7622780814593676,
+            0.7663201268644146
+          ],
+          "sample_count": 5,
+          "sample_failure_reason_counts": {
+            "regular": 5
+          },
+          "sample_status_counts": {
+            "REGULAR": 5
+          },
+          "sampling_certified": true,
+          "sampling_error_scope": "not measured; every authoritative vertex mapped",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "mapped every authoritative critical-curve vertex",
+          "sampling_samples_used": 5,
+          "sampling_unresolved_intervals": [],
+          "source_critical_status": "REGULAR",
+          "status": "REGULAR",
+          "total_u_length": 0.25858928795150443,
+          "transition_id": 1
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 13.901588620001169,
+              "max_quadrature_error": 3.934630399271555e-13,
+              "min": 6.419659682571922
+            },
+            "child_3": {
+              "max": 33.09588350000796,
+              "max_quadrature_error": 7.72999442233413e-11,
+              "min": 6.532845670232392
+            },
+            "parent": {
+              "max": 39.515543182579876,
+              "max_quadrature_error": 5.712901502831133e-11,
+              "min": 14.206252552499933
+            }
+          },
+          "authoritative_sample_count": 70,
+          "max_abs_additivity_residual": 9.592326932761353e-14,
+          "max_additivity_tolerance_ratio": 6.704989232896739e-08,
+          "max_port_alpha_identity_error": 1.1102230246251565e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.9955631155720486,
+          "s_range": [
+            0.3874578253127935,
+            0.7453096884202924
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 26.280041613521846,
+          "sampling_max_geometry_error": 1.4659177944029333,
+          "sampling_reason": "certification interrupted by an interior-maximum count change",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              69
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "MULTIWAY",
+          "total_u_length": 3.57145786377898,
+          "transition_id": 2
+        }
+      ]
+    },
+    "1:0.8:structured:marching_tetrahedra": {
+      "b": 11.09443403011491,
+      "backend": "structured",
+      "critical": {
+        "point_count": 107,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 1,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 4.821222067955782,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 107,
+        "status": "REGULAR"
+      },
+      "extractor": "marching_tetrahedra",
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 107,
+        "g_zero_segment_count": 107,
+        "point_count": 544,
+        "status": "REGULAR",
+        "triangle_count": 988,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.23209645600013573,
+        "case_total": 4.152054201000055,
+        "critical_curves": 0.03121797299991158,
+        "surface_extraction": 1.068690055999923,
+        "transition_mapping": 3.0521114850000686
+      },
+      "transition_status_counts": {
+        "MULTIWAY": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 26.62639093441581,
+              "max_quadrature_error": 1.5421264265569334e-10,
+              "min": 6.429381528697581
+            },
+            "child_3": {
+              "max": 26.62639093441581,
+              "max_quadrature_error": 1.5420908994201454e-10,
+              "min": 7.111729554357687
+            },
+            "parent": {
+              "max": 53.252781868831825,
+              "max_quadrature_error": 3.218931964657425e-11,
+              "min": 14.181803107061981
+            }
+          },
+          "authoritative_sample_count": 107,
+          "max_abs_additivity_residual": 2.0605739337042905e-13,
+          "max_additivity_tolerance_ratio": 3.862167747447969e-08,
+          "max_port_alpha_identity_error": 8.881784197001252e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.5582077044438752,
+          "s_range": [
+            0.4010207504426186,
+            0.7290762750375248
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 13.731572812799826,
+          "sampling_max_geometry_error": 1.0352986609515222,
+          "sampling_reason": "certification interrupted by an interior-maximum count change",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              53,
+              0
+            ],
+            [
+              0,
+              53
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "MULTIWAY",
+          "total_u_length": 4.821222067955782,
+          "transition_id": 0
+        }
+      ]
+    },
+    "1:0.8:structured:pyvista": {
+      "b": 11.09443403011491,
+      "backend": "structured",
+      "critical": {
+        "point_count": 115,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 1,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 4.821357836657498,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 115,
+        "status": "REGULAR"
+      },
+      "extractor": "pyvista",
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 115,
+        "g_zero_segment_count": 115,
+        "point_count": 544,
+        "status": "REGULAR",
+        "triangle_count": 988,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.23209645600013573,
+        "case_total": 4.796845252999901,
+        "critical_curves": 0.03590894300009495,
+        "surface_extraction": 1.102987849000101,
+        "transition_mapping": 3.6579063700000916
+      },
+      "transition_status_counts": {
+        "MULTIWAY": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 26.62639093441581,
+              "max_quadrature_error": 1.5421264265569334e-10,
+              "min": 6.4494102200267385
+            },
+            "child_3": {
+              "max": 26.62639093441581,
+              "max_quadrature_error": 1.5420908994201454e-10,
+              "min": 7.111729554357687
+            },
+            "parent": {
+              "max": 53.252781868831825,
+              "max_quadrature_error": 2.950570698306476e-11,
+              "min": 14.181803107061981
+            }
+          },
+          "authoritative_sample_count": 115,
+          "max_abs_additivity_residual": 2.0605739337042905e-13,
+          "max_additivity_tolerance_ratio": 3.862167747447969e-08,
+          "max_port_alpha_identity_error": 8.881784197001252e-16,
+          "max_port_s_identity_error": 5.551115123125783e-17,
+          "max_quadrature_tolerance_ratio": 0.5604670694737713,
+          "s_range": [
+            0.4010207504426186,
+            0.7290762750375248
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 13.453152378967808,
+          "sampling_max_geometry_error": 1.0328234026071006,
+          "sampling_reason": "certification interrupted by an interior-maximum count change",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              57,
+              0
+            ],
+            [
+              0,
+              57
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "MULTIWAY",
+          "total_u_length": 4.821357836657498,
+          "transition_id": 0
+        }
+      ]
+    },
+    "2:0.8:gmsh:marching_tetrahedra": {
+      "b": 10.648368010778029,
+      "backend": "gmsh",
+      "critical": {
+        "point_count": 9,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 1,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 0.4517644615542381,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 8,
+        "status": "REGULAR"
+      },
+      "extractor": "marching_tetrahedra",
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 9,
+        "g_zero_segment_count": 8,
+        "point_count": 362,
+        "status": "REGULAR",
+        "triangle_count": 640,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.05005049500005043,
+        "case_total": 3.810287539000001,
+        "critical_curves": 0.006244371000093452,
+        "surface_extraction": 0.5206420500001059,
+        "transition_mapping": 3.2833561949998966
+      },
+      "transition_status_counts": {
+        "BUDGET_INSUFFICIENT": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 11.257972438260568,
+              "max_quadrature_error": 5.32196509084315e-12,
+              "min": 11.087199343770443
+            },
+            "child_3": {
+              "max": 11.258175341089109,
+              "max_quadrature_error": 4.835243316847482e-12,
+              "min": 11.08724979913534
+            },
+            "parent": {
+              "max": 22.516147779349662,
+              "max_quadrature_error": 1.2965226580295903e-10,
+              "min": 22.263536977999507
+            }
+          },
+          "authoritative_sample_count": 9,
+          "max_abs_additivity_residual": 4.8476778147232835e-12,
+          "max_additivity_tolerance_ratio": 2.167662157252769e-06,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.5513329267168968,
+          "s_range": [
+            0.6196460432354584,
+            0.8986300700763888
+          ],
+          "sample_count": 8,
+          "sample_failure_reason_counts": {
+            "regular": 8
+          },
+          "sample_status_counts": {
+            "REGULAR": 8
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.25256797044459844,
+          "sampling_max_geometry_error": 0.15650883202744895,
+          "sampling_reason": "transition sampling budget 8 exhausted after 8 of 9 authoritative vertices; 1 intervals remain uncertified",
+          "sampling_samples_used": 8,
+          "sampling_unresolved_intervals": [
+            [
+              4,
+              6
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "BUDGET_INSUFFICIENT",
+          "total_u_length": 0.4517644615542381,
+          "transition_id": 0
+        }
+      ]
+    },
+    "2:0.8:gmsh:pyvista": {
+      "b": 10.648368010778029,
+      "backend": "gmsh",
+      "critical": {
+        "point_count": 11,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 1,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 0.4549272336758555,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 10,
+        "status": "REGULAR"
+      },
+      "extractor": "pyvista",
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 11,
+        "g_zero_segment_count": 10,
+        "point_count": 362,
+        "status": "REGULAR",
+        "triangle_count": 640,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.05005049500005043,
+        "case_total": 3.8454907339998954,
+        "critical_curves": 0.006635684000002584,
+        "surface_extraction": 0.48522058599996853,
+        "transition_mapping": 3.353602348999857
+      },
+      "transition_status_counts": {
+        "BUDGET_INSUFFICIENT": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 11.257972438260568,
+              "max_quadrature_error": 5.314859663485549e-12,
+              "min": 11.087199343770411
+            },
+            "child_3": {
+              "max": 11.258175341089109,
+              "max_quadrature_error": 4.831690603168681e-12,
+              "min": 11.087249799135305
+            },
+            "parent": {
+              "max": 22.516147779349662,
+              "max_quadrature_error": 1.2965226580295903e-10,
+              "min": 22.263536977999443
+            }
+          },
+          "authoritative_sample_count": 11,
+          "max_abs_additivity_residual": 4.8334669600080815e-12,
+          "max_additivity_tolerance_ratio": 2.1613077060772453e-06,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.5513329267168968,
+          "s_range": [
+            0.6196460432354584,
+            0.898630070076404
+          ],
+          "sample_count": 8,
+          "sample_failure_reason_counts": {
+            "regular": 8
+          },
+          "sample_status_counts": {
+            "REGULAR": 8
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.25256806285870326,
+          "sampling_max_geometry_error": 0.1563857587361298,
+          "sampling_reason": "transition sampling budget 8 exhausted after 8 of 11 authoritative vertices; 2 intervals remain uncertified",
+          "sampling_samples_used": 8,
+          "sampling_unresolved_intervals": [
+            [
+              2,
+              5
+            ],
+            [
+              7,
+              9
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "BUDGET_INSUFFICIENT",
+          "total_u_length": 0.4549272336758555,
+          "transition_id": 0
+        }
+      ]
+    },
+    "2:0.8:structured:marching_tetrahedra": {
+      "b": 10.648368010778029,
+      "backend": "structured",
+      "critical": {
+        "point_count": 16,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 1,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 0.5580905298822662,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 2,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 15,
+        "status": "REGULAR"
+      },
+      "extractor": "marching_tetrahedra",
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 16,
+        "g_zero_segment_count": 15,
+        "point_count": 1182,
+        "status": "REGULAR",
+        "triangle_count": 2264,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.2505341309999949,
+        "case_total": 5.630893599000046,
+        "critical_curves": 1.2436110749999898,
+        "surface_extraction": 1.0821029660000931,
+        "transition_mapping": 3.305147497000007
+      },
+      "transition_status_counts": {
+        "BUDGET_INSUFFICIENT": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 11.258074598768097,
+              "max_quadrature_error": 5.0039972165905056e-12,
+              "min": 11.070007015045846
+            },
+            "child_3": {
+              "max": 11.258074598768097,
+              "max_quadrature_error": 4.462208380573429e-12,
+              "min": 11.070512208225228
+            },
+            "parent": {
+              "max": 22.516149197536205,
+              "max_quadrature_error": 1.2964730561994804e-10,
+              "min": 22.23296464981567
+            }
+          },
+          "authoritative_sample_count": 16,
+          "max_abs_additivity_residual": 1.3500311979441904e-13,
+          "max_additivity_tolerance_ratio": 6.036998347023848e-08,
+          "max_port_alpha_identity_error": 1.6653345369377348e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.5513118008008354,
+          "s_range": [
+            0.6196449011556826,
+            0.9946133761058147
+          ],
+          "sample_count": 8,
+          "sample_failure_reason_counts": {
+            "regular": 8
+          },
+          "sample_status_counts": {
+            "REGULAR": 8
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.2826564116497785,
+          "sampling_max_geometry_error": 0.20495716081704562,
+          "sampling_reason": "transition sampling budget 8 exhausted after 8 of 16 authoritative vertices; 4 intervals remain uncertified",
+          "sampling_samples_used": 8,
+          "sampling_unresolved_intervals": [
+            [
+              4,
+              9
+            ],
+            [
+              9,
+              12
+            ],
+            [
+              2,
+              4
+            ],
+            [
+              13,
+              15
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "BUDGET_INSUFFICIENT",
+          "total_u_length": 0.5580905298822662,
+          "transition_id": 0
+        }
+      ]
+    },
+    "2:0.8:structured:pyvista": {
+      "b": 10.648368010778029,
+      "backend": "structured",
+      "critical": {
+        "point_count": 17,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 1,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 0.5594829209439126,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 2,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 16,
+        "status": "REGULAR"
+      },
+      "extractor": "pyvista",
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 17,
+        "g_zero_segment_count": 16,
+        "point_count": 1182,
+        "status": "REGULAR",
+        "triangle_count": 2264,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.2505341309999949,
+        "case_total": 5.498566843000162,
+        "critical_curves": 1.0134396840001045,
+        "surface_extraction": 1.2170795959998486,
+        "transition_mapping": 3.2680103959999087
+      },
+      "transition_status_counts": {
+        "BUDGET_INSUFFICIENT": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 11.258074598768097,
+              "max_quadrature_error": 5.0039972165905056e-12,
+              "min": 11.070007015045846
+            },
+            "child_3": {
+              "max": 11.258074598768097,
+              "max_quadrature_error": 4.458655666894629e-12,
+              "min": 11.070512208225228
+            },
+            "parent": {
+              "max": 22.516149197536205,
+              "max_quadrature_error": 1.2964730561994804e-10,
+              "min": 22.23296464981567
+            }
+          },
+          "authoritative_sample_count": 17,
+          "max_abs_additivity_residual": 1.3500311979441904e-13,
+          "max_additivity_tolerance_ratio": 6.036998347023848e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.5513118008008354,
+          "s_range": [
+            0.6196449011556826,
+            0.9946133761058147
+          ],
+          "sample_count": 8,
+          "sample_failure_reason_counts": {
+            "regular": 8
+          },
+          "sample_status_counts": {
+            "REGULAR": 8
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.2826551046676826,
+          "sampling_max_geometry_error": 0.20513045501751898,
+          "sampling_reason": "transition sampling budget 8 exhausted after 8 of 17 authoritative vertices; 4 intervals remain uncertified",
+          "sampling_samples_used": 8,
+          "sampling_unresolved_intervals": [
+            [
+              9,
+              12
+            ],
+            [
+              4,
+              9
+            ],
+            [
+              13,
+              16
+            ],
+            [
+              2,
+              4
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "BUDGET_INSUFFICIENT",
+          "total_u_length": 0.5594829209439126,
+          "transition_id": 0
+        }
+      ]
+    },
+    "3:0.8:gmsh:marching_tetrahedra": {
+      "b": 3.155082926916041,
+      "backend": "gmsh",
+      "critical": {
+        "point_count": 44,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 1,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 2.2682426441528794,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 43,
+        "status": "REGULAR"
+      },
+      "extractor": "marching_tetrahedra",
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 44,
+        "g_zero_segment_count": 43,
+        "point_count": 104,
+        "status": "REGULAR",
+        "triangle_count": 162,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.04289976299992304,
+        "case_total": 51.572787856000105,
+        "critical_curves": 0.015121229000214953,
+        "surface_extraction": 0.3456732219999594,
+        "transition_mapping": 51.211941927
+      },
+      "transition_status_counts": {
+        "MAX_PERIODS": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 7.808116084983128,
+              "max_quadrature_error": 4.661515617954137e-11,
+              "min": 2.3362435322881705
+            },
+            "child_3": {
+              "max": 7.806425567902856,
+              "max_quadrature_error": 3.82991416358891e-11,
+              "min": 2.336576247001012
+            },
+            "parent": {
+              "max": 10.144692331984139,
+              "max_quadrature_error": 1.8157223791622698e-11,
+              "min": 10.142669100191009
+            }
+          },
+          "authoritative_sample_count": 44,
+          "max_abs_additivity_residual": 1.7763568394002505e-14,
+          "max_additivity_tolerance_ratio": 1.7342714306441128e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.5292295847350956,
+          "s_range": [
+            0.4559076557117431,
+            0.9387383368393406
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "backward_max_periods": 1,
+            "regular": 2
+          },
+          "sample_status_counts": {
+            "MAX_PERIODS": 1,
+            "REGULAR": 2
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              43
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "MAX_PERIODS",
+          "total_u_length": 2.2682426441528794,
+          "transition_id": 0
+        }
+      ]
+    },
+    "3:0.8:gmsh:pyvista": {
+      "b": 3.155082926916041,
+      "backend": "gmsh",
+      "critical": {
+        "point_count": 43,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 1,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 2.268207793525673,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 42,
+        "status": "REGULAR"
+      },
+      "extractor": "pyvista",
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 43,
+        "g_zero_segment_count": 42,
+        "point_count": 104,
+        "status": "REGULAR",
+        "triangle_count": 162,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.04289976299992304,
+        "case_total": 50.22451107000006,
+        "critical_curves": 0.014350366999906328,
+        "surface_extraction": 0.3508941560000949,
+        "transition_mapping": 49.85923330199989
+      },
+      "transition_status_counts": {
+        "MAX_PERIODS": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 7.808116084983128,
+              "max_quadrature_error": 4.661515617954137e-11,
+              "min": 2.3362435322881705
+            },
+            "child_3": {
+              "max": 7.806425567902856,
+              "max_quadrature_error": 3.82991416358891e-11,
+              "min": 2.336576247001012
+            },
+            "parent": {
+              "max": 10.144692331984139,
+              "max_quadrature_error": 1.8157223791622698e-11,
+              "min": 10.142669100191009
+            }
+          },
+          "authoritative_sample_count": 43,
+          "max_abs_additivity_residual": 1.7763568394002505e-14,
+          "max_additivity_tolerance_ratio": 1.7342714306441128e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.5292295847350956,
+          "s_range": [
+            0.4559076557117431,
+            0.9387383368393406
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "backward_max_periods": 1,
+            "regular": 2
+          },
+          "sample_status_counts": {
+            "MAX_PERIODS": 1,
+            "REGULAR": 2
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              42
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "MAX_PERIODS",
+          "total_u_length": 2.268207793525673,
+          "transition_id": 0
+        }
+      ]
+    },
+    "3:0.8:structured:marching_tetrahedra": {
+      "b": 3.155082926916041,
+      "backend": "structured",
+      "critical": {
+        "point_count": 56,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 1,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 2.36663676677243,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 55,
+        "status": "REGULAR"
+      },
+      "extractor": "marching_tetrahedra",
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 56,
+        "g_zero_segment_count": 55,
+        "point_count": 234,
+        "status": "REGULAR",
+        "triangle_count": 412,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.20933987700004764,
+        "case_total": 55.36335625300012,
+        "critical_curves": 0.018339191999984905,
+        "surface_extraction": 0.61778858699995,
+        "transition_mapping": 54.72719724800004
+      },
+      "transition_status_counts": {
+        "MAX_PERIODS": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 7.7392437970747965,
+              "max_quadrature_error": 3.2018832030189515e-13,
+              "min": 2.3234942072226668
+            },
+            "child_3": {
+              "max": 7.7392437970748,
+              "max_quadrature_error": 3.255173908200959e-13,
+              "min": 2.3234942072226623
+            },
+            "parent": {
+              "max": 10.062738004297453,
+              "max_quadrature_error": 3.7833771576354673e-11,
+              "min": 10.06273800429745
+            }
+          },
+          "authoritative_sample_count": 56,
+          "max_abs_additivity_residual": 1.5987211554602254e-14,
+          "max_additivity_tolerance_ratio": 1.57312050628894e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.3419928372312324,
+          "s_range": [
+            0.45590765571174546,
+            0.9667190497121181
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "backward_max_periods": 1,
+            "regular": 2
+          },
+          "sample_status_counts": {
+            "MAX_PERIODS": 1,
+            "REGULAR": 2
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              55
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "MAX_PERIODS",
+          "total_u_length": 2.36663676677243,
+          "transition_id": 0
+        }
+      ]
+    },
+    "3:0.8:structured:pyvista": {
+      "b": 3.155082926916041,
+      "backend": "structured",
+      "critical": {
+        "point_count": 55,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 1,
+          "GAMMA_MIN": 0
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 2.3666325115706015,
+          "GAMMA_MIN": 0.0
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 0,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 54,
+        "status": "REGULAR"
+      },
+      "extractor": "pyvista",
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 55,
+        "g_zero_segment_count": 54,
+        "point_count": 234,
+        "status": "REGULAR",
+        "triangle_count": 412,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.20933987700004764,
+        "case_total": 49.469371563000095,
+        "critical_curves": 0.01960585799997716,
+        "surface_extraction": 0.5249358639998718,
+        "transition_mapping": 48.924789249000014
+      },
+      "transition_status_counts": {
+        "MAX_PERIODS": 1
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 7.7392437970747965,
+              "max_quadrature_error": 3.2018832030189515e-13,
+              "min": 2.3234942072226668
+            },
+            "child_3": {
+              "max": 7.7392437970748,
+              "max_quadrature_error": 3.255173908200959e-13,
+              "min": 2.3234942072226623
+            },
+            "parent": {
+              "max": 10.062738004297453,
+              "max_quadrature_error": 3.7833771576354673e-11,
+              "min": 10.06273800429745
+            }
+          },
+          "authoritative_sample_count": 55,
+          "max_abs_additivity_residual": 1.5987211554602254e-14,
+          "max_additivity_tolerance_ratio": 1.57312050628894e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.3419928372312324,
+          "s_range": [
+            0.45590765571174546,
+            0.9667190497121181
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "backward_max_periods": 1,
+            "regular": 2
+          },
+          "sample_status_counts": {
+            "MAX_PERIODS": 1,
+            "REGULAR": 2
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              54
+            ]
+          ],
+          "source_critical_status": "REGULAR",
+          "status": "MAX_PERIODS",
+          "total_u_length": 2.3666325115706015,
+          "transition_id": 0
+        }
+      ]
+    },
+    "4:0.8:gmsh:marching_tetrahedra": {
+      "b": 6.637692367842499,
+      "backend": "gmsh",
+      "critical": {
+        "point_count": 93,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 4,
+          "GAMMA_MIN": 2
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 7.203344170160091,
+          "GAMMA_MIN": 0.8556969148524942
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.5833209733549234,
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 5,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 3,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 90,
+        "status": "DEGENERATE"
+      },
+      "extractor": "marching_tetrahedra",
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 88,
+        "g_zero_segment_count": 85,
+        "point_count": 217,
+        "status": "REGULAR",
+        "triangle_count": 364,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.0627633210001477,
+        "case_total": 8.056764449999946,
+        "critical_curves": 1.0160377129998324,
+        "surface_extraction": 0.88154088400006,
+        "transition_mapping": 6.159154288999844
+      },
+      "transition_status_counts": {
+        "MULTIWAY": 1,
+        "UNRESOLVED": 3
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 16.005239576687714,
+              "max_quadrature_error": 4.973799150320701e-13,
+              "min": 14.587353043508806
+            },
+            "child_3": {
+              "max": 0.17027754871310474,
+              "max_quadrature_error": 5.082045895221654e-14,
+              "min": 0.05615336643066229
+            },
+            "parent": {
+              "max": 16.061392943118356,
+              "max_quadrature_error": 5.4753995836022525e-11,
+              "min": 14.757630592221874
+            }
+          },
+          "authoritative_sample_count": 9,
+          "max_abs_additivity_residual": 3.6415315207705135e-14,
+          "max_additivity_tolerance_ratio": 2.4509503706983358e-08,
+          "max_port_alpha_identity_error": 3.3306690738754696e-16,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.32092336199376575,
+          "s_range": [
+            0.7386991391506749,
+            0.983804880112414
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              8
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.5679615052761284,
+          "transition_id": 0
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 15.982853380237913,
+              "max_quadrature_error": 1.0587086762825493e-12,
+              "min": 14.595029341764318
+            },
+            "child_3": {
+              "max": 2.128850849256626,
+              "max_quadrature_error": 2.67841304690819e-14,
+              "min": 0.14510910637506144
+            },
+            "parent": {
+              "max": 18.111704229494492,
+              "max_quadrature_error": 9.430536989032312e-12,
+              "min": 14.74013844813935
+            }
+          },
+          "authoritative_sample_count": 6,
+          "max_abs_additivity_residual": 4.618527782440651e-14,
+          "max_additivity_tolerance_ratio": 2.5360217386798892e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.04934430166870446,
+          "s_range": [
+            0.7386991391506732,
+            0.9466592388245934
+          ],
+          "sample_count": 6,
+          "sample_failure_reason_counts": {
+            "regular": 3,
+            "source_classification": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3,
+            "UNRESOLVED": 3
+          },
+          "sampling_certified": true,
+          "sampling_error_scope": "not measured; every authoritative vertex mapped",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "mapped every authoritative critical-curve vertex",
+          "sampling_samples_used": 6,
+          "sampling_unresolved_intervals": [],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 2.6554859367469135,
+          "transition_id": 1
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 0.16975658520984283,
+              "max_quadrature_error": 7.394085344003543e-14,
+              "min": 0.0744399736862375
+            },
+            "child_3": {
+              "max": 15.603303359892482,
+              "max_quadrature_error": 1.1013412404281553e-13,
+              "min": 14.58678385600441
+            },
+            "parent": {
+              "max": 15.677743333578674,
+              "max_quadrature_error": 5.284752250039222e-11,
+              "min": 14.756540441214248
+            }
+          },
+          "authoritative_sample_count": 12,
+          "max_abs_additivity_residual": 4.618527782440651e-14,
+          "max_additivity_tolerance_ratio": 2.9272423088613442e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.31687454017828637,
+          "s_range": [
+            0.738699139150675,
+            0.9830822246324498
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              11
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.5674274525246116,
+          "transition_id": 2
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 19.71576558413975,
+              "max_quadrature_error": 3.1175062531474396e-11,
+              "min": 1.4897457827997453
+            },
+            "child_3": {
+              "max": 19.715767667352125,
+              "max_quadrature_error": 3.1178615245153196e-11,
+              "min": 1.4983563756184402
+            },
+            "parent": {
+              "max": 39.43153325149156,
+              "max_quadrature_error": 1.379813737197993e-10,
+              "min": 16.651836986398976
+            }
+          },
+          "authoritative_sample_count": 55,
+          "max_abs_additivity_residual": 3.161915174132446e-13,
+          "max_additivity_tolerance_ratio": 7.998463287565869e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.3412716823315352,
+          "s_range": [
+            0.7254460967363751,
+            0.9699202526799975
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 22.77209675387426,
+          "sampling_max_geometry_error": 1.0036667549355056,
+          "sampling_reason": "certification interrupted by an interior-maximum count change",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              54
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "MULTIWAY",
+          "total_u_length": 3.4124692756124375,
+          "transition_id": 3
+        }
+      ]
+    },
+    "4:0.8:gmsh:pyvista": {
+      "b": 6.637692367842499,
+      "backend": "gmsh",
+      "critical": {
+        "point_count": 96,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 4,
+          "GAMMA_MIN": 2
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 7.2033376735397265,
+          "GAMMA_MIN": 0.8558072214934795
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.5833209733549234,
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 5,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 3,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 93,
+        "status": "DEGENERATE"
+      },
+      "extractor": "pyvista",
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 91,
+        "g_zero_segment_count": 88,
+        "point_count": 217,
+        "status": "REGULAR",
+        "triangle_count": 364,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.0627633210001477,
+        "case_total": 7.979318259000138,
+        "critical_curves": 1.0458018790000096,
+        "surface_extraction": 0.8845677070000875,
+        "transition_mapping": 6.0488974869999765
+      },
+      "transition_status_counts": {
+        "MULTIWAY": 1,
+        "UNRESOLVED": 3
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 16.005239576687714,
+              "max_quadrature_error": 4.973799150320701e-13,
+              "min": 14.587353043508806
+            },
+            "child_3": {
+              "max": 0.17027754871310474,
+              "max_quadrature_error": 5.082045895221654e-14,
+              "min": 0.05615336643066229
+            },
+            "parent": {
+              "max": 16.061392943118356,
+              "max_quadrature_error": 5.4753995836022525e-11,
+              "min": 14.757630592221874
+            }
+          },
+          "authoritative_sample_count": 10,
+          "max_abs_additivity_residual": 3.6415315207705135e-14,
+          "max_additivity_tolerance_ratio": 2.4509503706983358e-08,
+          "max_port_alpha_identity_error": 3.3306690738754696e-16,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.32092336199376575,
+          "s_range": [
+            0.7386991391506748,
+            0.983804880112414
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              9
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.5679678963178001,
+          "transition_id": 0
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 15.982853380237913,
+              "max_quadrature_error": 1.0587086762825493e-12,
+              "min": 14.595029341764318
+            },
+            "child_3": {
+              "max": 2.128850849256626,
+              "max_quadrature_error": 2.67841304690819e-14,
+              "min": 0.14510910637506144
+            },
+            "parent": {
+              "max": 18.111704229494492,
+              "max_quadrature_error": 9.430536989032312e-12,
+              "min": 14.74013844813935
+            }
+          },
+          "authoritative_sample_count": 6,
+          "max_abs_additivity_residual": 4.618527782440651e-14,
+          "max_additivity_tolerance_ratio": 2.5360217386798892e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.04934430166870446,
+          "s_range": [
+            0.7386991391506732,
+            0.9466592388245934
+          ],
+          "sample_count": 6,
+          "sample_failure_reason_counts": {
+            "regular": 3,
+            "source_classification": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3,
+            "UNRESOLVED": 3
+          },
+          "sampling_certified": true,
+          "sampling_error_scope": "not measured; every authoritative vertex mapped",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "mapped every authoritative critical-curve vertex",
+          "sampling_samples_used": 6,
+          "sampling_unresolved_intervals": [],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 2.6554859367469135,
+          "transition_id": 1
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 0.16975658520984283,
+              "max_quadrature_error": 7.394085344003543e-14,
+              "min": 0.0744399736862375
+            },
+            "child_3": {
+              "max": 15.603303359892482,
+              "max_quadrature_error": 1.1013412404281553e-13,
+              "min": 14.58678385600441
+            },
+            "parent": {
+              "max": 15.677743333578674,
+              "max_quadrature_error": 5.284752250039222e-11,
+              "min": 14.756540441214248
+            }
+          },
+          "authoritative_sample_count": 12,
+          "max_abs_additivity_residual": 4.618527782440651e-14,
+          "max_additivity_tolerance_ratio": 2.9272423088613442e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.31687454017828637,
+          "s_range": [
+            0.738699139150675,
+            0.9830822246324498
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              11
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.5674274525246106,
+          "transition_id": 2
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 19.71576558413975,
+              "max_quadrature_error": 3.1175062531474396e-11,
+              "min": 1.4897457827997438
+            },
+            "child_3": {
+              "max": 19.715767667352125,
+              "max_quadrature_error": 3.1178615245153196e-11,
+              "min": 1.4983563756184193
+            },
+            "parent": {
+              "max": 39.43153325149156,
+              "max_quadrature_error": 1.379813737197993e-10,
+              "min": 16.651836986398987
+            }
+          },
+          "authoritative_sample_count": 56,
+          "max_abs_additivity_residual": 3.161915174132446e-13,
+          "max_additivity_tolerance_ratio": 7.998463287565869e-08,
+          "max_port_alpha_identity_error": 2.220446049250313e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.3412716823315352,
+          "s_range": [
+            0.7254460967363751,
+            0.9699202526799968
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 22.772095552660417,
+          "sampling_max_geometry_error": 1.0036664086073606,
+          "sampling_reason": "certification interrupted by an interior-maximum count change",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              55
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "MULTIWAY",
+          "total_u_length": 3.412456387950403,
+          "transition_id": 3
+        }
+      ]
+    },
+    "4:0.8:structured:marching_tetrahedra": {
+      "b": 6.637692367842499,
+      "backend": "structured",
+      "critical": {
+        "point_count": 113,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 3,
+          "GAMMA_MIN": 2
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 4.51833795069139,
+          "GAMMA_MIN": 0.7547805158962904
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.14674683582469855,
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 2,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 110,
+        "status": "DEGENERATE"
+      },
+      "extractor": "marching_tetrahedra",
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 111,
+        "g_zero_segment_count": 108,
+        "point_count": 382,
+        "status": "REGULAR",
+        "triangle_count": 684,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.1760638729999755,
+        "case_total": 6.18023993099996,
+        "critical_curves": 0.09852371400006632,
+        "surface_extraction": 1.1675800030000119,
+        "transition_mapping": 4.914099880000094
+      },
+      "transition_status_counts": {
+        "MULTIWAY": 1,
+        "UNRESOLVED": 2
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 19.71576662573815,
+              "max_quadrature_error": 3.1302960223911214e-11,
+              "min": 1.491258709798256
+            },
+            "child_3": {
+              "max": 19.71576662573815,
+              "max_quadrature_error": 3.129940751023241e-11,
+              "min": 1.4912587097982526
+            },
+            "parent": {
+              "max": 39.43153325147624,
+              "max_quadrature_error": 1.3798561775181743e-10,
+              "min": 16.65438823887376
+            }
+          },
+          "authoritative_sample_count": 73,
+          "max_abs_additivity_residual": 6.394884621840902e-14,
+          "max_additivity_tolerance_ratio": 1.8023974280205763e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.3412821791683581,
+          "s_range": [
+            0.7254460967366712,
+            0.9688716624366128
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 22.777145012602475,
+          "sampling_max_geometry_error": 1.0053079331581976,
+          "sampling_reason": "certification interrupted by an interior-maximum count change",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              72
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "MULTIWAY",
+          "total_u_length": 3.413672372503663,
+          "transition_id": 0
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 0.16079222660035555,
+              "max_quadrature_error": 6.365741267444491e-14,
+              "min": 0.07617212752911075
+            },
+            "child_3": {
+              "max": 15.556152925669755,
+              "max_quadrature_error": 8.704148513061227e-14,
+              "min": 14.581258426495715
+            },
+            "parent": {
+              "max": 15.632325053198786,
+              "max_quadrature_error": 7.324702000766497e-11,
+              "min": 14.742050653096083
+            }
+          },
+          "authoritative_sample_count": 9,
+          "max_abs_additivity_residual": 7.993605777301127e-14,
+          "max_additivity_tolerance_ratio": 5.08100725752283e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.4403895412901268,
+          "s_range": [
+            0.738699139150673,
+            0.9705356919031413
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              8
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.5515925158344859,
+          "transition_id": 1
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 15.657443739733107,
+              "max_quadrature_error": 1.1368683772161603e-13,
+              "min": 14.581258426495722
+            },
+            "child_3": {
+              "max": 0.16079222660036885,
+              "max_quadrature_error": 4.9960036108132044e-15,
+              "min": 0.07235503469114282
+            },
+            "parent": {
+              "max": 15.72979877442417,
+              "max_quadrature_error": 3.7326636638995393e-11,
+              "min": 14.74205065309611
+            }
+          },
+          "authoritative_sample_count": 15,
+          "max_abs_additivity_residual": 8.040790255847696e-14,
+          "max_additivity_tolerance_ratio": 5.079527775703006e-08,
+          "max_port_alpha_identity_error": 1.1102230246251565e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.22311467784094827,
+          "s_range": [
+            0.7386991391506744,
+            0.9705356919031414
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              14
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.5530730623532412,
+          "transition_id": 2
+        }
+      ]
+    },
+    "4:0.8:structured:pyvista": {
+      "b": 6.637692367842499,
+      "backend": "structured",
+      "critical": {
+        "point_count": 114,
+        "polyline_counts": {
+          "DEGENERATE": 0,
+          "GAMMA_MAX": 3,
+          "GAMMA_MIN": 2
+        },
+        "polyline_length_by_kind": {
+          "DEGENERATE": 0.0,
+          "GAMMA_MAX": 4.51835196719456,
+          "GAMMA_MIN": 0.7547796724908471
+        },
+        "report": {
+          "ambiguous_segment_length_history": [
+            0.14674683582469855,
+            0.0
+          ],
+          "boundary_exit_split_count": 0,
+          "curve_walk_junction_count": 0,
+          "degenerate_solve_failure_count": 0,
+          "refined_segment_count": 2,
+          "reversal_repaired_count": 0,
+          "reversal_unrepaired_count": 0,
+          "source_unresolved_split_count": 0,
+          "unresolved_endpoint_count": 0,
+          "unresolved_segment_count": 0
+        },
+        "segment_count": 111,
+        "status": "DEGENERATE"
+      },
+      "extractor": "pyvista",
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "lambda_n": 0.8,
+      "outcome": "completed",
+      "surface": {
+        "component_count": 1,
+        "g_zero_point_count": 112,
+        "g_zero_segment_count": 109,
+        "point_count": 382,
+        "status": "REGULAR",
+        "triangle_count": 684,
+        "unresolved_split_count": 0
+      },
+      "timings_seconds": {
+        "background_build_shared": 0.1760638729999755,
+        "case_total": 5.456825386999981,
+        "critical_curves": 0.0973778449999827,
+        "surface_extraction": 0.998181046000127,
+        "transition_mapping": 4.361211821999859
+      },
+      "transition_status_counts": {
+        "MULTIWAY": 1,
+        "UNRESOLVED": 2
+      },
+      "transitions": [
+        {
+          "actions": {
+            "child_1": {
+              "max": 19.71576662573815,
+              "max_quadrature_error": 3.1302960223911214e-11,
+              "min": 1.491258709798256
+            },
+            "child_3": {
+              "max": 19.71576662573815,
+              "max_quadrature_error": 3.129940751023241e-11,
+              "min": 1.4912587097982526
+            },
+            "parent": {
+              "max": 39.43153325147624,
+              "max_quadrature_error": 1.3798561775181743e-10,
+              "min": 16.65438823887376
+            }
+          },
+          "authoritative_sample_count": 73,
+          "max_abs_additivity_residual": 6.394884621840902e-14,
+          "max_additivity_tolerance_ratio": 1.8023974280205763e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.3412821791683581,
+          "s_range": [
+            0.7254460967366712,
+            0.9688716624366128
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 3
+          },
+          "sample_status_counts": {
+            "REGULAR": 3
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 22.777145012602475,
+          "sampling_max_geometry_error": 1.0053079287109188,
+          "sampling_reason": "certification interrupted by an interior-maximum count change",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              72
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "MULTIWAY",
+          "total_u_length": 3.4136654235993062,
+          "transition_id": 0
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 0.16079222660035555,
+              "max_quadrature_error": 6.365741267444491e-14,
+              "min": 0.07617212752911075
+            },
+            "child_3": {
+              "max": 15.556152925669755,
+              "max_quadrature_error": 8.704148513061227e-14,
+              "min": 14.581258426495715
+            },
+            "parent": {
+              "max": 15.632325053198786,
+              "max_quadrature_error": 7.324702000766497e-11,
+              "min": 14.742050653096083
+            }
+          },
+          "authoritative_sample_count": 9,
+          "max_abs_additivity_residual": 7.993605777301127e-14,
+          "max_additivity_tolerance_ratio": 5.08100725752283e-08,
+          "max_port_alpha_identity_error": 0.0,
+          "max_port_s_identity_error": 2.220446049250313e-16,
+          "max_quadrature_tolerance_ratio": 0.4403895412901268,
+          "s_range": [
+            0.738699139150673,
+            0.9705356919031413
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              8
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.5515925158344859,
+          "transition_id": 1
+        },
+        {
+          "actions": {
+            "child_1": {
+              "max": 15.657443739733107,
+              "max_quadrature_error": 1.1368683772161603e-13,
+              "min": 14.581258426495722
+            },
+            "child_3": {
+              "max": 0.16079222660036885,
+              "max_quadrature_error": 4.9960036108132044e-15,
+              "min": 0.07235503469114282
+            },
+            "parent": {
+              "max": 15.72979877442417,
+              "max_quadrature_error": 3.7326636638995393e-11,
+              "min": 14.74205065309611
+            }
+          },
+          "authoritative_sample_count": 16,
+          "max_abs_additivity_residual": 8.040790255847696e-14,
+          "max_additivity_tolerance_ratio": 5.079527775703006e-08,
+          "max_port_alpha_identity_error": 1.1102230246251565e-16,
+          "max_port_s_identity_error": 1.1102230246251565e-16,
+          "max_quadrature_tolerance_ratio": 0.22311467784094827,
+          "s_range": [
+            0.7386991391506744,
+            0.9705356919031414
+          ],
+          "sample_count": 3,
+          "sample_failure_reason_counts": {
+            "regular": 2,
+            "source_classification": 1
+          },
+          "sample_status_counts": {
+            "REGULAR": 2,
+            "UNRESOLVED": 1
+          },
+          "sampling_certified": false,
+          "sampling_error_scope": "maximum midpoint discrepancy encountered, including intervals later refined away; not a final residual bound",
+          "sampling_max_action_error": 0.0,
+          "sampling_max_geometry_error": 0.0,
+          "sampling_reason": "certification interrupted by mapped sample failure",
+          "sampling_samples_used": 3,
+          "sampling_unresolved_intervals": [
+            [
+              0,
+              15
+            ]
+          ],
+          "source_critical_status": "DEGENERATE",
+          "status": "UNRESOLVED",
+          "total_u_length": 0.5530940277607675,
+          "transition_id": 2
+        }
+      ]
+    }
+  },
+  "controls": {
+    "bounds": {
+      "absolute_margin": 0.0,
+      "candidate_count": 8,
+      "n_s": 17,
+      "n_theta": 32,
+      "n_zeta": 32,
+      "safety_factor": 2.0,
+      "user_b_max": null,
+      "user_b_min": null
+    },
+    "gmsh_background": {
+      "axis_gradient_radius": 1e-06,
+      "axis_radius": 0.2,
+      "axis_size": null,
+      "critical_points": [],
+      "critical_radius": 0.2,
+      "critical_size": null,
+      "low_gradient_size": null,
+      "low_gradient_threshold": null,
+      "target_size": 0.3
+    },
+    "structured_background": {
+      "n_poloidal": 24,
+      "n_radial": 6,
+      "n_zeta": 12
+    },
+    "transition": {
+      "D2_tolerance": 1e-10,
+      "action_quadrature_atol": 1e-11,
+      "action_quadrature_order": 32,
+      "action_quadrature_rtol": 1e-11,
+      "additivity_atol": 1e-08,
+      "additivity_rtol": 1e-07,
+      "curve_action_atol": 1e-08,
+      "curve_action_rtol": 0.02,
+      "curve_edge_proximity": 0.02,
+      "curve_geometry_atol": 1e-08,
+      "curve_geometry_rtol": 0.2,
+      "curve_self_contact_ratio": 0.1,
+      "field_identity_tolerance": 1e-08,
+      "max_action_quadrature_order": 512,
+      "max_curve_samples": 8,
+      "max_field_periods": 128,
+      "root_atol_B": 1e-10,
+      "root_atol_zeta": 1e-12,
+      "root_rtol": 1e-12,
+      "samples_per_field_period": 64,
+      "samples_per_wavelength": 24,
+      "tangent_atol_B": 1e-09,
+      "tangent_slope_tolerance": 1e-08
+    }
+  },
+  "files": {
+    "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc": {
+      "bounds_seconds": 3.265941768000175,
+      "nfp": 4,
+      "refined_B_max": 12.030690150609969,
+      "refined_B_min": 7.715684270822195
+    },
+    "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc": {
+      "bounds_seconds": 3.442371906000062,
+      "nfp": 4,
+      "refined_B_max": 12.032438296028296,
+      "refined_B_min": 7.342416966461362
+    },
+    "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc": {
+      "bounds_seconds": 3.43473459300003,
+      "nfp": 4,
+      "refined_B_max": 12.050343540204448,
+      "refined_B_min": 5.040465893072355
+    },
+    "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc": {
+      "bounds_seconds": 2.9465470590000677,
+      "nfp": 5,
+      "refined_B_max": 3.370588903233543,
+      "refined_B_min": 2.293059021646033
+    },
+    "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc": {
+      "bounds_seconds": 2.729897648999895,
+      "nfp": 3,
+      "refined_B_max": 7.069800279009327,
+      "refined_B_min": 4.909260723175189
+    }
+  }
+}

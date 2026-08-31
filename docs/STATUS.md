@@ -60,7 +60,12 @@ move it into `docs/DESIGN.md` and delete it here.
   backends x two extractors x six levels is 120 cases, and `docs/DESIGN.md`
   §23 milestone 10.3 counts them that way. The milestone 9/10/10.1/10.2 reports
   under `docs/validation/` predate the new level and describe 100 cases; they are
-  records of what was run, not a target to match.
+  records of what was run, not a target to match. The twenty new cases are recorded
+  in `docs/validation/lambda-n-0p8-matrix.md`: all completed, no new failure class,
+  extractors agreeing on every transition status. Two things for 10.3 to carry —
+  `d23p4` at this level hits the 128-field-period cap on all four combinations, and
+  the largest relative flux drift during event insertion, `4.13e-3` on the coarse
+  gmsh TURBO surface, is above the `8.77e-4` the 10.2 matrix recorded.
 
 - Keep milestone 10.3 within the existing test budget. The W7-X tests that used to
   dominate it now run on `boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc`, the same
