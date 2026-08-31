@@ -155,6 +155,10 @@ def classify_failure_reason(reason: str) -> str:
         return "background_geometry"
     if "incident to more than one sheet" in reason:
         return "background_geometry"
+    if "face corridor" in reason:
+        return "background_geometry"
+    if "no finite neighboring action data" in reason:
+        return "background_geometry"
     if "sampling budget" in reason:
         return "source_budget"
     if "neither equal-height nor fold geometry certified" in reason:
@@ -887,9 +891,10 @@ def converge_transitions(
     )
 
 
-_BACKGROUND_CLASSES = frozenset(
-    {"unresolved_critical", "background_geometry", "off_component"}
-)
+# The background ladder is the outermost remedy: any failure class that
+# survives its within-level ladders can retry on a finer background, except a
+# pure field-period cap ceiling, which no background changes.
+_BACKGROUND_EXEMPT_CLASSES = frozenset({"max_periods"})
 
 
 def converge_case(
@@ -910,12 +915,12 @@ def converge_case(
     level ``level``; level 0 is the base resolution and the coordinator may
     request up to ``budgets.background_levels``.  Background escalation is
     dispatched for an ``UNRESOLVED`` extraction (ADR 0001 sheet-bridging
-    splits), an ``UNRESOLVED`` critical-curve classification, and for
-    residual failures whose recorded remedy is a finer background
-    (source-classification failures, a companion curve the surface cannot
-    hold, an open endpoint that cannot reach ``EDGE``).  All other budgets
-    come from ``budgets``; ``transition_config`` supplies the remaining
-    §21.3 controls, identical for every case in a matrix.
+    splits), an ``UNRESOLVED`` critical-curve classification, and — as the
+    outermost bounded remedy — for any failure class that survives its
+    within-level ladders, except a pure field-period cap ceiling, which no
+    background changes.  All other budgets come from ``budgets``;
+    ``transition_config`` supplies the remaining §21.3 controls, identical
+    for every case in a matrix.
     """
     budgets = budgets or RefinementBudgets()
     attempts: list[RemediationRecord] = []
@@ -955,7 +960,9 @@ def converge_case(
             resolution = replace(
                 resolution, attempts=tuple(attempts) + resolution.attempts
             )
-            trigger = sorted(set(resolution.failure_class_counts) & _BACKGROUND_CLASSES)
+            trigger = sorted(
+                set(resolution.failure_class_counts) - _BACKGROUND_EXEMPT_CLASSES
+            )
             if resolution.resolved or not trigger:
                 return resolution
             trigger_class = trigger[0]
