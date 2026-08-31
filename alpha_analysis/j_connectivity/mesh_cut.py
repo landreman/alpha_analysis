@@ -1752,17 +1752,16 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
             }
         )
     if len(adjacent) != 2:
-        if len(adjacent) == 1 and not probes:
-            # A short slit between two event junctions can leave the surface
-            # globally connected: the two local sides meet around the events,
-            # so no trustworthy parent/child sheet assignment exists at this
-            # background resolution. Typical of an under-resolved junction
-            # complex; the remedy is background refinement, never a guessed
-            # one-sheet duplication.
+        if len(adjacent) == 1:
+            # A slit can leave the surface globally connected — its two local
+            # sides meet around its ends — so no trustworthy parent/child
+            # sheet assignment exists at this background resolution. Typical
+            # of an under-resolved junction complex; the remedy is background
+            # refinement, never a guessed one-sheet duplication.
             raise _TransitionCutConflict(
-                "companion arc between event junctions does not separate the "
-                "surface at this resolution; refine the background mesh to "
-                "resolve the junction complex"
+                "companion cut does not separate the surface at this "
+                "resolution; refine the background mesh to resolve the "
+                "junction complex"
             )
         raise _TransitionCutConflict(
             "a generic companion cut must have exactly two incident triangle sides; "
