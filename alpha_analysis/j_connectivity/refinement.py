@@ -74,7 +74,7 @@ class RefinementBudgets:
     localization_bisections: tuple[int, ...] = (20, 80, 320)
     scan_resolution_factors: tuple[int, ...] = (1, 2, 4)
     background_levels: int = 2
-    local_refinement_rounds: int = 2
+    local_refinement_rounds: int = 4
     empty_interval_samples: int = 2
 
     def __post_init__(self) -> None:

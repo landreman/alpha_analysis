@@ -75,7 +75,7 @@ BUDGETS = RefinementBudgets(
     max_field_period_caps=(128, 256, 1024),
     localization_bisections=(20, 80, 320),
     background_levels=2,
-    local_refinement_rounds=2,
+    local_refinement_rounds=4,
     empty_interval_samples=2,
 )
 
