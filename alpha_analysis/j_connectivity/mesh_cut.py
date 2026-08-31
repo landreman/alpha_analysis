@@ -2067,6 +2067,93 @@ def _geometry_resolution_issue(mesh, transition, event_endpoint_indices=()):
     return None
 
 
+def _slit_wedge_labels(mesh, inserted, labels, next_label):
+    """Split the triangle fans around a non-separating slit into two banks.
+
+    A companion cut whose two ends terminate at interior events (for example
+    two degenerate curve endpoints, ADR 0008) is a genuine branch slit: the
+    surface stays globally connected around its ends, so component labels
+    cannot tell its sides apart, yet the parent and child banks are locally
+    well defined.  Triangles incident to an *interior* chain vertex are
+    assigned a bank by the chain's own orientation — a triangle containing
+    the directed chain edge in its winding is on one bank, the reversed edge
+    on the other — and the remaining fan triangles inherit the bank through
+    fan adjacency that never walks across the chain or around a tip.  The
+    tips stay shared by both banks, which is the slit's physical topology;
+    their incompatible one-sided limits go through the existing
+    unresolved-event-action path.  Returns ``(region, tips)`` and rewrites
+    ``labels`` in place, or ``None`` when no interior vertex exists (a
+    single-edge slit is below the mesh resolution) or the fan walk cannot
+    assign every triangle unambiguously.
+    """
+    chain_edges = {tuple(sorted(map(int, edge))) for edge in inserted.path_edges}
+    degree: dict[int, int] = {}
+    for first, second in chain_edges:
+        degree[first] = degree.get(first, 0) + 1
+        degree[second] = degree.get(second, 0) + 1
+    interior = {vertex for vertex, count in degree.items() if count >= 2}
+    tips = {vertex for vertex, count in degree.items() if count == 1}
+    if not interior:
+        return None
+    region = [
+        triangle_id
+        for triangle_id, triangle in enumerate(mesh.triangles)
+        if any(int(vertex) in interior for vertex in triangle)
+    ]
+    order = {vertex: parameter for vertex, parameter in inserted.vertex_u.items()}
+    sides: dict[int, int] = {}
+    for triangle_id in region:
+        triangle = list(map(int, mesh.triangles[triangle_id]))
+        for local in range(3):
+            first, second = triangle[local], triangle[(local + 1) % 3]
+            if tuple(sorted((first, second))) not in chain_edges:
+                continue
+            if first not in order or second not in order:
+                continue
+            forward = order[first] < order[second]
+            proposed = 0 if forward else 1
+            if sides.setdefault(triangle_id, proposed) != proposed:
+                return None
+    frontier = [triangle_id for triangle_id in region if triangle_id in sides]
+    if not frontier:
+        return None
+    region_set = set(region)
+    edge_owners: dict[tuple[int, int], list[int]] = {}
+    for triangle_id in region:
+        triangle = list(map(int, mesh.triangles[triangle_id]))
+        for local in range(3):
+            edge = tuple(sorted((triangle[local], triangle[(local + 1) % 3])))
+            edge_owners.setdefault(edge, []).append(triangle_id)
+    while frontier:
+        triangle_id = frontier.pop()
+        triangle = list(map(int, mesh.triangles[triangle_id]))
+        for local in range(3):
+            edge = tuple(sorted((triangle[local], triangle[(local + 1) % 3])))
+            if edge in chain_edges:
+                continue
+            # Fan adjacency only: crossing an edge that touches no interior
+            # chain vertex would walk around a tip and join the two banks.
+            if not any(vertex in interior for vertex in edge):
+                continue
+            for neighbor in edge_owners.get(edge, ()):
+                if neighbor == triangle_id or neighbor not in region_set:
+                    continue
+                if neighbor in sides:
+                    if sides[neighbor] != sides[triangle_id]:
+                        return None
+                    continue
+                sides[neighbor] = sides[triangle_id]
+                frontier.append(neighbor)
+    if any(triangle_id not in sides for triangle_id in region):
+        return None
+    base = {int(labels[triangle_id]) for triangle_id in region}
+    if len(base) != 1:
+        return None
+    for triangle_id in region:
+        labels[triangle_id] = next_label + sides[triangle_id]
+    return set(region), tips
+
+
 def _refresh_inserted_actions(mesh, triangles, labels, copy_id, assigned):
     """Refresh off-cut insertion descendants after branch actions are assigned.
 
@@ -2333,7 +2420,11 @@ def cut_surface_at_transitions(
             "insertions; the cut cannot be trusted"
         )
     while True:
-        pre_duplicate_labels = _triangle_components(mesh.triangles, blocked_edges)
+        base_labels = _triangle_components(mesh.triangles, blocked_edges)
+        pre_duplicate_labels = np.asarray(base_labels, dtype=np.int64).copy()
+        next_virtual = int(pre_duplicate_labels.max(initial=0)) + 1
+        wedge_regions: set[int] = set()
+        shared_tips: set[int] = set()
         all_cut_vertices = {vertex for edge in blocked_edges for vertex in edge}
         branch_components = {}
         demoted = None
@@ -2345,6 +2436,34 @@ def cut_surface_at_transitions(
                     )
                 )
             except _TransitionCutConflict as conflict:
+                if "does not separate the surface" in str(conflict):
+                    # A branch slit: split its local fans into two banks and
+                    # retry with the bank labels; the tips stay shared, so
+                    # both one-sided limits land on one vertex and go through
+                    # the unresolved-event-action path.
+                    saved = pre_duplicate_labels.copy()
+                    wedge = _slit_wedge_labels(
+                        mesh, inserted, pre_duplicate_labels, next_virtual
+                    )
+                    if wedge is not None and not (wedge[0] & wedge_regions):
+                        next_virtual += 2
+                        try:
+                            branch_components[inserted.transition.transition_id] = (
+                                _branch_components(
+                                    mesh,
+                                    inserted,
+                                    pre_duplicate_labels,
+                                    all_cut_vertices,
+                                )
+                            )
+                            wedge_regions |= wedge[0]
+                            shared_tips |= wedge[1]
+                            continue
+                        except _TransitionCutConflict as retry_conflict:
+                            pre_duplicate_labels[:] = saved
+                            conflict = retry_conflict
+                    elif wedge is not None:
+                        pre_duplicate_labels[:] = saved
                 demoted = (inserted, str(conflict))
                 break
         if demoted is None:
@@ -2373,6 +2492,13 @@ def cut_surface_at_transitions(
     copy_id = {}
     for vertex in sorted(all_cut_vertices):
         components = _incident_components(mesh.triangles, pre_duplicate_labels, vertex)
+        if vertex in shared_tips:
+            # A branch-slit tip is physically one point shared by both banks
+            # (the slit ends there); its incompatible one-sided limits are
+            # handled by the unresolved-event-action path, never by copies.
+            for component in components:
+                copy_id[(vertex, component)] = vertex
+            continue
         for index, component in enumerate(components):
             if index == 0:
                 new_id = vertex
@@ -2429,12 +2555,15 @@ def cut_surface_at_transitions(
         child_ids = np.array(
             [copy_id[(int(vertex), child_component)] for vertex in inserted.sample_ids]
         )
+        # The child-3 curve lives on one physical sheet; bank labels are a
+        # duplication artifact of a nearby slit, so its incidence is checked
+        # against the base component labels.
         gamma_components = {
             component
             for index, vertex in enumerate(inserted.gamma_ids)
             if index not in inserted.event_endpoint_indices
             for component in _incident_components(
-                mesh.triangles, pre_duplicate_labels, int(vertex)
+                mesh.triangles, base_labels, int(vertex)
             )
         }
         if len(gamma_components) != 1:
@@ -2525,6 +2654,20 @@ def cut_surface_at_transitions(
     label_map = {}
     for old, new in zip(pre_duplicate_labels, final_labels):
         if old in label_map and label_map[old] != new:
+            raise ConstrainedCutError("vertex duplication did not separate a cut sheet")
+        label_map[int(old)] = int(new)
+    # A small base component can be covered entirely by a slit's bank labels;
+    # its child-3 port still references the base label, whose banks rejoin
+    # into one final sheet.
+    for old, new in zip(base_labels, final_labels):
+        if int(old) in label_map:
+            continue
+        conflicting = {
+            int(other_new)
+            for other_old, other_new in zip(base_labels, final_labels)
+            if int(other_old) == int(old)
+        }
+        if len(conflicting) != 1:
             raise ConstrainedCutError("vertex duplication did not separate a cut sheet")
         label_map[int(old)] = int(new)
     ports = [
