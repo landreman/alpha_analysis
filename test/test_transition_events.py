@@ -267,6 +267,45 @@ def test_contact_arcs_share_physical_events_and_have_one_sided_actions(
             for port in curve.ports:
                 np.testing.assert_allclose(port.points[end, :2], point[:2], atol=1.0e-9)
 
+    # A source certification cannot authorize a newly discovered itinerary
+    # change inside an event arc. Inject an extra interior maximum at a source
+    # sample away from all contact probes, without inventing another event.
+    from dataclasses import replace
+    from alpha_analysis.j_connectivity import TransitionStatus
+
+    source = localized.transitions[0]
+    assert source.sampling_certified
+    probed_u = {
+        float(sample.u[0]) % source.total_u_length
+        for event in localized.events
+        for occurrence in event.occurrences
+        if occurrence.source_transition_id == source.transition_id
+        for sample in occurrence.samples
+    }
+    index = next(i for i, u in enumerate(source.u) if u not in probed_u)
+    counts = source.interior_maximum_count.copy()
+    counts[index] += 1
+    changed = replace(
+        localized,
+        transitions=(
+            replace(source, interior_maximum_count=counts),
+            *localized.transitions[1:],
+        ),
+    )
+    guarded = build_transition_arcs(field, critical, changed)
+    rejected = [
+        arc
+        for arc in guarded.arcs
+        if arc.unresolved_reason
+        == "unexplained interior-maximum count change within arc"
+    ]
+    assert rejected
+    assert all(
+        arc.curve.status is TransitionStatus.UNRESOLVED
+        and not arc.curve.sampling_certified
+        for arc in rejected
+    )
+
 
 def test_regular_arcs_cut_into_six_wells_without_dangling_event_ends(
     two_barrier_pipeline,
@@ -367,7 +406,38 @@ def test_uncut_incident_arc_preserves_distinct_event_limits(two_barrier_pipeline
     )
     conflicts = _assert_port_limits_are_preserved_or_explicitly_unknown(cut)
     assert conflicts
-    assert cut.unresolved_action_flux(field) > 0
+    # Isolate each unknown event vertex from the other missing surface data.
+    # Here iota=0, so |ds wedge d alpha|=2|dx wedge dy|: each triangle's
+    # measure is the absolute 2D determinant, independently of surface_flux.
+    # A single NaN must retain every incident triangle, including triangles
+    # whose other two vertices have known action.
+    for vertex in conflicts:
+        action = np.ones(len(cut.action_values))
+        action[vertex] = np.nan
+        isolated = replace(
+            cut,
+            action_values=action,
+            unresolved_event_action_vertex_ids=np.array([vertex]),
+        )
+        incident = [
+            triangle for triangle in cut.surface.triangles if vertex in triangle
+        ]
+        xy = cut.surface.points[np.asarray(incident), :2]
+        first = xy[:, 1] - xy[:, 0]
+        second = xy[:, 2] - xy[:, 0]
+        expected = np.sum(
+            np.abs(first[:, 0] * second[:, 1] - first[:, 1] * second[:, 0])
+        )
+        assert expected > 0
+        np.testing.assert_allclose(
+            isolated.unresolved_action_flux(field), expected, rtol=1e-12, atol=1e-14
+        )
+        known = replace(
+            isolated,
+            action_values=np.ones(len(action)),
+            unresolved_event_action_vertex_ids=np.empty(0, dtype=np.int64),
+        )
+        assert known.unresolved_action_flux(field) == 0
 
 
 def _assert_port_limits_are_preserved_or_explicitly_unknown(cut):

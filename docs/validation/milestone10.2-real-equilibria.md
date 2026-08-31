@@ -80,6 +80,13 @@ counts remain resolution controlled. No backend/extractor disagreement is promot
 to a resolved physical topology. Milestone 10.3 must coordinate critical/background
 refinement, source budgets, contact localization work, and cap convergence.
 
+The review follow-up adds a conservative interior-maximum-count check to event
+arc certification. All six cases with a previously certified regular event arc
+were rerun; their complete arc and cut summaries match this matrix exactly.
+`milestone10.2-review-checks.json` records the guarded implementation hashes,
+controls, and comparisons. Other cases remain on their existing failure paths;
+the additional rejection cannot promote them to a cut.
+
 Three initial d23p4 `lambda_n=0.5` runs raised a field-line-chart insertion error.
 The failing point was the known PL `EDGE` snap, whose nonlinear chart need not
 contain its Euclidean position. Inserting it through the same component's tagged

@@ -1257,9 +1257,14 @@ def build_transition_arcs(field, critical, localized):
                         remaining_budget,
                     )
                 )
-                certified = sampling_ok and all(
+                regular = all(
                     sample.status is TransitionStatus.REGULAR for sample in values
                 )
+                same_count = (
+                    len({int(sample.interior_maximum_count[0]) for sample in values})
+                    == 1
+                )
+                certified = sampling_ok and regular and same_count
                 curve = _combine_arc(
                     field,
                     source,
@@ -1270,7 +1275,11 @@ def build_transition_arcs(field, critical, localized):
                     parameters,
                 )
                 if not certified and not reason:
-                    reason = "source arc contains a failed trace"
+                    reason = (
+                        "source arc contains a failed trace"
+                        if not regular
+                        else "unexplained interior-maximum count change within arc"
+                    )
                 if reason == "source sampling budget exhausted on this arc":
                     curve = replace(
                         curve,

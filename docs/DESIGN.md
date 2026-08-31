@@ -1067,6 +1067,14 @@ allowance, and the path is limited to `max_corridor_faces=64`. This is local
 constrained insertion, not global chart retriangulation. Degree checks prohibit
 branches or dangling companion cuts away from `EDGE` or an explicit event.
 
+The separate snap to an existing vertex on the projected segment uses a
+chord-scaled physical offset allowance in normal-plane insertion:
+`max_surface_distance_ratio * physical_chord_length`. It does not move that
+vertex. This allowance can exceed the crossed-edge allowance when the anchor
+budget leaves a long chord; preserve component provenance and require the same
+connected-chain and decisive side-assignment checks. Report it as a remaining
+surface-resolution control, not a local-edge error bound or convergence result.
+
 Side assignment uses the existing decisive action comparison. Unrepresentable
 arcs retain all ports and their reasons. If an uncut incident arc leaves different
 one-sided event limits on one mesh vertex, retain those values on their distinct

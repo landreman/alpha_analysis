@@ -49,11 +49,18 @@ move it into `docs/DESIGN.md` and delete it here.
   completes the synthetic arrangement; the DMerc sampling regression is fixed.
   Event vertices carrying incompatible one-sided limits in a partially cut
   arrangement remain explicit unknown action, with all port limits preserved.
-  Local validation passes: 174 tests, both mutations, all six ADR grids, and the
+  Local validation passes: 174 tests, four mutation checks, all six ADR grids, and the
   100-case matrix (explicit unresolved outcomes, not matrix convergence).
   Reports are in `docs/validation/milestone10.2-*.md`. GitHub
   [Tests](https://github.com/landreman/alpha_analysis/actions/runs/33379169289)
   passed on implementation commit `e39c5a1` (lint, Python 3.10–3.12, and full suite).
+
+- Keep milestone 10.3 within the existing test budget: the W7-X event fixture and
+  test together cost about 95 s locally, and the existing bounce-point plot is
+  about 20 s. Event insertion's existing-vertex snap has a chord-scaled allowance
+  (DESIGN §10.3), so it is still a surface-resolution control. Critical-curve
+  projection now uses a centered `1e-6` Jacobian step to avoid relative-step
+  stagnation near `zeta=0`; accepted `B` and `g` residual tolerances are unchanged.
 
 - Milestone 0 established base-only `j_connectivity` imports; optional features must use `optional_import()` so missing extras provide an install command.
 - Milestone 1's `BoozerFieldLike.B()` uses pointwise NumPy broadcasting; legacy `compute_B()` retains its outer-`s` grid semantics.

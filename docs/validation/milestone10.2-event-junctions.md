@@ -143,3 +143,36 @@ curves, retains 951 unresolved arcs without exceptions, and makes no real-matrix
 convergence claim. All cases affected by the endpoint fixes were rerun on the
 final core. The implementation and reports are published in
 [PR #22](https://github.com/landreman/alpha_analysis/pull/22).
+
+## Review follow-up
+
+The first Claude review recommended **merge**, with no blocking findings. Both
+should-fix items are addressed: event arcs reject unexplained interior-maximum
+count changes even when source certification is already set, and the unknown
+action measure has an independent analytic check. With every other vertex finite,
+each isolated unknown event vertex contributes exactly the absolute `(x,y)`
+triangle determinants for this `iota=0` field. Replacing `any` unknown vertex by
+`all` unknown vertices fails at zero versus `1.37452523e-7`; removing the count
+guard incorrectly accepts an injected count change away from all contact probes.
+Both process-local mutations were observed red and never changed production files.
+
+All six synthetic ADR grids still produce six sheets, and the W7-X event test
+passes. The six real-matrix cases that previously had certified regular event
+arcs were rerun on the guarded implementation: their complete arc and cut
+summaries are unchanged. `milestone10.2-review-checks.json` records these comparisons,
+controls, and source hashes. The other matrix cases cannot newly resolve under
+this additional rejection guard; their existing explicit failures are unchanged.
+The original detailed matrix remains the record of those runs.
+
+DESIGN §10.3 now explicitly distinguishes the existing-vertex snap's chord-scaled
+allowance from crossed-edge allowances; neither allowance changed. STATUS records
+that resolution control and the test-time headroom needed by 10.3. It also records
+the centered absolute `1e-6` critical-curve projection Jacobian step, which avoids
+relative-step stagnation near `zeta=0` without changing accepted residual tolerances.
+
+Final follow-up gates, after the diagnostic jobs finished: `make test` passes
+173 tests in **59.36 s wall time** (59.12 s pytest; slowest fast test 17.61 s).
+`make check` passes formatting and all 174 tests in **149.11 s wall time**
+(147.46 s pytest). The W7-X fixture and call are 81.03 s and 16.44 s respectively;
+their combined 97.47 s remains the disclosed test-time headroom concern. The
+global tier budgets pass; neither numerical inputs nor tolerances changed.
