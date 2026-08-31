@@ -1704,21 +1704,66 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
     transition = inserted.transition
     parent = next(port for port in transition.ports if port.role == "parent")
     child = next(port for port in transition.ports if port.role == "child_1")
-    regular_sample_ids = [
-        vertex
+    probes = [
+        (
+            int(vertex),
+            float(parent.action_values[index]),
+            float(child.action_values[index]),
+        )
         for index, vertex in enumerate(inserted.sample_ids)
         if index not in inserted.event_endpoint_indices
     ]
-    adjacent = sorted(
-        {
-            component
-            for vertex in regular_sample_ids
-            for component in _incident_components(
-                mesh.triangles, triangle_labels, vertex
+    edge_probes = []
+    if not probes:
+        # A short arc between two event junctions has no non-event sample,
+        # but its constrained chain still separates two sides: probe the
+        # triangles flanking each chain edge, with the expected branch
+        # actions taken from the same common-u port interpolation the cut
+        # assigns along the chain.
+        for edge in sorted(inserted.path_edges):
+            first, second = map(int, edge)
+            if first not in inserted.vertex_u or second not in inserted.vertex_u:
+                continue
+            middle_u = 0.5 * (inserted.vertex_u[first] + inserted.vertex_u[second])
+            edge_probes.append(
+                (
+                    (first, second),
+                    _interpolate_port_action(transition, parent, middle_u),
+                    _interpolate_port_action(transition, child, middle_u),
+                )
             )
-        }
-    )
+    if probes:
+        adjacent = sorted(
+            {
+                component
+                for vertex, _, _ in probes
+                for component in _incident_components(
+                    mesh.triangles, triangle_labels, vertex
+                )
+            }
+        )
+    else:
+        adjacent = sorted(
+            {
+                int(triangle_labels[triangle_id])
+                for (first, second), _, _ in edge_probes
+                for triangle_id, triangle in enumerate(mesh.triangles)
+                if first in triangle and second in triangle
+            }
+        )
     if len(adjacent) != 2:
+        if len(adjacent) == 1 and not probes:
+            # A short slit between two event junctions can leave the surface
+            # globally connected: the two local sides meet around the events,
+            # so no trustworthy parent/child sheet assignment exists at this
+            # background resolution. Typical of an under-resolved junction
+            # complex; the remedy is background refinement, never a guessed
+            # one-sheet duplication.
+            raise _TransitionCutConflict(
+                "companion arc between event junctions does not separate the "
+                "surface at this resolution; refine the background mesh to "
+                "resolve the junction complex"
+            )
         raise _TransitionCutConflict(
             "a generic companion cut must have exactly two incident triangle sides; "
             f"found {adjacent}"
@@ -1727,9 +1772,7 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
     for component_index, component in enumerate(adjacent):
         parent_errors = []
         child_errors = []
-        for sample_index, vertex in enumerate(inserted.sample_ids):
-            if sample_index in inserted.event_endpoint_indices:
-                continue
+        for vertex, parent_expected, child_expected in probes:
             neighbor_values = []
             for triangle_id, triangle in enumerate(mesh.triangles):
                 if triangle_labels[triangle_id] != component or vertex not in triangle:
@@ -1741,8 +1784,26 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
                 )
             if neighbor_values:
                 value = float(np.mean(neighbor_values))
-                parent_errors.append(abs(value - parent.action_values[sample_index]))
-                child_errors.append(abs(value - child.action_values[sample_index]))
+                parent_errors.append(abs(value - parent_expected))
+                child_errors.append(abs(value - child_expected))
+        for (first, second), parent_expected, child_expected in edge_probes:
+            neighbor_values = []
+            for triangle_id, triangle in enumerate(mesh.triangles):
+                if (
+                    triangle_labels[triangle_id] != component
+                    or first not in triangle
+                    or second not in triangle
+                ):
+                    continue
+                neighbor_values.extend(
+                    mesh.action[item]
+                    for item in triangle
+                    if item not in all_cut_vertices and np.isfinite(mesh.action[item])
+                )
+            if neighbor_values:
+                value = float(np.mean(neighbor_values))
+                parent_errors.append(abs(value - parent_expected))
+                child_errors.append(abs(value - child_expected))
         if not parent_errors:
             # No finite pre-cut action neighbors this side (e.g. the caller
             # skipped the surface-wide traces). Generate one datum by tracing
@@ -2113,9 +2174,16 @@ def cut_surface_at_transitions(
     if event_endpoints:
         # All event anchors enter before constraints, so later incidence at a
         # true junction does not split/destroy an already constrained chain.
+        # A marginal anchor that cannot insert is skipped: without its shared
+        # vertex, an incident arc either still terminates consistently or
+        # fails its own degree checks and is demoted explicitly — never a
+        # silently branched junction.
         for points in _event_marginal_points:
             for point in points:
-                mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
+                try:
+                    mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
+                except ConstrainedCutError:
+                    continue
         for role in ("child_3", "parent"):
             for transition in transitions:
                 if not _is_resolvable(transition) or preflight_issues.get(
@@ -2132,6 +2200,13 @@ def cut_surface_at_transitions(
                             mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
                         else:
                             mesh.insert_point(point, preserve=True)
+                except ConstrainedCutError as error:
+                    # This transition's own anchors cannot enter the surface;
+                    # it is demoted with the recorded reason instead of
+                    # aborting every other transition on the slice.
+                    preflight_issues[transition.transition_id] = (
+                        f"{role} anchor insertion: {error}"
+                    )
                 finally:
                     mesh.active_component = None
     inserted_transitions = []
@@ -2212,11 +2287,14 @@ def cut_surface_at_transitions(
                 tagged=True,
                 event_endpoint_indices=endpoint_indices,
             )
-        except _TransitionCutConflict as conflict:
+        except ConstrainedCutError as conflict:
             # Vertices this transition already inserted are harmless
             # on-surface refinements; its partially constrained chain stays
             # protected but never becomes a cut. The transition itself is an
-            # explicit unresolved hyperedge, not a dead pitch slice.
+            # explicit unresolved hyperedge, not a dead pitch slice. This
+            # covers projection and location failures of this transition's
+            # own insertion as well as chain conflicts: all are recorded
+            # per-transition reasons, never an aborted slice (§21.2).
             unresolved.append(transition.transition_id)
             unresolved_reasons.append(str(conflict))
             for port in transition.ports:

@@ -1023,6 +1023,19 @@ must match all marginal points and their lifted separations. Exactly sampled
 nongeneric contacts also become explicit events; uncertain event geometry is
 retained without inventing a location or a binary decomposition (§5.4).
 
+A localized count change that is not an equal-height contact may instead
+certify as a below-`b` fold (ADR 0003's other case, ADR 0007): the marginal
+maximum plus, at a lifted offset on the same field line, an annihilating
+interior pair with `D_parallel B = D_parallel^2 B = 0`, strictly below `b` by
+the reported `fold_height_margin`, inside the parent well, local to the
+original sample bracket, and unique. A certified fold is an explicit
+`kind="fold"` event with one marginal point and continuous port limits; its
+uncertainty interval spans the bisected scan flip and the solved fold, because
+near the fold the pair is shallower than the root scan resolves (§21.3
+dimension 5) and probes in that blind zone carry blind counts. If both
+certifications accept, or neither does, the event stays uncertified and its
+incident arcs are not cut.
+
 `build_transition_arcs` subdivides at these events and computes one-sided limiting
 actions by independent parent and child integrals. It preserves the source `u`
 parameter and continuously aligns all field-line lifts. Each arc independently
@@ -1085,7 +1098,21 @@ action using §4.4's dimensionless `|ds wedge d alpha|`; this is not a bound on
 `K`-weighted volume or on reachability. Event/transition connectivity uncertainty
 remains separate. The NPZ format preserves arbitrary event-port endpoint
 incidence, unknown-action vertex IDs, unresolved arc reasons, and insertion counts.
-Matrix-level background/local refinement remains milestone 10.3 work.
+
+Milestone 10.3's coordinator (`j_connectivity.refinement`) drives these stages
+unattended: it dispatches each recorded unresolved reason to its targeted
+remediation — per-sample field-period-cap escalation, source-budget escalation
+reusing cached traces, contact-localization escalation, interval samples for
+event intervals without a regular sample, local edge-split refinement near
+companion curves whose strip width or constrained projection fails the local
+resolution requirement, and background escalation for unresolved extractions
+and critical classifications — with bounded, matrix-wide ladders and every
+retry recorded (§21.3). Component-provenance enforcement restricts every curve
+location and insertion to the single component that holds the whole curve
+within the surface-distance allowance, so an off-surface projection can never
+jump to a disconnected sheet (§21.2). A transition whose own insertion fails
+is demoted to an explicit unresolved hyperedge with the recorded reason rather
+than aborting the slice.
 
 For an earlier prototype, a mesh-aligned approximation based on itinerary changes across edges is acceptable, provided the direct backward map from \(\Gamma_{\max}\) is used to validate the location and branch correspondence.
 

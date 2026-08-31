@@ -137,11 +137,15 @@ def classify_failure_reason(reason: str) -> str:
         return "max_periods"
     if "T-to-EDGE strip width" in reason or "doubles back" in reason:
         return "thin_strip"
+    if "projected locally to B=b" in reason:
+        return "local_projection"
     if "disconnected" in reason and "component" in reason:
         return "off_component"
     if "from the nearest surface triangle" in reason:
         return "off_component"
     if "collapses onto the EDGE boundary" in reason or "from the EDGE" in reason:
+        return "background_geometry"
+    if "does not separate the surface" in reason:
         return "background_geometry"
     if "sampling budget" in reason:
         return "source_budget"
@@ -179,6 +183,22 @@ def _mentions_cap(*chunks) -> bool:
 
 def _is_strip_reason(reason: str) -> bool:
     return "T-to-EDGE strip width" in reason or "doubles back" in reason
+
+
+def _is_projection_reason(reason: str) -> bool:
+    return "projected locally to B=b" in reason
+
+
+def _is_locally_refinable_reason(reason: str) -> bool:
+    """Cut failures whose recorded remedy is local surface refinement.
+
+    A strip or strand separation below ``min_transition_strip_edge_ratio``
+    times the local edge scale passes once the local edges halve, and a
+    constrained vertex whose bounded ``B=b`` projection failed converges
+    because the PL surface approaches the true level quadratically while the
+    displacement allowance shrinks only linearly.
+    """
+    return _is_strip_reason(reason) or _is_projection_reason(reason)
 
 
 def _unwrap_near(point, origin, period):
@@ -342,7 +362,7 @@ def converge_cut(
             for transition_id, reason in zip(
                 cut.unresolved_transition_ids, cut.unresolved_transition_reasons
             )
-            if _is_strip_reason(reason)
+            if _is_locally_refinable_reason(reason)
         ]
         if not strip_ids or rounds_used >= budgets.local_refinement_rounds:
             break
@@ -383,10 +403,17 @@ def converge_cut(
         working_action = np.concatenate((working_action, new_action))
         working_surface = refined
         rounds_used += 1
+        triggered_by_strip = any(
+            _is_strip_reason(reason)
+            for reason in cut.unresolved_transition_reasons
+            if _is_locally_refinable_reason(reason)
+        )
         records.append(
             RemediationRecord(
                 round=rounds_used,
-                failure_class="thin_strip",
+                failure_class=(
+                    "thin_strip" if triggered_by_strip else ("local_projection")
+                ),
                 target=f"transitions {strip_ids}",
                 control="local_refinement_round",
                 previous=str(rounds_used - 1),
@@ -398,20 +425,24 @@ def converge_cut(
                 ),
             )
         )
-    remaining = [
-        reason
+    if any(
+        _is_locally_refinable_reason(reason)
         for reason in cut.unresolved_transition_reasons
-        if _is_strip_reason(reason)
-    ]
-    if remaining:
+    ):
+        used = f"({rounds_used} of {budgets.local_refinement_rounds} rounds used)"
         annotated = tuple(
             (
                 reason
                 + "; genuinely unrepresentable strip at the local refinement "
-                + f"bound ({rounds_used} of {budgets.local_refinement_rounds} "
-                + "rounds used)"
+                + f"bound {used}"
                 if _is_strip_reason(reason)
-                else reason
+                else (
+                    reason
+                    + "; local projection still failing at the local "
+                    + f"refinement bound {used}"
+                    if _is_projection_reason(reason)
+                    else reason
+                )
             )
             for reason in cut.unresolved_transition_reasons
         )
@@ -701,6 +732,10 @@ def converge_transitions(
             arrangement = None
             continue
         # 4. Source sampling work budget, reusing all cached traces.
+        # An arc whose certification discovered a new nongeneric sample or an
+        # unexplained count change needs more retained source vertices: after
+        # remapping, the change becomes a source-level contact bracket that
+        # localization can turn into an explicit event.
         needs_budget = [
             arc.curve.transition_id
             for arc in arrangement.arcs
@@ -708,6 +743,7 @@ def converge_transitions(
             or "sampling budget exhausted" in (arc.unresolved_reason or "")
             or arc.unresolved_reason
             == "unexplained interior-maximum count change within arc"
+            or arc.unresolved_reason == "additional nongeneric or failed sample in arc"
         ] + [
             transition.transition_id
             for transition in transitions

@@ -907,6 +907,58 @@ def localize_transition_contacts(field, critical, transitions, config=None):
             _register_event(
                 events, geometry, occurrence, critical.period, config.event_tolerance
             )
+        # An open GAMMA_MAX polyline whose terminal vertex is classified
+        # DEGENERATE ends where the marginal maximum annihilates
+        # (D_parallel^2 B -> 0, §5.4's first bullet; the milestone 8 junction
+        # solves place that vertex on the solved degenerate point).  The
+        # terminal vertex cannot be traced, so the curve's end becomes an
+        # explicit event whose uncertainty interval is the terminal
+        # authoritative vertex spacing: incident arcs stop at the last
+        # regular vertex and the annihilation neighborhood stays inside the
+        # event rather than being truncated silently or vetoing the whole
+        # curve (ADR 0008).
+        if not polyline.closed and len(polyline.vertex_ids) >= 2:
+            last = len(polyline.vertex_ids) - 1
+            for end_index, neighbor_index, sample_index in (
+                (0, 1, 0),
+                (last, last - 1, len(transition.u) - 1),
+            ):
+                vertex = int(polyline.vertex_ids[end_index])
+                if critical.point_kind[vertex] != CriticalKind.DEGENERATE.value:
+                    continue
+                point = np.asarray(critical.points[vertex], dtype=float)
+                s = float(np.sum(point[:2] ** 2))
+                theta = float(np.arctan2(point[1], point[0]))
+                zeta = float(point[2])
+                alpha = theta - float(field.iota(s)) * zeta
+                interval = sorted(
+                    (
+                        float(polyline.u[end_index]),
+                        float(polyline.u[neighbor_index]),
+                    )
+                )
+                occurrence = ContactBracket(
+                    transition.transition_id,
+                    (sample_index, sample_index),
+                    np.asarray(interval, dtype=float),
+                    (),
+                    True,
+                    "degenerate curve endpoint: the marginal maximum "
+                    "annihilates within one authoritative vertex spacing",
+                )
+                _register_event(
+                    events,
+                    (
+                        point[np.newaxis, :],
+                        np.array([s, alpha]),
+                        np.array([zeta]),
+                        "degenerate_endpoint",
+                        None,
+                    ),
+                    occurrence,
+                    critical.period,
+                    config.event_tolerance,
+                )
     return LocalizedTransitions(
         tuple(transitions), tuple(events), scan_artifacts=tuple(artifacts)
     )
@@ -1340,14 +1392,17 @@ def build_transition_arcs(field, critical, localized, extra_samples=None):
                     # micro-bracket's midpoint (milestone 10.2, unchanged).
                     # A certified fold's interval also spans the root scan's
                     # blind zone, whose probes carry blind interior-maximum
-                    # counts: its incident arcs start at the interval bounds
-                    # and the blind zone stays inside the event (ADR 0007).
+                    # counts, and a degenerate curve endpoint's interval is
+                    # the untraceable terminal vertex spacing: those events'
+                    # incident arcs start at the interval bounds and the
+                    # uncertain span stays inside the event (ADRs 0007, 0008).
                     *(
                         (
                             float(np.min(occurrence.u_interval)),
                             float(np.max(occurrence.u_interval)),
                         )
-                        if event.kind == "fold" and occurrence.localized
+                        if event.kind in ("fold", "degenerate_endpoint")
+                        and occurrence.localized
                         else (
                             float(np.mean(occurrence.u_interval)),
                             float(np.mean(occurrence.u_interval)),
@@ -1517,40 +1572,55 @@ def build_transition_arcs(field, critical, localized, extra_samples=None):
                             "event geometry remains unresolved: " + occurrence.reason
                         )
                 values = [sample for _, sample in rows]
+                parameters = [u for u, _ in rows]
+                # A degenerate curve endpoint has no traceable limiting well:
+                # the arc keeps its last regular sample as the terminal
+                # payload and the untraceable annihilation neighborhood stays
+                # inside the event's uncertainty interval (ADR 0008).
                 if left_event is not None:
-                    if left_event.event_id not in wells:
-                        wells[left_event.event_id] = _event_well(
-                            field, left_event, critical.period, source.controls
+                    if left_event.kind != "degenerate_endpoint":
+                        if left_event.event_id not in wells:
+                            wells[left_event.event_id] = _event_well(
+                                field, left_event, critical.period, source.controls
+                            )
+                        values.insert(
+                            0,
+                            _event_limit(
+                                field,
+                                left_event,
+                                values[0],
+                                critical.period,
+                                *wells[left_event.event_id],
+                            ),
                         )
-                    values.insert(
-                        0,
-                        _event_limit(
-                            field,
-                            left_event,
-                            values[0],
-                            critical.period,
-                            *wells[left_event.event_id],
-                        ),
-                    )
+                        parameters.insert(0, low)
                 else:
                     values.insert(0, _single_sample(source, 0))
+                    parameters.insert(0, low)
                 if right_event is not None:
-                    if right_event.event_id not in wells:
-                        wells[right_event.event_id] = _event_well(
-                            field, right_event, critical.period, source.controls
+                    if right_event.kind != "degenerate_endpoint":
+                        if right_event.event_id not in wells:
+                            wells[right_event.event_id] = _event_well(
+                                field, right_event, critical.period, source.controls
+                            )
+                        values.append(
+                            _event_limit(
+                                field,
+                                right_event,
+                                values[-1],
+                                critical.period,
+                                *wells[right_event.event_id],
+                            )
                         )
-                    values.append(
-                        _event_limit(
-                            field,
-                            right_event,
-                            values[-1],
-                            critical.period,
-                            *wells[right_event.event_id],
-                        )
-                    )
+                        parameters.append(high)
                 else:
                     values.append(_single_sample(source, len(source.u) - 1))
-                parameters = [low, *[u for u, _ in rows], high]
+                    parameters.append(high)
+                if len(values) < 2:
+                    raise ValueError(
+                        "event interval retains fewer than two samples; the "
+                        "arc is below the authoritative vertex resolution"
+                    )
                 values, parameters, sampling_ok, unresolved_intervals, reason, added = (
                     _certify_arc_samples(
                         field,
