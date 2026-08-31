@@ -697,6 +697,57 @@ def test_local_refinement_refines_near_the_curve_not_globally():
     assert len(near_refined) > np.count_nonzero(surface.points[:, 0] <= -0.55)
 
 
+def test_local_refinement_actions_never_blend_across_the_companion():
+    # Finite pre-cut actions with a jump along the coming cut: refined
+    # midpoints of same-branch edges take PL values, midpoints of edges that
+    # cross the companion are clamped to their own side or stay NaN — never
+    # a parent/child blend (§21.2).  The parent branch spans [2.9, 3.3] and
+    # the child branch [0.95, 1.15]; any non-port finite value strictly
+    # between the bands is a blend across the discontinuity.
+    surface, _ = _surface_and_action()
+    transition = _transition()
+    companion = np.column_stack(([-0.4, 0.0, 0.4], [0.19, 0.19, 0.19], np.zeros(3)))
+    x, y = surface.points[:, 0], surface.points[:, 1]
+    action = np.where(
+        y < 0.19,
+        3.1 + 0.25 * x,
+        np.where(np.abs(x) <= 0.4, 1.05 + 0.125 * x, np.nan),
+    )
+    action[9:] = np.nan
+    # Move the child-3 marginal actions out of the parent/child-1 gap so a
+    # cross-branch blend (about 2.1 for these branches) cannot hide behind a
+    # legitimate child-3 interpolation.
+    ports = []
+    for port in transition.ports:
+        if port.role in {"parent", "child_1"}:
+            ports.append(replace(port, points=companion))
+        else:
+            ports.append(replace(port, action_values=np.array([4.0, 4.05, 4.1])))
+    transition = replace(transition, ports=tuple(ports))
+
+    cut, records = converge_cut(
+        surface,
+        action,
+        (transition,),
+        budgets=RefinementBudgets(local_refinement_rounds=4),
+    )
+    assert cut.unresolved_transition_ids.size == 0
+    assert len(np.unique(cut.sheet_ids)) == 3
+    assert [r.failure_class for r in records].count("thin_strip") >= 1
+    values = cut.action_values
+    port_vertices = {
+        int(vertex) for port in cut.ports for vertex in port.polyline_vertex_ids
+    }
+    check = np.array(
+        [index not in port_vertices for index in range(len(values))]
+    ) & np.isfinite(values)
+    blended = check & (values > 1.2) & (values < 2.85)
+    assert not np.any(blended), values[blended]
+    # The crossing-edge midpoints that could not be clamped stay explicit
+    # NaN rather than silently absent (§21.2).
+    assert np.count_nonzero(~np.isfinite(values)) > 0
+
+
 def test_zero_width_strip_reports_refinement_bound_not_a_cut():
     surface, action = _surface_and_action()
     transition = _transition()
