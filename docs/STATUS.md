@@ -61,6 +61,13 @@ move it into `docs/DESIGN.md` and delete it here.
   (DESIGN §10.3), so it is still a surface-resolution control. Critical-curve
   projection now uses a centered `1e-6` Jacobian step to avoid relative-step
   stagnation near `zeta=0`; accepted `B` and `g` residual tolerances are unchanged.
+- A `CutEvent.sample_indices` entry denotes a one-sided event limit only when its
+  referenced port has `sheet_id >= 0`. An unresolved port may retain the full
+  source mapping for diagnosis; its indexed finite action is not an event limit.
+  Keep that port's connectivity unresolved when 10.3 consumes event incidence.
+- The legacy (non-event) `constrain_edge` path also gains safety checks: existing
+  vertex snaps are component-scoped and bounded in full 3-D, and the common-component
+  endpoint check runs before the snap shortcut. Existing mesh-cut tests pass unchanged.
 
 - Milestone 0 established base-only `j_connectivity` imports; optional features must use `optional_import()` so missing extras provide an install command.
 - Milestone 1's `BoozerFieldLike.B()` uses pointwise NumPy broadcasting; legacy `compute_B()` retains its outer-`s` grid semantics.
