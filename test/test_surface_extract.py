@@ -593,9 +593,7 @@ def test_w7x_split_points_polish_on_the_thin_tube_near_min_B(
     # succeed, and the split points must stay local to their parent edges
     # and inside the unit disk (no wild vertices).
     field = BoozerField.from_boozmn(
-        os.path.join(
-            DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
-        )
+        os.path.join(DATA_DIR, "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc")
     )
     background = StructuredPrismMeshBackend(BackgroundMeshConfig(*resolution)).build(
         field

@@ -66,7 +66,7 @@ FILES = (
     "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
     "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
 )
-LAMBDA_N = (0.05, 0.1, 0.5, 0.9, 0.95)
+LAMBDA_N = (0.05, 0.1, 0.5, 0.8, 0.9, 0.95)
 
 
 def _write_checkpoint(path: Path, payload: dict) -> None:
