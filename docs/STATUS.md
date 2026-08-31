@@ -27,7 +27,7 @@ lowest-numbered unchecked row.
 | 10 | Constrained cuts and sheet IDs | Insert \(T\), duplicate vertices, and make \(A\) continuous on each sheet | [x] | #19 |
 | 10.1 | Sampling-robust cut geometry | Make the sheet graph invariant to the transition sample budget, or explicitly budget-limited | [x] | #21 |
 | 10.2 | Contact localization and segment-level cutting | Cut the resolved arcs of curves with localized §5.4 events instead of vetoing whole curves | [x] | #22 |
-| 10.3 | Failure-directed refinement and matrix convergence | Converge the five-equilibrium matrix unattended via per-failure-class remediation | [x] | |
+| 10.3 | Failure-directed refinement and matrix convergence | Converge the five-equilibrium matrix unattended via per-failure-class remediation | [ ] | |
 | 11 | Direct contour tracer | Build the correctness oracle | [ ] | |
 | 12 | Interval primitives and bounded ordinary flood fill | Classify edge-connected action ranges without transitions using a finite algorithm with lower and upper bounds | [ ] | |
 | 13 | Transition-aware bounded flood fill | Add common-parameter transfer through hyperedges while preserving finite termination and bounds | [ ] | |
@@ -142,7 +142,10 @@ move it into `docs/DESIGN.md` and delete it here.
 
 - Milestone 10.3's coordinator (`j_connectivity.refinement`) converges each case
   with matrix-wide bounded ladders and records every retry; see
-  `docs/validation/milestone10.3-real-equilibria.md` for the final matrix.
+  `docs/validation/milestone10.3-real-equilibria.md` for the measured matrix.
+  The milestone's row stays unchecked pending proposed ADR 0009: every case
+  terminates explicitly, but the resolved fraction is below the §23 95%
+  threshold and the residual classes are at their ladder bounds.
   Things milestone 11 must carry:
   - Two new certified §5.4 event kinds exist under proposed ADRs 0007/0008:
     `"fold"` (one marginal point, continuous port limits, uncertainty interval
