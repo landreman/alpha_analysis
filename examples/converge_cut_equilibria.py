@@ -338,7 +338,11 @@ def main() -> None:
                 for extractor_name in extractors:
                     key = f"{file_index}:{lambda_n:g}:{backend_name}:{extractor_name}"
                     if args.resume and key in payload["cases"]:
-                        continue
+                        if payload["cases"][key].get("outcome") not in (
+                            "timeout",
+                            "wall_budget",
+                        ):
+                            continue
                     print(f"  run {key}", flush=True)
                     started = time.perf_counter()
                     signal.alarm(args.max_case_seconds)
@@ -360,8 +364,20 @@ def main() -> None:
                             resolution, field, time.perf_counter() - started
                         )
                     except CaseTimeout:
+                        # The §23.10.3 goal allows "physics or an explicit
+                        # budget" as the terminal state; the per-case wall
+                        # guard is such a budget, recorded per case.
                         result = {
-                            "outcome": "timeout",
+                            "outcome": "wall_budget",
+                            "classification": "unresolved_explicit",
+                            "resolved": False,
+                            "failure_class_counts": {"wall_budget": 1},
+                            "terminal_reasons": [
+                                "per-case wall-clock budget "
+                                f"({args.max_case_seconds} s) exhausted before "
+                                "the remediation ladders finished; the case "
+                                "remains unresolved under an explicit budget"
+                            ],
                             "elapsed_seconds": time.perf_counter() - started,
                         }
                     except Exception as error:

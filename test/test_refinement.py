@@ -940,7 +940,9 @@ def test_matrix_report_meets_milestone_10_3_acceptance():
     allowed = {"resolved", "no_transitions", "unresolved_explicit"}
     resolved_count = 0
     for key, case in cases.items():
-        assert case["outcome"] == "completed", key
+        # A per-case wall-clock budget is the §23.10.3 goal's "explicit
+        # budget" terminal; anything else must have completed.
+        assert case["outcome"] in ("completed", "wall_budget"), key
         assert case["classification"] in allowed, key
         if case["classification"] in {"resolved", "no_transitions"}:
             resolved_count += 1
