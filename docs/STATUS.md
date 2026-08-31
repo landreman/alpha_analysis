@@ -55,9 +55,28 @@ move it into `docs/DESIGN.md` and delete it here.
   [Tests](https://github.com/landreman/alpha_analysis/actions/runs/33379169289)
   passed on implementation commit `e39c5a1` (lint, Python 3.10–3.12, and full suite).
 
-- Keep milestone 10.3 within the existing test budget: the W7-X event fixture and
-  test together cost about 95 s locally, and the existing bounce-point plot is
-  about 20 s. Event insertion's existing-vertex snap has a chord-scaled allowance
+- The real-equilibrium matrix now carries a sixth radially global level,
+  `lambda_n = 0.8`, alongside `0.05, 0.1, 0.5, 0.9, 0.95`: five files x two
+  backends x two extractors x six levels is 120 cases, and `docs/DESIGN.md`
+  §23 milestone 10.3 counts them that way. The milestone 9/10/10.1/10.2 reports
+  under `docs/validation/` predate the new level and describe 100 cases; they are
+  records of what was run, not a target to match. The twenty new cases are recorded
+  in `docs/validation/lambda-n-0p8-matrix.md`: all completed, no new failure class,
+  extractors agreeing on every transition status. Two things for 10.3 to carry —
+  `d23p4` at this level hits the 128-field-period cap on all four combinations, and
+  the largest relative flux drift during event insertion, `4.13e-3` on the coarse
+  gmsh TURBO surface, is above the `8.77e-4` the 10.2 matrix recorded.
+
+- Keep milestone 10.3 within the existing test budget. The W7-X tests that used to
+  dominate it now run on `boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc`, the same
+  equilibrium as `boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc`
+  at 512 rather than 3200 Boozer modes: global `B` bounds agree to 1e-4, and the
+  event fixture reproduces the same four contacts and two events at `b=2.7781394`.
+  That cut the full suite roughly threefold; spend the headroom on physics, not on
+  slower tests. Tests still on the high-resolution file are the ones pinned to it:
+  the boozmn/wout consistency checks, and the `_polish_g_crossing` and
+  near-threshold-well regressions whose recorded points lie on that field's `B=b`
+  surface. Event insertion's existing-vertex snap has a chord-scaled allowance
   (DESIGN §10.3), so it is still a surface-resolution control. Critical-curve
   projection now uses a centered `1e-6` Jacobian step to avoid relative-step
   stagnation near `zeta=0`; accepted `B` and `g` residual tolerances are unchanged.

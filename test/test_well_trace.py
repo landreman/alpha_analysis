@@ -567,9 +567,7 @@ def test_entry_and_in_trace_tangent_contacts_are_not_regular_wells():
 
 
 def test_selected_W7X_well_agrees_with_legacy_compute_J_invariant():
-    path = os.path.join(
-        DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
-    )
+    path = os.path.join(DATA_DIR, "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc")
     field = BoozerField.from_boozmn(path)
     s = 0.5
     surface = BoozerSurface(field, s)

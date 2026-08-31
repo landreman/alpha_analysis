@@ -2417,7 +2417,7 @@ each remedy requires manual per-case tuning.
 **Goal:** Make the five-equilibrium matrix converge unattended: every failure
 class triggers its targeted remediation, bounded, and what remains unresolved is
 physics or an explicit budget, not a default knob. Unresolved cuts into sheets
-are very rare: 5% or fewer of cases in the 100-case matrix.
+are very rare: 5% or fewer of cases in the 120-case matrix.
 
 **Changes:**
 
@@ -2426,11 +2426,11 @@ are very rare: 5% or fewer of cases in the 100-case matrix.
 - bounded escalation with every retry recorded (§21.3);
 - regeneration of the real-equilibrium validation matrix with budget-invariance
   checks.
-- To achieve resolved outcomes for least 95% of the cases n the 100-case matrix,
+- To achieve resolved outcomes for least 95% of the cases n the 120-case matrix,
   diagnose the reasons for unresolved cases, devise new ideas if needed to
   remedy the unresolved cases, and budgets can be increased.
 
-**Acceptance:** The 100-case matrix report shows every case either resolves or terminates with a physically meaningful reason (a genuinely unrepresentable strip at the refinement bound, a genuine cap ceiling) with counts per failure class; no case needs manual per-case tuning to resolve.
+**Acceptance:** The 120-case matrix report shows every case either resolves or terminates with a physically meaningful reason (a genuinely unrepresentable strip at the refinement bound, a genuine cap ceiling) with counts per failure class; no case needs manual per-case tuning to resolve.
 At least 95% of the cases in the matrix have resolved cuts into sheets or have
 no transitions; only 5% or fewer of the cases are unresolved.
 

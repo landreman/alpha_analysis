@@ -469,11 +469,14 @@ def w7x_event_pipeline():
         extract_critical_curves,
     )
 
+    # The lower-resolution boozmn file for the same W7-X equilibrium: it
+    # reproduces the same four contacts and two events at this level, at a
+    # fraction of the field-evaluation cost.
     field = BoozerField.from_boozmn(
         str(
             Path(__file__).parents[1]
             / "data"
-            / "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
+            / "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc"
         )
     )
     b = 2.7781394

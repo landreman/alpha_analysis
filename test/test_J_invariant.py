@@ -12,9 +12,7 @@ from alpha_analysis import (
     find_bounce_points,
 )
 
-boozmn_file_name = os.path.join(
-    DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
-)
+boozmn_file_name = os.path.join(DATA_DIR, "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc")
 
 
 def test_compute_J_invariant_reference_grid():
@@ -31,28 +29,28 @@ def test_compute_J_invariant_reference_grid():
     j_reference = np.array(
         [
             [
-                [0.00873977512318135, 0.023394976504410036],
-                [0.043955587975138856, 0.02417013078841274],
-                [0.047411593347227256, 0.021248913705857228],
-                [0.023917904151112786, 0.024170130788412694],
+                [0.008881013641398709, 0.02279216042466707],
+                [0.043982204954358166, 0.02423475867978361],
+                [0.04752252331096682, 0.02134864246888575],
+                [0.02400059213337957, 0.024234758679783912],
             ],
             [
-                [0.14376622898855615, 0.091361876815906],
-                [0.1488120349311294, 0.11350986852550063],
-                [0.15033078696630559, 0.11476743295690289],
-                [0.14665286628320484, 0.0873463502918537],
+                [0.14383367182084644, 0.09132880853782989],
+                [0.1488626644852888, 0.11346307987838118],
+                [0.15041034830800995, 0.1144819159163441],
+                [0.1469045281610108, 0.08814200026716232],
             ],
             [
-                [0.5668853990400646, 0.4598254566459877],
-                [0.253930388305994, 0.1987444796980752],
-                [0.25089923422733934, 0.20052247249992536],
-                [0.8453458338883063, 0.4396318158857731],
+                [0.5670274953330922, 0.4602784397518842],
+                [0.25410126165820823, 0.19883570777394943],
+                [0.2510781578010797, 0.20033970661702052],
+                [0.8460996824762832, 0.4396219915845909],
             ],
             [
-                [np.nan, 1.4271735115821336],
-                [np.nan, 1.4192534097688618],
-                [np.nan, 0.3250939627968473],
-                [np.nan, 1.4192534097688614],
+                [np.nan, 1.4286179951731803],
+                [np.nan, 1.4195318446495615],
+                [np.nan, 0.3249846578271875],
+                [np.nan, 1.4195318446495622],
             ],
         ]
     )
@@ -95,7 +93,12 @@ def test_J_refine_doesnt_change_too_much():
     B_bounces = [0.1, 2.4, 2.7, 3.1, 5.1]
     alphas = np.linspace(0.0, 2.0 * np.pi, 10)
     phi_center = np.pi / surf.nfp
-    n_phi = 1001
+    # The refined-vs-unrefined gap is the O(dphi^2) endpoint error of the
+    # unrefined bounce points, so it is set by the grid, not by the field:
+    # the worst cases are the shallow wells at B_bounce = 2.4, just above
+    # B_min = 2.294.  On this grid that gap converges as 5.5e-3, 1.1e-3,
+    # 2.9e-4 for n_phi = 1001, 2001, 4001.
+    n_phi = 2001
     phi_margin = 4.0
 
     for B_bounce in B_bounces:
@@ -121,7 +124,7 @@ def test_J_refine_doesnt_change_too_much():
             )
 
             np.testing.assert_allclose(
-                data_refined["J"], data_unrefined["J"], atol=1e-14, rtol=0.004
+                data_refined["J"], data_unrefined["J"], atol=1e-14, rtol=0.002
             )
 
 

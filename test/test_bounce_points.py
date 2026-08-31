@@ -12,9 +12,7 @@ from alpha_analysis import (
     plot_bounce_points,
 )
 
-boozmn_file_name = os.path.join(
-    DATA_DIR, "boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc"
-)
+boozmn_file_name = os.path.join(DATA_DIR, "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc")
 
 
 def test_refine_doesnt_change_too_much():

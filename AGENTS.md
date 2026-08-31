@@ -95,7 +95,7 @@ Certified runs must preserve the sheet graph; budget sensitivity remains a §21.
 convergence signal to report, not a knob to tune (see ADR 0005 and milestone 10.1).
 If the new machinery is specific to one value of \(b = B_{bounce}\), then
 exercise the functionality for
-\(\lambda_n = 0.05, 0.1, 0.5, 0.9, 0.95\) where \(\lambda_n\) is defined by
+\(\lambda_n = 0.05, 0.1, 0.5, 0.8, 0.9, 0.95\) where \(\lambda_n\) is defined by
 \(b = B_{min} + \lambda_n * (B_{max} - B_{min})\) and \(B_{min}\) and \(B_{max}\) are radially global
 (extrema over all radii).
 
