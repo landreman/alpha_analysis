@@ -7,6 +7,9 @@
 
 ## Context
 
+This section records the prototype at the time of the decision; follow-up
+implementation evidence appears below.
+
 Milestone 10.2 requires that a curve with a bracketed contact "cuts its regular
 arcs and carries an explicit event hyperedge at the localized contact" and that
 "no dangling cut terminates in a surface interior without an event node."
@@ -176,3 +179,24 @@ The required 100-case matrix, mutation checks, final diagnostic/persistence
 verification, and ready-for-review gate remain incomplete. No Claude review is
 requested for this stopped draft. The existing Tests gate is not waived: it must
 be green before this milestone is marked complete or the next one starts.
+
+## Implementation follow-up
+
+The decided cutter-side work now completes the six-sheet synthetic arrangement
+on all six backgrounds without weakening its acceptance test. A fallback through
+actual adjacent triangle faces replaces the branching vertex path; it splits
+crossed edges within the existing distance allowance, preserves provenance and
+action stencils, and is bounded by 64 faces per insertion. The experimental broad
+chart-cavity retriangulation module was removed. The existing DMerc test also
+passes: the guard now recognizes physical `EDGE` endpoints in reordered critical
+curves while retaining the companion-cut degree check.
+
+The W7-X reference retains two cut regular arcs and both explicit physical events;
+coarse `EDGE` strips and a nonseparating incident arc remain unresolved. Distinct
+one-sided limits at a shared unresolved event vertex are preserved on their ports;
+the vertex action is `NaN`, with its incident measure included in unresolved flux.
+No complete real-equilibrium topology or reachability value is claimed.
+
+See `docs/validation/milestone10.2-event-junctions.md` for tests, mutations,
+diagnostics, resolution evidence, and the current validation/publication gates.
+This follow-up does not change the Decision or milestone 10.3's scope.

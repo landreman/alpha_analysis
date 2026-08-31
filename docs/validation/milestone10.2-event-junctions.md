@@ -1,93 +1,140 @@
-# Milestone 10.2 stopped investigation
+# Milestone 10.2 contact localization and event-junction cuts
 
-This is evidence for **proposed ADR 0006**, not a completed validation report.
-Milestone 10.2 remains unchecked. The draft must not be merged in this state.
+Accepted ADR 0006 keeps the six-sheet and no-dangling-cut criteria unchanged.
+The bounded cutter now passes both, including all six backgrounds from the ADR.
+The experimental broad chart-cavity retriangulation module was removed.
 
 ## Reproduction
 
 ```bash
-.venv/bin/python examples/investigate_event_junctions.py \
-  --output /tmp/milestone102-evidence
-.venv/bin/python -m pytest test/test_transition_events.py -q
+source .venv/bin/activate
+python examples/investigate_event_junctions.py --output /tmp/event-junctions
+python examples/investigate_event_junctions.py --w7x --output /tmp/w7x-events
+python examples/validate_cut_equilibria.py --localize-events --output /tmp/events-matrix.json
+make check
 ```
 
-The investigation script saves JSON evidence, a pickle-free cut snapshot, and
-the diagnostic below. The checked-in JSON includes hashes of the experimental
-implementation files. The script is not a replacement for the failing test.
-Its optional `--w7x` path is provided for further investigation; a completed
-W7-X cut has **not** been validated in this draft.
+The investigation driver saves JSON evidence, a pickle-free cut snapshot, and
+synthetic diagnostic PNG. `--resolution NR NTHETA NZETA` reproduces individual ADR
+grids. Reports record source hashes. Concurrent diagnostic timings are not
+clean test-budget benchmarks.
 
-## Observations
+## Acceptance evidence
 
-| Quantity | Observed result |
+| Criterion | Named test and independent constraint |
 | --- | --- |
-| Synthetic bounce field | `3.001685664207343` |
-| Background / extractor | structured `(4,16,36)` / marching tetrahedra |
-| Incoming vertices / triangles | 571 / 904 |
-| Source extraction / critical status | `REGULAR` / `REGULAR` |
-| Source maximum-curve vertices | 71 and 69 |
-| Folded input chart triangles | 13, all in incoming component 1 |
-| Localized physical events / source occurrences | 2 / 4 |
-| Experimental regular arcs | 4 |
-| Accepted cuts / explicitly unresolved arcs | 3 / 1 |
-| Actual sheets / independently expected sheets | **5 / 6** |
-| Unresolved arc | 3, with all three ports retained at sheet ID `-1` |
-| Diagnostic run including PNG | 12.64 s |
+| Bracketed contact becomes an explicit event | `test_localized_contacts_preserve_the_two_equal_height_maxima`: independent scalar equations pin event angles, heights, and negative curvatures. |
+| Regular arcs cut without binary decomposition | `test_contact_arcs_share_physical_events_and_have_one_sided_actions` and `test_regular_arcs_cut_into_six_wells_without_dangling_event_ends`: two lower marginal barriers inside `[a,d]` give six limiting wells, with independently integrated parent/child actions and six incident sheets per event. |
+| W7-X four-contact reference cuts arcs and retains events | `test_w7x_reference_four_contacts_cut_regular_arcs_with_explicit_events`: four occurrences pair into two physical events; regular arcs cut, failed arcs retain their ports, and incidence/actions survive serialization. |
+| No dangling interior cut | The synthetic and W7-X cut tests require every non-degree-two cut vertex to carry `EDGE` or explicit event-endpoint provenance. |
 
-The two lower maxima and the bounding ordinary crossings define six limiting
-well intervals independently of the triangulation; ADR 0006 gives the equations.
-The test therefore continues to require six sheets. Replacing that check with
-five, deleting it, labeling the accidental path branch an event, or omitting the
-unresolved arc would conceal the failure.
+Additional production-path safeguards:
 
-The source mesh's 13 reversed chart triangles are genuine folds in its field-line
-projection: adjacent triangles have consistent mesh-edge winding. Local cavity
-retriangulation and field-line-chart insertion improve the result but do not yet
-complete the fourth arc. The current refusal names a branch at vertex 243 and a
-dangling sample at vertex 811. IDs are diagnostic to this run, not golden values.
+- `test_sampled_equal_height_contact_keeps_an_explicit_event` covers an exactly
+  sampled contact and an open-source terminal contact without periodic wrapping.
+- `test_scan_alias_brackets_dissolve_without_inventing_physical_events` uses an
+  analytic field whose ordinary crossings cannot move or acquire a barrier at the
+  bounce height. Finer scans remove four false count brackets; independent
+  quadrature confirms the actions. Unclassified below-b folds remain explicit.
+- `test_regular_arc_certification_survives_a_source_contact_stop` verifies that
+  independently certifiable arcs survive, without exceeding the source budget.
+- `test_uncut_incident_arc_preserves_distinct_event_limits` catches conflicting
+  limits at a shared vertex in a partial arrangement: both port values remain
+  intact and the vertex is explicitly unknown, never overwritten.
+- The existing DMerc budget-invariance test passes unchanged. Its source sample
+  order can differ from actual boundary-chain order; the guard now recognizes
+  physical `EDGE` endpoints while preserving the companion-cut degree check.
 
-![Unresolved event-junction cut](milestone10.2-event-junctions.png)
+## Synthetic resolution evidence
 
-The image shows the incoming component carrying the unresolved arc. The blue
-curve is the mapped companion curve; it is **not** an accepted cut. The stars
-are the independently localized events. No cut is manufactured across the
-unresolved strip.
+The field and six independently identifiable well intervals are given in ADR 0006.
+The bounce field is `3.001685664207343`. The baseline incoming mesh has 571 points,
+904 triangles, two maximum curves with 71 and 69 vertices, and 13 folded chart
+triangles. No incoming component is merged or omitted.
 
-## Tests and limits
+| Structured grid | Sheets | Physical events | Unresolved arcs | Largest inserted face corridor |
+| --- | ---: | ---: | ---: | ---: |
+| 4,16,36 | 6 | 2 | 0 | 13 |
+| 4,16,48 | 6 | 2 | 0 | 25 |
+| 4,24,36 | 6 | 2 | 0 | 16 |
+| 4,24,54 | 6 | 2 | 0 | 16 |
+| 6,24,54 | 6 | 2 | 0 | 2 |
+| 4,16,45 | 6 | 2 | 0 | 25 |
 
-- `test_localized_contacts_preserve_the_two_equal_height_maxima` passes. It
-  compares against independent scalar equations for a second maximum whose
-  height crosses the bounce field between source samples.
-- `test_contact_arcs_share_physical_events_and_have_one_sided_actions` passes.
-  It checks event sharing, analytic event coordinates, field-line identity, and
-  independently integrated limiting action additivity.
-- `test_regular_arcs_cut_into_six_wells_without_dangling_event_ends` fails at
-  **5 != 6**. Its remaining assertions are not claimed as verification.
-- The existing `test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit`
-  also fails: the experimental path-degree guard retains one unresolved
-  transition where the existing test requires a cut. This is a regression to
-  diagnose and fix before merge, not an accepted change to milestone 10.1.
+All corridors are below the 64-face bound. All twelve ports have valid sheet
+incidence; no triangle spans the parent/child jump. Maximum port action error is
+below `9e-15`; all cut serialization round trips agree. Scalar flux change from
+insertion is below `3.5e-5` relative. This is topology stability evidence, not a
+convergence rate or a bound on weighted volume, triangle quality, or reachability.
 
-The baseline full check passed all 166 tests in 55.31 s of pytest time. The final
-`make check` passes formatting, then reports **167 passed, 2 failed in 56.11 s**
-(57.94 s total command wall time). Its slowest test is the existing bounce-point
-plot test at 16.76 s; the new six-sheet test takes 8.05 s, and the shared event
-fixture takes 3.83 s. These timings are within the budget, but the gate is red.
-The separate fast tier reports the same **167 passed, 2 failed in 48.26 s**
-(48.54 s command wall time); its slowest test is the bounce-point plot at 18.39 s,
-and the new six-sheet test takes 9.01 s. Both runs use three pytest workers in
-the required clean Python 3.10.5 virtual environment.
+![Event-junction cut on a folded chart](milestone10.2-event-junctions.png)
 
-The tests were first run against unimplemented stubs, then through the prototype.
-No test was weakened, skipped, xfailed, deleted, or newly marked slow. Mutation
-verification, the required five-equilibrium 100-case matrix, event serialization
-round-trip tests, complete nongeneric-sample handling, and final API/diagnostic
-integration remain unfinished because the STOP condition was reached.
+The figure shows the component carrying arc 3: input chart folds are red, the
+mapped companion is blue, and events are stars. The right panel colors the cut
+sheets. All four arcs cut in the full arrangement. Details are in
+`milestone10.2-event-junctions.json` and `milestone10.2-resolution-sweep.json`.
 
-The W7-X localization probe used
-`boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc`, `b=2.7781394`,
-and a structured `(6,24,12)` background. Its four contact occurrences pair into
-two events at `s=0.1184098663731` and `s=0.318907160215`, with localized parameter
-intervals narrower than `1e-5`. That probe took 67.25 s including source mapping.
-This is localization evidence only; the real cut acceptance criterion is still
-unmet, and no matrix convergence claim is made.
+The additional `map_transitions_budget_sweep` run reuses original-vertex traces
+at budgets 8, 10, 16, and full (`milestone10.2-event-budget-sweep.json`). Budgets
+8/10 leave all four arcs sampling-insufficient; budget 16 certifies two arcs but
+their geometry cannot yet be cut (a sub-resolution reversal and a nonseparating
+side). These runs keep all four arcs unresolved and three uncut geometric
+components, not a three-well physical result. Full mapping cuts all four arcs
+and gives six sheets. Both source `total_u_length` values are identical across
+budgets. This sensitivity is reported, not tuned away; sampling certification
+alone does not override the independent geometric cut guards.
+
+## W7-X and unresolved measure
+
+The W7-X reference uses `boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc`,
+`b=2.7781394`, structured `(6,24,12)`, and marching tetrahedra. Four source brackets
+pair into events at `s=0.1184098663731` and `s=0.318907160215` on lifted field lines.
+Final parameter brackets are narrower than `1e-5`.
+
+Five arcs result: arcs 1 and 3 cut; arcs 0 and 4 retain unresolved coarse `EDGE`
+strips, and arc 2 retains an unresolved nonseparating companion. There are two
+geometric sheets, not a claim of resolved physical topology. At two shared event
+vertices, the uncut incident arc leaves incompatible child limits: four endpoint
+samples therefore refer to explicitly unknown mesh action. Their distinct finite
+limits remain on the ports. Other port actions agree with the mesh to about `9e-15`.
+
+Diagnostics skip surface-wide action tracing and use production side probes for
+assignment. Unknown-action triangles remain present. `unresolved_action_flux`
+accounts for their complete dimensionless `|ds wedge d alpha|` measure; it is
+**not** a K-weighted volume or a Theta bound. Event connectivity and uncut-arc
+uncertainty remain separate. Milestone 10.3 owns coordinated refinement; later
+reachability/quadrature must carry every unknown contribution.
+
+## Mutations and gates
+
+Two process-local mutations were observed red and removed on process exit; no
+production files were mutated during matrix runs:
+
+1. Replace the independently integrated event parent action with child 1 alone.
+   `test_contact_arcs_share_physical_events_and_have_one_sided_actions` fails with
+   an omitted contribution of about `2.44979498` in length units.
+2. Restore the old vertex-path fallback instead of adjacent-face insertion.
+   `test_regular_arcs_cut_into_six_wells_without_dangling_event_ends` fails at
+   **5 != 6**. The accidental branch is not relabeled as a physical event.
+
+`make check` passes all **174 tests** (159.69 s pytest; 162.27 s command
+wall time), including the unchanged 21 mesh-cut tests. The new W7-X test is `slow`;
+the same event physics retains fast production synthetic tests and both mutations
+above. No test was weakened, skipped, xfailed, or deleted. `make test` passes
+173 fast tests in 68.17 s pytest / 68.57 s command wall time; its slowest test is
+19.93 s. The full gate's largest durations are W7-X fixture setup 83.91 s,
+the existing bounce-point plot 20.20 s, W7-X cutting/persistence 17.35 s,
+the existing J-refinement check 15.00 s, and the new six-sheet test 10.65 s.
+After the matrix completed, standalone `make test-full` passes all 174 tests in
+144.32 s pytest / **144.59 s command wall time**. Its largest durations are W7-X
+fixture setup 79.17 s, the existing bounce-point plot 17.55 s, W7-X cutting and
+persistence 16.21 s, and the new six-sheet test 10.23 s. Setup and call durations
+are listed separately as pytest reports them; the W7-X test including setup is
+about 95 s. Both global tier budgets are met without changing numerical inputs.
+The publication/CI gate is still pending; the milestone row stays unchecked.
+
+The completed 100-case matrix and diagnosed backend/extractor differences are in
+`milestone10.2-real-equilibria.md` and its JSON companion. It reproduces 164 source
+curves, retains 951 unresolved arcs without exceptions, and makes no real-matrix
+convergence claim. All cases affected by the endpoint fixes were rerun on the
+final core. GitHub publication and its Tests gate remain pending.

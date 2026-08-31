@@ -1,14 +1,13 @@
-"""Reproduce the stopped milestone-10.2 investigation (proposed ADR 0006).
+"""Reproduce milestone-10.2 event-junction diagnostics (accepted ADR 0006).
 
-This is a diagnostic, not a convergence claim. The synthetic case currently
-produces five sheets and an explicit unresolved arc; its six-sheet pytest
-acceptance check is intentionally still red. Example::
+This diagnostic supplements the independent six-well topology test. Example::
 
     .venv/bin/python examples/investigate_event_junctions.py --output /tmp/event-junctions
 
 Pass --w7x to exercise the reference curve with four contact occurrences. The
 output directory receives JSON evidence, a pickle-free cut snapshot if cutting
-completes, and a synthetic diagnostic PNG. Nothing is marked accepted by this run.
+completes, and a synthetic diagnostic PNG. Use --resolution for the ADR's
+background sweep. A successful diagnostic is not a full convergence claim.
 """
 
 import argparse
@@ -55,7 +54,7 @@ def synthetic_field():
     )
 
 
-def plot_synthetic(source, arrangement, cut, path):
+def plot_synthetic(source, arrangement, cut, path, resolution):
     import matplotlib.pyplot as plt
     from matplotlib.collections import PolyCollection
     from matplotlib.lines import Line2D
@@ -76,13 +75,19 @@ def plot_synthetic(source, arrangement, cut, path):
             source,
             f"Source component: {np.count_nonzero(folded)} folded triangles",
         ),
-        (axes[1], cut.surface, "Arc 3 remains unresolved; no cut is accepted here"),
+        (axes[1], cut.surface, "Conforming cut through the folded chart"),
     ):
-        triangles = surface.triangles[surface.component_ids == component]
+        selected_cells = surface.component_ids == component
+        triangles = surface.triangles[selected_cells]
+        colors = (
+            plt.get_cmap("Pastel1")(cut.sheet_ids[selected_cells] % 9)
+            if surface is cut.surface
+            else "#edf0f2"
+        )
         axis.add_collection(
             PolyCollection(
                 surface.points[triangles, :2],
-                facecolors="#edf0f2",
+                facecolors=colors,
                 edgecolors="#a6adb3",
                 linewidths=0.35,
             )
@@ -141,9 +146,10 @@ def plot_synthetic(source, arrangement, cut, path):
         fontsize=8,
     )
     fig.suptitle(
-        "BLOCKED prototype — proposed ADR 0006\n"
-        f"Synthetic two-barrier field; b={source.level:.12f}; structured (4,16,36); "
-        f"sheets {len(np.unique(cut.sheet_ids))}/6 required",
+        "Bounded event-junction insertion — ADR 0006\n"
+        f"Synthetic two-barrier field; structured {resolution}; "
+        f"{len(np.unique(cut.sheet_ids))} sheets; {len(cut.events)} events; "
+        f"{len(cut.unresolved_transition_ids)} unresolved arcs",
         fontsize=12,
     )
     fig.savefig(path, dpi=170)
@@ -155,6 +161,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--w7x", action="store_true")
+    parser.add_argument("--resolution", type=int, nargs=3)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     repository = Path(__file__).resolve().parents[1]
@@ -171,8 +178,10 @@ def main():
         field = synthetic_field()
         b = float(field.B(0.5, 0.0, np.arccos(-np.sqrt(7 / 30))))
         resolution = (4, 16, 36)
+    if args.resolution:
+        resolution = tuple(args.resolution)
     report = {
-        "implementation_status": "BLOCKED: proposed ADR 0006; not converged",
+        "implementation_status": "bounded insertion diagnostic; no full convergence claim",
         "equilibrium": str(equilibrium),
         "b": b,
         "resolution": resolution,
@@ -182,7 +191,7 @@ def main():
             for name in (
                 "alpha_analysis/j_connectivity/transition_events.py",
                 "alpha_analysis/j_connectivity/mesh_cut.py",
-                "alpha_analysis/j_connectivity/_chart_repair.py",
+                "alpha_analysis/j_connectivity/critical_curves.py",
             )
         },
     }
@@ -239,7 +248,7 @@ def main():
         }
         for arc in arrangement.arcs
     ]
-    print("Localized events and built experimental arcs", flush=True)
+    print("Localized events and built transition arcs", flush=True)
     try:
         cut = cut_surface_at_transition_arcs(
             extraction.incoming,
@@ -250,19 +259,27 @@ def main():
         save_cut_surface(args.output / "cut.npz", cut)
         report.update(
             {
-                "cut_outcome": "completed diagnostic, not accepted",
+                "cut_outcome": "completed",
                 "sheet_count": len(np.unique(cut.sheet_ids)),
                 "unresolved_arc_ids": cut.unresolved_transition_ids.tolist(),
                 "unresolved_arc_reasons": cut.unresolved_transition_reasons,
                 "port_sheet_ids": [
                     (port.transition_id, port.role, port.sheet_id) for port in cut.ports
                 ],
+                "corridor_count": cut.corridor_count,
+                "max_corridor_faces_used": cut.max_corridor_faces_used,
+                "unresolved_event_action_vertex_ids": cut.unresolved_event_action_vertex_ids.tolist(),
+                "unresolved_action_flux": cut.unresolved_action_flux(field),
             }
         )
         if not args.w7x:
             report["expected_sheet_count"] = 6
             report["source_folded_triangle_ids"] = plot_synthetic(
-                extraction.incoming, arrangement, cut, args.output / "diagnostic.png"
+                extraction.incoming,
+                arrangement,
+                cut,
+                args.output / "diagnostic.png",
+                resolution,
             )
     except Exception as error:
         report["cut_outcome"] = "exception"

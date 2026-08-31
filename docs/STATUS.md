@@ -44,15 +44,15 @@ here — a convention settled during implementation, a data file that has to be
 regenerated, a known-shaky tolerance. Keep it short; when an entry becomes permanent,
 move it into `docs/DESIGN.md` and delete it here.
 
-- Milestone 10.2 is stopped on **proposed ADR 0006**. Contact localization and
-  one-sided limits work in the experimental branch, but the production synthetic
-  arrangement yields five sheets instead of six and retains one arc unresolved.
-  Its source incoming mesh has 13 folded field-line-chart triangles. Decide whether
-  10.2 must include the local surface-resolution prerequisite assigned to 10.3, or
-  explicitly revise the acceptance scope, before proceeding. The six-sheet test
-  remains an ordinary failing test; the experimental cut guard also regresses the
-  existing DMerc budget-invariance test. No milestone is marked complete by this
-  draft.
+- Milestone 10.2 continues under **accepted ADR 0006**, with its six-sheet
+  acceptance unchanged. Bounded insertion through adjacent triangle faces now
+  completes the synthetic arrangement; the DMerc sampling regression is fixed.
+  Event vertices carrying incompatible one-sided limits in a partially cut
+  arrangement remain explicit unknown action, with all port limits preserved.
+  Local validation passes: 174 tests, both mutations, all six ADR grids, and the
+  100-case matrix (explicit unresolved outcomes, not matrix convergence).
+  Reports are in `docs/validation/milestone10.2-*.md`. Publication and the required
+  GitHub Tests gate remain pending, so the milestone row is not yet marked complete.
 
 - Milestone 0 established base-only `j_connectivity` imports; optional features must use `optional_import()` so missing extras provide an install command.
 - Milestone 1's `BoozerFieldLike.B()` uses pointwise NumPy broadcasting; legacy `compute_B()` retains its outer-`s` grid semantics.
@@ -114,3 +114,4 @@ Design decisions taken during implementation that differ from `docs/DESIGN.md` l
 - ADR 0003 — a `GAMMA_MAX` curve whose sampling steps over a nongeneric event is `MULTIWAY` even when every sample is `REGULAR`, and keeps its finite port actions for Milestone 10 to subdivide. (ADRs 0001 and 0002 predate this list and are not repeated here.)
 - ADR 0004 — an open companion-cut endpoint within the local surface-distance allowance (`max_surface_distance_ratio` × local edge scale) is extended to the nearest `EDGE` boundary edge, splitting it, with the extension's `u`/action clamped to the endpoint sample; beyond that allowance the transition stays an explicit geometry-unresolved hyperedge.
 - ADR 0005 — a critical polyline reversal at sub-resolution strand separation is reordered by arc length along the true `B=b, g=0` curve only when a bounded certification walk confirms one simple arc; uncertified reversals stay as extracted and counted, the cut-time double-back guard is permanent, and wide reversals are genuine geometry that is never touched.
+- ADR 0006 — bounded robust event-junction insertion belongs in milestone 10.2 with the six-sheet acceptance unchanged; milestone 10.3 coordinates matrix-level refinement. Failed incident arcs and unknown action measure remain explicit.

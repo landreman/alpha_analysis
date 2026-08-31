@@ -22,6 +22,9 @@ from .transitions import (
     _scan_step,
     _refined_action,
     _adaptive_parent_action,
+    _certify_interval,
+    _interval_midpoint_index,
+    _interval_priority,
 )
 from .types import TransitionStatus
 
@@ -40,10 +43,13 @@ class ContactLocalizationConfig:
     u_tolerance: float = 1.0e-5
     max_bisections: int = 20
     event_tolerance: float = 1.0e-7
+    scan_refinement_factor: int = 2
 
     def __post_init__(self):
         if self.max_bisections < 1:
             raise ValueError("max_bisections must be positive")
+        if self.scan_refinement_factor < 2:
+            raise ValueError("scan_refinement_factor must be at least two")
         for name in ("u_tolerance", "event_tolerance"):
             if not np.isfinite(getattr(self, name)) or getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be finite and positive")
@@ -59,6 +65,7 @@ class ContactBracket:
     samples: tuple
     localized: bool
     reason: str
+    scan_samples: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -86,12 +93,19 @@ class TransitionArc:
     ``curve`` stores one-sided limiting values at an event, not a proposed
     resolution of that event. Event connectivity remains a separate hyperedge.
     ``endpoint_event_ids`` is in the arc's order, with -1 for an ordinary end.
+    If endpoint construction fails, ``curve`` retains the source mapping for
+    diagnosis, explicitly uncertified; ``source_interval`` is the requested
+    unresolved span and no limiting event action is claimed for that payload.
     """
 
     curve: object
     source_transition_id: int
     endpoint_event_ids: tuple[int, int]
     unresolved_reason: str = ""
+    source_u: np.ndarray | None = None
+    additional_source_samples: int = 0
+    unresolved_source_intervals: tuple[tuple[float, float], ...] = ()
+    source_interval: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -101,6 +115,7 @@ class LocalizedTransitions:
     transitions: tuple
     events: tuple[TransitionEvent, ...]
     arcs: tuple[TransitionArc, ...] = ()
+    scan_artifacts: tuple[ContactBracket, ...] = ()
 
 
 def _single_sample(transition, index, *, u=None):
@@ -227,22 +242,31 @@ def _solve_equal_height(field, left, right, period, config):
                 ]
             )
 
-        solved = root(residual, [s, theta_m, zeta_m, tau], tol=1.0e-11)
+        # Unconstrained trial iterates can leave s>0 where the axis-regular
+        # field continuation is defined. They are rejected, never accepted
+        # from a NaN residual comparison.
+        with np.errstate(invalid="ignore", over="ignore"):
+            solved = root(residual, [s, theta_m, zeta_m, tau], tol=1.0e-11)
         ss, theta, zeta, offset = solved.x
         if not np.all(np.isfinite(solved.x)) or not 0 < ss <= 1:
             continue
         values = residual(solved.x)
         controls = sample.controls
         if (
-            np.max(np.abs(values[[0, 2]])) > controls.root_atol_B
+            not np.all(np.isfinite(values))
+            or np.max(np.abs(values[[0, 2]])) > controls.root_atol_B
             or np.max(np.abs(values[[1, 3]])) > controls.tangent_atol_B
         ):
             continue
         theta2 = theta + float(field.iota(ss)) * offset
+        curvatures = np.array(
+            [field.D2_B(ss, theta, zeta), field.D2_B(ss, theta2, zeta + offset)],
+            dtype=float,
+        )
         if (
             abs(offset) <= controls.root_atol_zeta
-            or float(field.D2_B(ss, theta, zeta)) >= -controls.D2_tolerance
-            or float(field.D2_B(ss, theta2, zeta + offset)) >= -controls.D2_tolerance
+            or not np.all(np.isfinite(curvatures))
+            or np.any(curvatures >= -controls.D2_tolerance)
         ):
             continue
         points = np.array(
@@ -280,6 +304,262 @@ def _solve_equal_height(field, left, right, period, config):
     return candidates[0] if len(candidates) == 1 else None
 
 
+def _sampled_event_geometry(field, sample, period, config):
+    """Recover the marginal points of an exactly sampled tangent contact.
+
+    The production scan's MULTIWAY stop retains the second maximum's lifted
+    location even though it correctly leaves all limiting actions unknown.
+    Both marginal residuals are checked before that location becomes an event.
+    """
+    s, alpha = sample.field_line_identity[0]
+    zeta_m = sample.event_zeta_unwrapped[0, 1]
+    if not np.all(np.isfinite([s, alpha, zeta_m])):
+        return None
+    iota = float(field.iota(s))
+    maxima = [float(zeta_m)]
+    points = [sample.marginal_points[0]]
+    for direction in (-1.0, 1.0):
+        trace = _directional_crossing(
+            field,
+            b=sample.b,
+            s=s,
+            theta_m=alpha + iota * zeta_m,
+            zeta_m=zeta_m,
+            direction=direction,
+            iota=iota,
+            period=period,
+            config=sample.controls,
+        )
+        if trace.status is not TransitionStatus.MULTIWAY or not np.isfinite(trace.zeta):
+            continue
+        zeta = float(trace.zeta)
+        theta = alpha + iota * zeta
+        if (
+            abs(float(field.B(s, theta, zeta)) - sample.b) > sample.controls.root_atol_B
+            or abs(float(field.D_B(s, theta, zeta))) > sample.controls.tangent_atol_B
+            or float(field.D2_B(s, theta, zeta)) >= -sample.controls.D2_tolerance
+        ):
+            continue
+        point = np.array(
+            [np.sqrt(s) * np.cos(theta), np.sqrt(s) * np.sin(theta), zeta % period]
+        )
+        if any(
+            np.linalg.norm(_periodic_delta(point, old, period))
+            <= config.event_tolerance
+            for old in points
+        ):
+            continue
+        points.append(point)
+        maxima.append(zeta)
+    if len(points) < 2:
+        return None
+    return np.asarray(points), np.array([s, alpha]), np.asarray(maxima)
+
+
+def _register_event(events, geometry, occurrence, period, tolerance):
+    """Match all marginal points and their lifted separations, not proximity alone."""
+    if geometry is not None:
+        points, identity, lift = geometry
+        for index, event in enumerate(events):
+            if (
+                len(event.marginal_points) != len(points)
+                or event.zeta_unwrapped is None
+            ):
+                continue
+            distances = np.array(
+                [
+                    [
+                        np.linalg.norm(_periodic_delta(a, b, period))
+                        for b in event.marginal_points
+                    ]
+                    for a in points
+                ]
+            )
+            order = np.argmin(distances, axis=1)
+            if len(set(order)) != len(points) or np.any(
+                distances[np.arange(len(points)), order] > tolerance
+            ):
+                continue
+            # Identical reduced points after a different number of field-line
+            # turns are not the same event. Only a common lift translation is
+            # permitted for the entire matched set of maxima.
+            shifts = event.zeta_unwrapped[order] - lift
+            if (
+                np.ptp(shifts) > tolerance
+                or abs(event.field_line_identity[0] - identity[0]) > tolerance
+            ):
+                continue
+            events[index] = replace(
+                event, occurrences=event.occurrences + (occurrence,)
+            )
+            return
+    events.append(
+        TransitionEvent(
+            len(events),
+            np.empty((0, 3)) if geometry is None else geometry[0],
+            (occurrence,),
+            field_line_identity=None if geometry is None else geometry[1],
+            zeta_unwrapped=None if geometry is None else geometry[2],
+        )
+    )
+
+
+def _scan_artifact(field, critical, polyline, source, left, right, config, records):
+    """Dissolve a scan alias only with unchanged wells and a refined midpoint.
+
+    Two endpoint rescans must find the same extrema count while preserving
+    both lifted ordinary crossings to root tolerance and all actions to their
+    quadrature tolerance. A third, true-curve midpoint must independently pass
+    the usual geometry/action interpolation tests. Real below-b folds are not
+    dissolved merely because the highest barrier stays below b (ADR 0003).
+    """
+    controls = replace(
+        source.controls,
+        samples_per_field_period=source.controls.samples_per_field_period
+        * config.scan_refinement_factor,
+        samples_per_wavelength=source.controls.samples_per_wavelength
+        * config.scan_refinement_factor,
+    )
+    refined_source = replace(source, controls=controls)
+    endpoints = [
+        _map_point(
+            field,
+            critical,
+            polyline,
+            refined_source,
+            item.marginal_points[0],
+            item.u[0],
+        )
+        for item in (left, right)
+    ]
+    records.extend(endpoints)
+    if any(item.status is not TransitionStatus.REGULAR for item in endpoints):
+        return None
+    if endpoints[0].interior_maximum_count[0] != endpoints[1].interior_maximum_count[0]:
+        return None
+    for old, new in zip((left, right), endpoints):
+        old_offsets = old.event_zeta_unwrapped[0] - old.event_zeta_unwrapped[0, 1]
+        new_offsets = new.event_zeta_unwrapped[0] - new.event_zeta_unwrapped[0, 1]
+        if np.any(
+            np.abs(old_offsets - new_offsets)
+            > 2
+            * (
+                controls.root_atol_zeta
+                + controls.root_rtol
+                * np.maximum(np.abs(old_offsets), np.abs(new_offsets))
+            )
+        ):
+            return None
+        for a, b in zip(old.ports, new.ports):
+            if abs(a.action_values[0] - b.action_values[0]) > 2 * (
+                controls.action_quadrature_atol
+                + controls.action_quadrature_rtol
+                * max(abs(a.action_values[0]), abs(b.action_values[0]))
+            ):
+                return None
+    first, last = left.marginal_points[0], right.marginal_points[0]
+    point = _projected_midpoint(
+        first,
+        last,
+        first + 0.5 * _periodic_delta(first, last, critical.period),
+        field,
+        critical.b,
+        critical.period,
+        CriticalCurveConfig(
+            B_tolerance=controls.root_atol_B, g_tolerance=controls.tangent_atol_B
+        ),
+    )
+    if point is None:
+        return None
+    middle = _map_point(
+        field, critical, polyline, refined_source, point, 0.5 * (left.u[0] + right.u[0])
+    )
+    records.append(middle)
+    if (
+        middle.status is not TransitionStatus.REGULAR
+        or middle.interior_maximum_count[0] != endpoints[0].interior_maximum_count[0]
+    ):
+        return None
+    span = float(right.u[0] - left.u[0])
+    for a, m, b in zip(endpoints[0].ports, middle.ports, endpoints[1].ports):
+        expected = a.points[0] + 0.5 * _periodic_delta(
+            a.points[0], b.points[0], critical.period
+        )
+        if (
+            np.linalg.norm(_periodic_delta(expected, m.points[0], critical.period))
+            > controls.curve_geometry_atol + controls.curve_geometry_rtol * span
+        ):
+            return None
+        expected_action = 0.5 * (a.action_values[0] + b.action_values[0])
+        if abs(
+            expected_action - m.action_values[0]
+        ) > controls.curve_action_atol + controls.curve_action_rtol * max(
+            abs(a.action_values[0]), abs(m.action_values[0]), abs(b.action_values[0])
+        ):
+            return None
+    return endpoints[0], middle, endpoints[1]
+
+
+def _localization_intervals(field, critical, polyline, source, left, right, config):
+    """Split newly discovered count levels under one shared bracket budget."""
+    pending = [(left, right)]
+    finished = []
+    samples = [left, right]
+    used = 0
+    while pending:
+        index = max(
+            range(len(pending)), key=lambda i: pending[i][1].u[0] - pending[i][0].u[0]
+        )
+        left, right = pending.pop(index)
+        if right.u[0] - left.u[0] <= config.u_tolerance:
+            finished.append((left, right, "localized count-change interval"))
+            continue
+        if used >= config.max_bisections:
+            finished.append((left, right, "contact localization budget exhausted"))
+            continue
+        first, second = left.marginal_points[0], right.marginal_points[0]
+        point = _projected_midpoint(
+            first,
+            second,
+            first + 0.5 * _periodic_delta(first, second, critical.period),
+            field,
+            critical.b,
+            critical.period,
+            CriticalCurveConfig(
+                B_tolerance=source.controls.root_atol_B,
+                g_tolerance=source.controls.tangent_atol_B,
+            ),
+        )
+        if point is None:
+            finished.append((left, right, "critical-curve midpoint projection failed"))
+            continue
+        sample = _map_point(
+            field, critical, polyline, source, point, 0.5 * (left.u[0] + right.u[0])
+        )
+        samples.append(sample)
+        used += 1
+        if sample.status is not TransitionStatus.REGULAR:
+            if (
+                sample.status is TransitionStatus.MULTIWAY
+                and _sampled_event_geometry(field, sample, critical.period, config)
+                is not None
+            ):
+                finished.append(
+                    (sample, sample, "localized sampled equal-height contact")
+                )
+            else:
+                finished.append(
+                    (left, right, "midpoint trace: " + sample.sample_failure_reason[0])
+                )
+            continue
+        count = sample.interior_maximum_count[0]
+        if count != left.interior_maximum_count[0]:
+            pending.append((left, sample))
+        if count != right.interior_maximum_count[0]:
+            pending.append((sample, right))
+    return finished, tuple(samples)
+
+
 def localize_transition_contacts(field, critical, transitions, config=None):
     """Bisect ADR 0003 brackets without choosing a multiway decomposition.
 
@@ -292,6 +572,7 @@ def localize_transition_contacts(field, critical, transitions, config=None):
     config = config or ContactLocalizationConfig()
     maxima = [p for p in critical.polylines if p.kind is CriticalKind.GAMMA_MAX]
     events = []
+    artifacts = []
     for transition in transitions:
         polyline = maxima[transition.transition_id]
         for pair in transition.contact_sample_pairs:
@@ -301,100 +582,80 @@ def localize_transition_contacts(field, critical, transitions, config=None):
             if second_index < first_index:
                 right_u += transition.total_u_length
             right = _single_sample(transition, second_index, u=right_u)
-            samples = [left, right]
-            reason = "contact localization budget exhausted"
-            for _ in range(config.max_bisections):
-                if right.u[0] - left.u[0] <= config.u_tolerance:
-                    reason = "localized count-change interval"
-                    break
-                first, second = left.marginal_points[0], right.marginal_points[0]
-                middle = first + 0.5 * _periodic_delta(first, second, critical.period)
-                point = _projected_midpoint(
-                    first,
-                    second,
-                    middle,
-                    field,
-                    critical.b,
-                    critical.period,
-                    CriticalCurveConfig(
-                        B_tolerance=transition.controls.root_atol_B,
-                        g_tolerance=transition.controls.tangent_atol_B,
+            scan_samples = []
+            refined = _scan_artifact(
+                field, critical, polyline, transition, left, right, config, scan_samples
+            )
+            if refined is not None:
+                artifacts.append(
+                    ContactBracket(
+                        transition.transition_id,
+                        (first_index, second_index),
+                        np.array([left.u[0], right.u[0]]),
+                        tuple(refined),
+                        True,
+                        "scan alias dissolved by endpoint and midpoint rescans with unchanged wells",
+                        tuple(scan_samples),
+                    )
+                )
+                continue
+            intervals, samples = _localization_intervals(
+                field, critical, polyline, transition, left, right, config
+            )
+            for left, right, reason in intervals:
+                localized = bool(right.u[0] - left.u[0] <= config.u_tolerance)
+                geometry = None
+                if localized:
+                    geometry = (
+                        _sampled_event_geometry(field, left, critical.period, config)
+                        if left is right
+                        else _solve_equal_height(
+                            field, left, right, critical.period, config
+                        )
+                    )
+                occurrence = ContactBracket(
+                    transition.transition_id,
+                    (first_index, second_index),
+                    np.array([left.u[0], right.u[0]]),
+                    samples,
+                    localized and geometry is not None,
+                    (
+                        reason
+                        if geometry is not None
+                        else reason + "; equal-height event not certified"
                     ),
+                    tuple(scan_samples),
                 )
-                if point is None:
-                    reason = "critical-curve midpoint projection failed"
-                    break
-                sample = _map_point(
-                    field,
-                    critical,
-                    polyline,
-                    transition,
-                    point,
-                    0.5 * (left.u[0] + right.u[0]),
+                _register_event(
+                    events,
+                    geometry,
+                    occurrence,
+                    critical.period,
+                    config.event_tolerance,
                 )
-                samples.append(sample)
-                if sample.status is not TransitionStatus.REGULAR:
-                    reason = "midpoint trace: " + sample.sample_failure_reason[0]
-                    break
-                count = sample.interior_maximum_count[0]
-                if count == left.interior_maximum_count[0]:
-                    left = sample
-                elif count == right.interior_maximum_count[0]:
-                    right = sample
-                else:
-                    reason = "additional interior-maximum count in contact bracket"
-                    break
-            localized = right.u[0] - left.u[0] <= config.u_tolerance
+        for index, status in enumerate(transition.sample_status):
+            if status not in (TransitionStatus.MULTIWAY, TransitionStatus.TANGENT):
+                continue
+            sample = _single_sample(transition, index)
             geometry = (
-                _solve_equal_height(field, left, right, critical.period, config)
-                if localized
+                _sampled_event_geometry(field, sample, critical.period, config)
+                if status is TransitionStatus.MULTIWAY
                 else None
             )
-            points = None if geometry is None else geometry[0]
             occurrence = ContactBracket(
                 transition.transition_id,
-                (first_index, second_index),
-                np.array([left.u[0], right.u[0]]),
-                tuple(samples),
-                localized and points is not None,
-                (
-                    reason
-                    if points is not None
-                    else reason + "; equal-height event not certified"
-                ),
+                (index, index),
+                np.repeat(transition.u[index], 2),
+                (sample,),
+                geometry is not None,
+                "sampled nongeneric event: " + transition.sample_failure_reason[index],
             )
-            match = None
-            if points is not None:
-                for index, event in enumerate(events):
-                    if len(event.marginal_points) != len(points):
-                        continue
-                    distances = np.array(
-                        [
-                            [
-                                np.linalg.norm(_periodic_delta(a, b, critical.period))
-                                for b in event.marginal_points
-                            ]
-                            for a in points
-                        ]
-                    )
-                    if np.all(np.min(distances, axis=1) <= config.event_tolerance):
-                        match = index
-                        break
-            if match is None:
-                events.append(
-                    TransitionEvent(
-                        len(events),
-                        np.empty((0, 3)) if points is None else points,
-                        (occurrence,),
-                        field_line_identity=None if geometry is None else geometry[1],
-                        zeta_unwrapped=None if geometry is None else geometry[2],
-                    )
-                )
-            else:
-                events[match] = replace(
-                    events[match], occurrences=events[match].occurrences + (occurrence,)
-                )
-    return LocalizedTransitions(tuple(transitions), tuple(events))
+            _register_event(
+                events, geometry, occurrence, critical.period, config.event_tolerance
+            )
+    return LocalizedTransitions(
+        tuple(transitions), tuple(events), scan_artifacts=tuple(artifacts)
+    )
 
 
 def _event_well(field, event, period, controls):
@@ -566,20 +827,13 @@ def _event_limit(field, event, sample, period, roots, sigma):
     )
 
 
-def _combine_arc(source, samples, period, arc_id, certified):
+def _combine_arc(field, source, samples, period, arc_id, certified, parameters):
     """Form one continuous open arc with its own authoritative PL arc length."""
     points = np.concatenate([item.marginal_points for item in samples])
-    u = np.concatenate(
-        (
-            [0.0],
-            np.cumsum(
-                [
-                    np.linalg.norm(_periodic_delta(a, b, period))
-                    for a, b in zip(points[:-1], points[1:])
-                ]
-            ),
-        )
-    )
+    # Keep the source's authoritative parameter. Localization inserts samples
+    # on that parameter; it must not change its total length as the budget
+    # changes. source_u on the arc preserves the unshifted correspondence.
+    u = np.asarray(parameters) - parameters[0]
     if np.any(np.diff(u) <= 0):
         raise ValueError("distinct arc samples coincide at an event")
     ports = tuple(
@@ -600,6 +854,25 @@ def _combine_arc(source, samples, period, arc_id, certified):
         )
         for index, port in enumerate(source.ports)
     )
+    # Singleton localization/refinement traces have their own periodic lifts.
+    # Align every port to the continuously lifted marginal arc, preserving
+    # each trace's entry/marginal/exit offsets on the same field line.
+    old_events = np.concatenate([item.event_zeta_unwrapped for item in samples])
+    zeta = np.unwrap(points[:, 2], period=period)
+    zeta += period * round((old_events[0, 1] - zeta[0]) / period)
+    shift = zeta - old_events[:, 1]
+    ports = tuple(
+        replace(port, zeta_unwrapped=port.zeta_unwrapped + shift) for port in ports
+    )
+    identities = np.concatenate([item.field_line_identity for item in samples]).copy()
+    iota = np.asarray(field.iota(identities[:, 0]))
+    theta = np.unwrap(np.arctan2(points[:, 1], points[:, 0]))
+    first_theta = (
+        identities[0, 1]
+        + np.ravel(np.broadcast_to(iota, len(points)))[0] * old_events[0, 1]
+    )
+    theta += 2 * np.pi * round((first_theta - theta[0]) / (2 * np.pi))
+    identities[:, 1] = theta - iota * zeta
     return replace(
         source,
         transition_id=arc_id,
@@ -607,12 +880,8 @@ def _combine_arc(source, samples, period, arc_id, certified):
         total_u_length=float(u[-1]),
         ports=ports,
         marginal_points=points,
-        field_line_identity=np.concatenate(
-            [item.field_line_identity for item in samples]
-        ),
-        event_zeta_unwrapped=np.concatenate(
-            [item.event_zeta_unwrapped for item in samples]
-        ),
+        field_line_identity=identities,
+        event_zeta_unwrapped=old_events + shift[:, None],
         additivity_residual=np.concatenate(
             [item.additivity_residual for item in samples]
         ),
@@ -627,12 +896,157 @@ def _combine_arc(source, samples, period, arc_id, certified):
         sampling_samples_used=len(samples),
         authoritative_sample_count=len(samples),
         sampling_certified=certified,
-        sampling_unresolved_intervals=None,
+        sampling_unresolved_intervals=(
+            None if certified else np.array([[0, len(samples) - 1]])
+        ),
         sampling_reason=(
             "regular source arc with one-sided event limits"
             if certified
             else "source arc remains uncertified"
         ),
+    )
+
+
+def _certify_arc_samples(field, critical, polyline, source, values, parameters, budget):
+    """Certify one arc using remaining authoritative-vertex work (§10.2).
+
+    Every existing trace is retained. Only original critical-curve vertices
+    can consume the remaining source budget; contact-localization traces have
+    their separate explicit bisection budget. Unknown intervals and new
+    physical failures remain unresolved, independently of other arcs.
+    """
+    if source.sampling_certified:
+        return values, parameters, True, [], "", 0
+    low, high = parameters[0], parameters[-1]
+    known = dict(zip(map(float, parameters), values))
+    candidates = {u: (sample.marginal_points[0], -1) for u, sample in known.items()}
+    for index, original_u in enumerate(polyline.u):
+        for cycle in (0, 1) if polyline.closed else (0,):
+            u = float(original_u + cycle * polyline.total_length)
+            if low < u < high:
+                candidates[u] = (critical.points[polyline.vertex_ids[index]], index)
+    coordinates = np.array(sorted(candidates))
+    points = np.array([candidates[u][0] for u in coordinates])
+    cache = {index: known[u] for index, u in enumerate(coordinates) if u in known}
+    tags = np.array(
+        [
+            (
+                critical.boundary_tags[polyline.vertex_ids[candidates[u][1]]]
+                if candidates[u][1] >= 0
+                else 0
+            )
+            for u in coordinates
+        ]
+    )
+    curve = replace(
+        polyline,
+        vertex_ids=np.arange(len(points)),
+        segment_ids=np.empty(0, dtype=np.int64),
+        u=coordinates - low,
+        total_length=float(high - low),
+        closed=False,
+    )
+    local = replace(
+        critical,
+        points=points,
+        segments=np.empty((0, 2), dtype=np.int64),
+        D2_B=np.zeros(len(points)),
+        point_kind=np.full(len(points), CriticalKind.GAMMA_MAX.value),
+        segment_kind=np.empty(0, dtype=np.int64),
+        boundary_tags=tags,
+        polylines=(curve,),
+    )
+    uncertain = []
+    for left, right in source.sampling_unresolved_intervals:
+        a, b = float(polyline.u[left]), float(polyline.u[right])
+        if right <= left:
+            b += polyline.total_length
+        for cycle in (-1, 0, 1):
+            uncertain.append(
+                (a + cycle * polyline.total_length, b + cycle * polyline.total_length)
+            )
+    selected = sorted(cache)
+    pending = [
+        (a, b)
+        for a, b in zip(selected[:-1], selected[1:])
+        if _interval_midpoint_index(curve, a, b) is not None
+        and (
+            not uncertain
+            or any(coordinates[a] < y and coordinates[b] > x for x, y in uncertain)
+        )
+    ]
+    added = 0
+    failures = []
+    while pending:
+        interval = max(
+            pending,
+            key=lambda pair: _interval_priority(local, curve, *pair, source.controls)[
+                0
+            ],
+        )
+        pending.remove(interval)
+        left, right = interval
+        middle = _interval_midpoint_index(curve, left, right)
+        if middle is None:
+            continue
+        if budget[0] is not None and budget[0] <= 0:
+            pending.append(interval)
+            break
+        original_index = candidates[float(coordinates[middle])][1]
+        sample = _map_polyline_samples(
+            field,
+            critical,
+            polyline,
+            source.transition_id,
+            source.controls,
+            np.array([original_index]),
+        )
+        cache[middle] = sample
+        if budget[0] is not None:
+            budget[0] -= 1
+        added += 1
+        passed, _, _, reason = _certify_interval(
+            local, curve, left, middle, right, cache, source.controls
+        )
+        if any(
+            cache[index].status is not TransitionStatus.REGULAR
+            for index in (left, middle, right)
+        ):
+            failures.append(interval)
+            continue
+        if (
+            len(
+                {
+                    int(cache[index].interior_maximum_count[0])
+                    for index in (left, middle, right)
+                }
+            )
+            > 1
+        ):
+            failures.append(interval)
+            continue
+        if not passed:
+            pending.extend(
+                pair
+                for pair in ((left, middle), (middle, right))
+                if _interval_midpoint_index(curve, *pair) is not None
+            )
+    selected = sorted(cache)
+    reason = (
+        "additional nongeneric or failed sample in arc"
+        if failures
+        else "source sampling budget exhausted on this arc" if pending else ""
+    )
+    unresolved = [
+        (float(coordinates[a]), float(coordinates[b])) for a, b in failures + pending
+    ]
+    return (
+        [cache[i] for i in selected],
+        coordinates[selected].tolist(),
+        not unresolved,
+        unresolved,
+        reason,
+        added,
     )
 
 
@@ -647,6 +1061,16 @@ def build_transition_arcs(field, critical, localized):
     arcs = []
     wells = {}
     for source in localized.transitions:
+        polyline = [p for p in critical.polylines if p.kind is CriticalKind.GAMMA_MAX][
+            source.transition_id
+        ]
+        remaining_budget = [
+            (
+                None
+                if source.controls.max_curve_samples is None
+                else max(0, source.controls.max_curve_samples - len(source.u))
+            )
+        ]
         occurrences = sorted(
             [
                 (float(np.mean(occurrence.u_interval)), event, occurrence)
@@ -656,12 +1080,24 @@ def build_transition_arcs(field, critical, localized):
             ],
             key=lambda item: item[0],
         )
-        if not occurrences:
+        artifacts = [
+            item
+            for item in localized.scan_artifacts
+            if item.source_transition_id == source.transition_id
+        ]
+        if not occurrences and not artifacts:
             arcs.append(
                 TransitionArc(
                     replace(source, transition_id=len(arcs)),
                     source.transition_id,
                     (-1, -1),
+                    (
+                        ""
+                        if source.status is TransitionStatus.REGULAR
+                        else source.sampling_reason
+                        + "; "
+                        + ", ".join(sorted(set(source.sample_failure_reason)))
+                    ),
                 )
             )
             continue
@@ -671,15 +1107,69 @@ def build_transition_arcs(field, critical, localized):
         for _, event, occurrence in occurrences:
             for sample in occurrence.samples:
                 samples[float(sample.u[0])] = sample
+        for artifact in artifacts:
+            for sample in artifact.samples:
+                samples[float(sample.u[0])] = sample
         # Closed source curves can have a bracket straddling u=total_length.
         length = source.total_u_length
-        samples = {u % length: sample for u, sample in samples.items()}
+        samples = {
+            (u % length if polyline.closed else u): sample
+            for u, sample in samples.items()
+        }
         occurrences = sorted(
-            [(u % length, e, o) for u, e, o in occurrences], key=lambda item: item[0]
+            [(u % length if polyline.closed else u, e, o) for u, e, o in occurrences],
+            key=lambda item: item[0],
         )
-        polyline = [p for p in critical.polylines if p.kind is CriticalKind.GAMMA_MAX][
-            source.transition_id
-        ]
+        if not occurrences:
+            rows = sorted(samples.items())
+            if polyline.closed:
+                rows.append((length, rows[0][1]))
+            values, parameters, certified, unresolved, reason, added = (
+                _certify_arc_samples(
+                    field,
+                    critical,
+                    polyline,
+                    source,
+                    [row[1] for row in rows],
+                    [row[0] for row in rows],
+                    remaining_budget,
+                )
+            )
+            regular = all(value.status is TransitionStatus.REGULAR for value in values)
+            same_count = (
+                len({int(value.interior_maximum_count[0]) for value in values}) == 1
+            )
+            certified = certified and regular and same_count
+            if not certified and not reason:
+                reason = (
+                    "unresolved sample or itinerary variation after scan refinement"
+                )
+            if polyline.closed:
+                values, parameters = values[:-1], parameters[:-1]
+            curve = _combine_arc(
+                field, source, values, critical.period, len(arcs), certified, parameters
+            )
+            curve = replace(
+                curve,
+                total_u_length=length,
+                sampling_reason=reason
+                or "scan aliases removed; regular curve certified",
+            )
+            if reason == "source sampling budget exhausted on this arc":
+                curve = replace(curve, status=TransitionStatus.BUDGET_INSUFFICIENT)
+            arcs.append(
+                TransitionArc(
+                    curve,
+                    source.transition_id,
+                    (-1, -1),
+                    reason,
+                    np.asarray(parameters),
+                    added,
+                    tuple(unresolved),
+                    (0.0, length),
+                )
+            )
+            continue
         intervals = list(zip(occurrences[:-1], occurrences[1:]))
         if polyline.closed:
             u, event, occurrence = occurrences[0]
@@ -690,6 +1180,10 @@ def build_transition_arcs(field, critical, localized):
         for left, right in intervals:
             low, left_event, left_occurrence = left
             high, right_event, right_occurrence = right
+            if high <= low:
+                # A sampled event at an open source endpoint has only its
+                # interior incident arc, not a fictitious zero-length arc.
+                continue
             rows = sorted(
                 [
                     (u + k * length, sample)
@@ -703,6 +1197,9 @@ def build_transition_arcs(field, critical, localized):
                 -1 if event is None else event.event_id
                 for event in (left_event, right_event)
             )
+            added = 0
+            unresolved_intervals = []
+            parameters = []
             try:
                 if not rows:
                     raise ValueError("event interval has no regular arc sample")
@@ -748,21 +1245,58 @@ def build_transition_arcs(field, critical, localized):
                     )
                 else:
                     values.append(_single_sample(source, len(source.u) - 1))
-                certified = source.sampling_certified and all(
+                parameters = [low, *[u for u, _ in rows], high]
+                values, parameters, sampling_ok, unresolved_intervals, reason, added = (
+                    _certify_arc_samples(
+                        field,
+                        critical,
+                        polyline,
+                        source,
+                        values,
+                        parameters,
+                        remaining_budget,
+                    )
+                )
+                certified = sampling_ok and all(
                     sample.status is TransitionStatus.REGULAR for sample in values
                 )
                 curve = _combine_arc(
-                    source, values, critical.period, len(arcs), certified
+                    field,
+                    source,
+                    values,
+                    critical.period,
+                    len(arcs),
+                    certified,
+                    parameters,
                 )
-                reason = (
-                    ""
-                    if certified
-                    else "source arc sampling or trace status remains unresolved"
-                )
+                if not certified and not reason:
+                    reason = "source arc contains a failed trace"
+                if reason == "source sampling budget exhausted on this arc":
+                    curve = replace(
+                        curve,
+                        status=TransitionStatus.BUDGET_INSUFFICIENT,
+                        sampling_reason=reason,
+                    )
             except (ValueError, FloatingPointError) as error:
                 curve = replace(
-                    source, transition_id=len(arcs), status=TransitionStatus.UNRESOLVED
+                    source,
+                    transition_id=len(arcs),
+                    status=TransitionStatus.UNRESOLVED,
+                    sampling_certified=False,
+                    sampling_reason=str(error),
                 )
                 reason = str(error)
-            arcs.append(TransitionArc(curve, source.transition_id, event_ids, reason))
+                unresolved_intervals = [(low, high)]
+            arcs.append(
+                TransitionArc(
+                    curve,
+                    source.transition_id,
+                    event_ids,
+                    reason,
+                    np.asarray(parameters),
+                    added,
+                    tuple(unresolved_intervals),
+                    (low, high),
+                )
+            )
     return replace(localized, arcs=tuple(arcs))

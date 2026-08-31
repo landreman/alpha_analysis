@@ -1006,11 +1006,39 @@ uncertified source-index intervals. An explicit stop flag controls certification
 human-readable diagnostic wording does not control it. The physical/event reason
 takes precedence over budget exhaustion when both occur on the last allowed sample.
 
+`localize_transition_contacts` refines each count-change bracket on the true
+`B=b, g=0` curve. Its default budget is 20 new midpoint traces per original
+bracket, shared if an intermediate count splits that bracket; the final `u`
+interval target is `1e-5`. Failed traces and exhausted intervals remain explicit.
+Two endpoint rescans at twice the root-scan density, and a corrected midpoint,
+may dissolve an alias only when the refined counts agree, the ordinary crossings
+and actions remain within their existing solve/quadrature tolerances, and the
+midpoint passes the geometry/action interpolation checks above. All probes are
+retained. A below-`b` fold is not dismissed merely because the highest barrier
+stays below `b`.
+
+An equal-height event requires both maxima to satisfy `B=b`, `D_parallel B=0`,
+and negative curvature on one lifted field line. Events shared by source curves
+must match all marginal points and their lifted separations. Exactly sampled
+nongeneric contacts also become explicit events; uncertain event geometry is
+retained without inventing a location or a binary decomposition (§5.4).
+
+`build_transition_arcs` subdivides at these events and computes one-sided limiting
+actions by independent parent and child integrals. It preserves the source `u`
+parameter and continuously aligns all field-line lifts. Each arc independently
+certifies its remaining source intervals using the unused original source-vertex
+budget. Localization traces have their separate budget. A failed endpoint build
+retains the source mapping as diagnostic data and explicitly records the requested
+unresolved `source_interval`; it does not claim finite limiting endpoint data or
+permit a cut. `None` still means every authoritative source vertex is mapped,
+not that continuous sub-vertex errors have been bounded.
+
 ### 10.3 Align \(T\) with the triangular mesh
 
 Only a regular, sampling-certified transition may enter this operation. A
 budget-insufficient transition remains an explicit unresolved hyperedge with
 all ports and the budget reason; it is never ordinary missing connectivity.
+This gate applies separately to each arc after milestone 10.2 localization.
 
 The production implementation should insert \(T\) as a constrained polyline:
 
@@ -1029,6 +1057,27 @@ stencil vertex's copy on the descendant's own sheet. Never retain a stale
 parent/child blend. A stencil that genuinely crosses the final cut is
 unresolved (`NaN` action), not an interpolation across the discontinuity;
 later stages must account for that unresolved action under §21.2.
+
+At event junctions, insert shared endpoint anchors before constraints. When a
+folded field-line chart prevents the ordinary local insertion, a bounded path
+through actual adjacent triangle faces may split crossed edges while retaining
+component and cell provenance (ADR 0006). Existing constraints and physical
+boundaries are barriers; each crossing must satisfy the existing local distance
+allowance, and the path is limited to `max_corridor_faces=64`. This is local
+constrained insertion, not global chart retriangulation. Degree checks prohibit
+branches or dangling companion cuts away from `EDGE` or an explicit event.
+
+Side assignment uses the existing decisive action comparison. Unrepresentable
+arcs retain all ports and their reasons. If an uncut incident arc leaves different
+one-sided event limits on one mesh vertex, retain those values on their distinct
+ports and set that vertex's action to `NaN`, with its ID recorded in
+`unresolved_event_action_vertex_ids`. Never overwrite one limit with another.
+`CutSurface.unresolved_action_flux` measures every triangle containing unknown
+action using §4.4's dimensionless `|ds wedge d alpha|`; this is not a bound on
+`K`-weighted volume or on reachability. Event/transition connectivity uncertainty
+remains separate. The NPZ format preserves arbitrary event-port endpoint
+incidence, unknown-action vertex IDs, unresolved arc reasons, and insertion counts.
+Matrix-level background/local refinement remains milestone 10.3 work.
 
 For an earlier prototype, a mesh-aligned approximation based on itinerary changes across edges is acceptable, provided the direct backward map from \(\Gamma_{\max}\) is used to validate the location and branch correspondence.
 

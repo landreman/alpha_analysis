@@ -1,5 +1,5 @@
 {
-  "implementation_status": "BLOCKED: proposed ADR 0006; not converged",
+  "implementation_status": "bounded insertion diagnostic; no full convergence claim",
   "equilibrium": "analytic field in ADR 0006",
   "b": 3.001685664207343,
   "resolution": [
@@ -10,12 +10,13 @@
   "localization_controls": {
     "u_tolerance": 1e-05,
     "max_bisections": 20,
-    "event_tolerance": 1e-07
+    "event_tolerance": 1e-07,
+    "scan_refinement_factor": 2
   },
   "source_sha256": {
-    "alpha_analysis/j_connectivity/transition_events.py": "6cb2e18af4d7dc9ef89604f6e99811a8fb4615fab22c1221932b1a7c0de29be6",
-    "alpha_analysis/j_connectivity/mesh_cut.py": "c9950385d07d9afed76ac7106fa709a37817967e3c282085c7d29552d08b0006",
-    "alpha_analysis/j_connectivity/_chart_repair.py": "65860cb3700e20eea6a12c9af5b7b50f40c9a0cd61062749690536ac56e039b4"
+    "alpha_analysis/j_connectivity/transition_events.py": "81920473150a82c24cfda25602ad2b1b79584c912bdf29f40f6a776cd0c620e9",
+    "alpha_analysis/j_connectivity/mesh_cut.py": "437c45619a95cf02aec86a99fcc6fef3c6ecbbba0a167799835bb3dd78d1b322",
+    "alpha_analysis/j_connectivity/critical_curves.py": "7599b22e73793e7ba9abd865f29ae01148d3a5bfc3f5fa1a602d2de924e16939"
   },
   "surface_status": "REGULAR",
   "critical_status": "REGULAR",
@@ -47,7 +48,7 @@
       ]
     ]
   ],
-  "mapping_seconds": 2.645462416985538,
+  "mapping_seconds": 3.150636750040576,
   "events": [
     {
       "event_id": 0,
@@ -188,31 +189,12 @@
       "reason": ""
     }
   ],
-  "cut_outcome": "completed diagnostic, not accepted",
-  "sheet_count": 5,
-  "unresolved_arc_ids": [
-    3
-  ],
-  "unresolved_arc_reasons": [
-    "inserted companion curve branches or terminates away from an authorized endpoint; invalid vertices [(243, 3, 8, []), (811, 1, 0, [45])]"
-  ],
+  "cut_outcome": "completed",
+  "sheet_count": 6,
+  "unresolved_arc_ids": [],
+  "unresolved_arc_reasons": [],
   "port_sheet_ids": [
     [
-      3,
-      "parent",
-      -1
-    ],
-    [
-      3,
-      "child_1",
-      -1
-    ],
-    [
-      3,
-      "child_3",
-      -1
-    ],
-    [
       0,
       "parent",
       2
@@ -239,25 +221,44 @@
     ],
     [
       1,
-      "child_3",
-      3
-    ],
-    [
-      2,
-      "parent",
-      0
-    ],
-    [
-      2,
-      "child_1",
-      2
-    ],
-    [
-      2,
       "child_3",
       4
+    ],
+    [
+      2,
+      "parent",
+      0
+    ],
+    [
+      2,
+      "child_1",
+      2
+    ],
+    [
+      2,
+      "child_3",
+      5
+    ],
+    [
+      3,
+      "parent",
+      4
+    ],
+    [
+      3,
+      "child_1",
+      3
+    ],
+    [
+      3,
+      "child_3",
+      5
     ]
   ],
+  "corridor_count": 10,
+  "max_corridor_faces_used": 13,
+  "unresolved_event_action_vertex_ids": [],
+  "unresolved_action_flux": 11.934332305966949,
   "expected_sheet_count": 6,
   "source_folded_triangle_ids": [
     449,
@@ -274,5 +275,5 @@
     528,
     559
   ],
-  "total_seconds": 12.641984416986816
+  "total_seconds": 16.19471708300989
 }
