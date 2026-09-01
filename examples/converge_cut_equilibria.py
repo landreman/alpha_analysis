@@ -288,6 +288,10 @@ def main() -> None:
             )
         },
     }
+    # Canonicalize through JSON so the comparison below sees exactly what a
+    # checkpoint stores (tuples become lists); otherwise every genuine resume
+    # of an existing checkpoint fails the controls check spuriously.
+    controls = json.loads(json.dumps(controls))
     if args.resume and args.output.exists():
         payload = json.loads(args.output.read_text())
         if payload["controls"] != controls:
