@@ -385,6 +385,12 @@ class _MutableMesh:
         self.constrained_edges: set[tuple[int, int]] = set()
         self.corridor_count = 0
         self.max_corridor_faces_used = 0
+        # Component-provenance enforcement (DESIGN.md §23 milestone 10.3):
+        # while set, every location, vertex snap, and insertion is restricted
+        # to triangles of this surface component, so an off-surface projection
+        # can never jump to a disconnected sheet that happens to be nearer in
+        # Euclidean coordinates (§21.2).
+        self.active_component: int | None = None
 
     def _unwrapped_triangle(self, triangle_id, point):
         ids = self.triangles[triangle_id]
@@ -394,11 +400,22 @@ class _MutableMesh:
         )
         return ids, vertices
 
-    def _nearest_location(self, point):
+    def _nearest_location(self, point, component=None):
+        if component is None:
+            component = self.active_component
         if not self.triangles:
             raise ConstrainedCutError("cannot insert a curve into an empty surface")
+        triangle_ids = np.arange(len(self.triangles), dtype=np.int64)
+        if component is not None:
+            triangle_ids = triangle_ids[
+                np.asarray(self.component_ids, dtype=np.int64) == int(component)
+            ]
+            if not len(triangle_ids):
+                raise ConstrainedCutError(
+                    f"surface has no triangles on component {component}"
+                )
         vertices = np.asarray(self.points, dtype=float)[
-            np.asarray(self.triangles, dtype=np.int64)
+            np.asarray(self.triangles, dtype=np.int64)[triangle_ids]
         ]
         vertices[:, :, 2] += self.period * np.round(
             (float(point[2]) - vertices[:, :, 2]) / self.period
@@ -413,10 +430,12 @@ class _MutableMesh:
             np.maximum(vertices.min(axis=1) - point, point - vertices.max(axis=1)),
             0.0,
         )
-        candidates = np.flatnonzero(
-            np.linalg.norm(box_delta, axis=1)
-            <= upper_bound + self.config.snap_tolerance
-        )
+        candidates = triangle_ids[
+            np.flatnonzero(
+                np.linalg.norm(box_delta, axis=1)
+                <= upper_bound + self.config.snap_tolerance
+            )
+        ]
         best = None
         for triangle_id in candidates:
             ids, vertices = self._unwrapped_triangle(triangle_id, point)
@@ -583,16 +602,29 @@ class _MutableMesh:
         self.component_ids.extend(component_additions)
         return new_id
 
+    def _component_vertices(self, component):
+        return {
+            int(vertex)
+            for triangle, owner in zip(self.triangles, self.component_ids)
+            if owner == component
+            for vertex in triangle
+        }
+
     def insert_point(self, point, *, tag=0, preserve=True):
         point = np.asarray(point, dtype=float)
+        snap_candidates = (
+            range(len(self.points))
+            if self.active_component is None
+            else sorted(self._component_vertices(self.active_component))
+        )
         distances = np.array(
             [
-                np.linalg.norm(_periodic_delta(point, existing, self.period))
-                for existing in self.points
+                np.linalg.norm(_periodic_delta(point, self.points[index], self.period))
+                for index in snap_candidates
             ]
         )
-        nearest = int(np.argmin(distances))
-        if distances[nearest] <= self.config.snap_tolerance:
+        nearest = int(snap_candidates[int(np.argmin(distances))])
+        if distances.min() <= self.config.snap_tolerance:
             self.tags[nearest] |= int(tag)
             return nearest
         distance, triangle_id, ids, closest, barycentric, edge_scale = (
@@ -699,15 +731,10 @@ class _MutableMesh:
         harmless offset from turning a boundary curve into an interior cut.
         """
         point = np.asarray(point, dtype=float)
+        if component is None:
+            component = self.active_component
         allowed_vertices = (
-            None
-            if component is None
-            else {
-                vertex
-                for triangle, owner in zip(self.triangles, self.component_ids)
-                if owner == component
-                for vertex in triangle
-            }
+            None if component is None else self._component_vertices(component)
         )
         tagged_vertices = [
             index
@@ -1358,10 +1385,25 @@ def _insert_curve(
     adaptive_anchors=False,
 ):
     tag = SurfaceMesh.G_ZERO if tagged else 0
+
+    def insert_tagged(point):
+        try:
+            return mesh.insert_tagged_point(point, tag)
+        except ConstrainedCutError:
+            if float(point[0] ** 2 + point[1] ** 2) < 1.0 - 1.0e-3:
+                raise
+            # A boundary-exit critical point (ADR 0001 EDGE|G_ZERO
+            # provenance) lives on the EDGE ring where the extracted g=0
+            # polyline ends; place it on the EDGE boundary and keep both
+            # provenance bits.
+            vertex = mesh.insert_tagged_point(point, SurfaceMesh.EDGE)
+            mesh.tags[vertex] |= tag
+            return vertex
+
     sample_ids = np.array(
         [
             (
-                mesh.insert_tagged_point(point, tag)
+                insert_tagged(point)
                 if tagged
                 else mesh.insert_point(point, preserve=True)
             )
@@ -1623,18 +1665,90 @@ def _incident_components(triangles, labels, vertex):
     )
 
 
-def _traced_side_action(mesh, component, triangle_labels, sample_ids):
+def _stabilized_side_demotion(
+    mesh,
+    inserted_transitions,
+    branch_components,
+    pre_duplicate_labels,
+    all_cut_vertices,
+):
+    """Last-resort side check at the stabilized component labels (§10.2).
+
+    Duplication gives every cut vertex one copy per incident component and
+    reads the parent- and child-side copies for each arc vertex.  An arc
+    vertex not incident to both branch components under exactly these labels
+    — typically an endpoint pinned to the mesh boundary whose one-sided fan
+    collapsed at a corner — has no trustworthy side assignment, so its
+    transition is demoted to an explicit unresolved hyperedge (§21.2) rather
+    than aborting the whole cut.  Evaluated only once every other demotion
+    criterion is silent, when the labels are final, so a cut that never
+    tripped the duplication-stage guard is untouched by construction.
+    Returns ``(inserted, reason)`` or ``None``.
+    """
+    for inserted in inserted_transitions:
+        parent_component, child_component = branch_components[
+            inserted.transition.transition_id
+        ]
+        for vertex, parameter in inserted.vertex_u.items():
+            incident = _incident_components(
+                mesh.triangles, pre_duplicate_labels, vertex
+            )
+            missing = [
+                side
+                for side, component in (
+                    ("parent", parent_component),
+                    ("child", child_component),
+                )
+                if vertex not in all_cut_vertices or component not in incident
+            ]
+            if missing:
+                return (
+                    inserted,
+                    f"arc {inserted.transition.transition_id} vertex {vertex} "
+                    f"u={parameter} lacks a {' and '.join(missing)}-side fan "
+                    "at the stabilized sheet labels; side assignment for "
+                    "this transition is untrustworthy at this resolution",
+                )
+    return None
+
+
+def _traced_side_action(mesh, component, triangle_labels, inserted):
     """Trace one well just inside ``component`` next to the inserted cut.
 
-    Returns ``(sample_index, action)`` from the first adjacent triangle whose
+    Returns ``(parameter, action)`` from the first adjacent triangle whose
     projected centroid yields a regular trace, or ``None``. This generates the
     same half-bounce action that ``evaluate_surface_data`` would have put on
     the surface, so side assignment stays data-driven even when the caller
-    skipped the surface-wide traces (ADR 0004).
+    skipped the surface-wide traces (ADR 0004). Candidates cover the mapped
+    samples and the chain's own split vertices, tried middle-of-arc first —
+    an arc's ends sit at events or annihilations where a probe well is
+    likeliest to be nongeneric.
     """
     if mesh.field is None:
         return None
-    for sample_index, vertex in enumerate(sample_ids):
+    # The mapped samples first, in order (their probes separated the sides in
+    # every previously green configuration), then the chain's own interior
+    # split vertices nearest the arc middle — the extension that keeps a
+    # probe available when every sample sits on an event or annihilation.
+    candidates = [
+        (int(vertex), float(inserted.vertex_u[int(vertex)]))
+        for vertex in inserted.sample_ids
+        if int(vertex) in inserted.vertex_u
+    ]
+    parameters = list(map(float, inserted.vertex_u.values()))
+    middle = 0.5 * (min(parameters) + max(parameters)) if parameters else 0.0
+    seen = {vertex for vertex, _ in candidates}
+    candidates.extend(
+        sorted(
+            (
+                (int(vertex), float(value))
+                for vertex, value in inserted.vertex_u.items()
+                if int(vertex) not in seen
+            ),
+            key=lambda item: abs(item[1] - middle),
+        )
+    )
+    for vertex, parameter in candidates:
         for triangle_id, triangle in enumerate(mesh.triangles):
             if triangle_labels[triangle_id] != component or vertex not in triangle:
                 continue
@@ -1669,7 +1783,7 @@ def _traced_side_action(mesh, component, triangle_labels, sample_ids):
                 mesh.trace_config or WellTraceConfig(),
             )
             if np.isfinite(trace.action_length):
-                return sample_index, float(trace.action_length)
+                return parameter, float(trace.action_length)
     return None
 
 
@@ -1677,21 +1791,65 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
     transition = inserted.transition
     parent = next(port for port in transition.ports if port.role == "parent")
     child = next(port for port in transition.ports if port.role == "child_1")
-    regular_sample_ids = [
-        vertex
+    probes = [
+        (
+            int(vertex),
+            float(parent.action_values[index]),
+            float(child.action_values[index]),
+        )
         for index, vertex in enumerate(inserted.sample_ids)
         if index not in inserted.event_endpoint_indices
     ]
-    adjacent = sorted(
-        {
-            component
-            for vertex in regular_sample_ids
-            for component in _incident_components(
-                mesh.triangles, triangle_labels, vertex
+    edge_probes = []
+    if not probes:
+        # A short arc between two event junctions has no non-event sample,
+        # but its constrained chain still separates two sides: probe the
+        # triangles flanking each chain edge, with the expected branch
+        # actions taken from the same common-u port interpolation the cut
+        # assigns along the chain.
+        for edge in sorted(inserted.path_edges):
+            first, second = map(int, edge)
+            if first not in inserted.vertex_u or second not in inserted.vertex_u:
+                continue
+            middle_u = 0.5 * (inserted.vertex_u[first] + inserted.vertex_u[second])
+            edge_probes.append(
+                (
+                    (first, second),
+                    _interpolate_port_action(transition, parent, middle_u),
+                    _interpolate_port_action(transition, child, middle_u),
+                )
             )
-        }
-    )
+    if probes:
+        adjacent = sorted(
+            {
+                component
+                for vertex, _, _ in probes
+                for component in _incident_components(
+                    mesh.triangles, triangle_labels, vertex
+                )
+            }
+        )
+    else:
+        adjacent = sorted(
+            {
+                int(triangle_labels[triangle_id])
+                for (first, second), _, _ in edge_probes
+                for triangle_id, triangle in enumerate(mesh.triangles)
+                if first in triangle and second in triangle
+            }
+        )
     if len(adjacent) != 2:
+        if len(adjacent) == 1:
+            # A slit can leave the surface globally connected — its two local
+            # sides meet around its ends — so no trustworthy parent/child
+            # sheet assignment exists at this background resolution. Typical
+            # of an under-resolved junction complex; the remedy is background
+            # refinement, never a guessed one-sheet duplication.
+            raise _TransitionCutConflict(
+                "companion cut does not separate the surface at this "
+                "resolution; refine the background mesh to resolve the "
+                "junction complex"
+            )
         raise _TransitionCutConflict(
             "a generic companion cut must have exactly two incident triangle sides; "
             f"found {adjacent}"
@@ -1700,9 +1858,7 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
     for component_index, component in enumerate(adjacent):
         parent_errors = []
         child_errors = []
-        for sample_index, vertex in enumerate(inserted.sample_ids):
-            if sample_index in inserted.event_endpoint_indices:
-                continue
+        for vertex, parent_expected, child_expected in probes:
             neighbor_values = []
             for triangle_id, triangle in enumerate(mesh.triangles):
                 if triangle_labels[triangle_id] != component or vertex not in triangle:
@@ -1714,23 +1870,43 @@ def _branch_components(mesh, inserted, triangle_labels, all_cut_vertices):
                 )
             if neighbor_values:
                 value = float(np.mean(neighbor_values))
-                parent_errors.append(abs(value - parent.action_values[sample_index]))
-                child_errors.append(abs(value - child.action_values[sample_index]))
+                parent_errors.append(abs(value - parent_expected))
+                child_errors.append(abs(value - child_expected))
+        for (first, second), parent_expected, child_expected in edge_probes:
+            neighbor_values = []
+            for triangle_id, triangle in enumerate(mesh.triangles):
+                if (
+                    triangle_labels[triangle_id] != component
+                    or first not in triangle
+                    or second not in triangle
+                ):
+                    continue
+                neighbor_values.extend(
+                    mesh.action[item]
+                    for item in triangle
+                    if item not in all_cut_vertices and np.isfinite(mesh.action[item])
+                )
+            if neighbor_values:
+                value = float(np.mean(neighbor_values))
+                parent_errors.append(abs(value - parent_expected))
+                child_errors.append(abs(value - child_expected))
         if not parent_errors:
             # No finite pre-cut action neighbors this side (e.g. the caller
             # skipped the surface-wide traces). Generate one datum by tracing
             # a well just inside the side instead of guessing (ADR 0004).
-            traced = _traced_side_action(
-                mesh, component, triangle_labels, inserted.sample_ids
-            )
+            traced = _traced_side_action(mesh, component, triangle_labels, inserted)
             if traced is None:
                 raise _TransitionCutConflict(
                     "a cut side has no finite neighboring action data and no "
                     "traceable probe point"
                 )
-            sample_index, value = traced
-            parent_errors.append(abs(value - parent.action_values[sample_index]))
-            child_errors.append(abs(value - child.action_values[sample_index]))
+            parameter, value = traced
+            parent_errors.append(
+                abs(value - _interpolate_port_action(transition, parent, parameter))
+            )
+            child_errors.append(
+                abs(value - _interpolate_port_action(transition, child, parameter))
+            )
         costs[component_index] = (np.mean(parent_errors), np.mean(child_errors))
     direct = costs[0, 0] + costs[1, 1]
     swapped = costs[0, 1] + costs[1, 0]
@@ -1822,15 +1998,63 @@ def _nearest_edge_boundary_point(mesh, point, component=None):
     return best_distance, best_point
 
 
+def _consistent_curve_component(mesh, points):
+    """Locate one whole curve on a single surface component, or explain why not.
+
+    Component-provenance enforcement (DESIGN.md §23 milestone 10.3): an
+    off-surface projection may be Euclidean-nearest to a disconnected sheet,
+    but a transition curve lives on one connected component.  The curve's
+    component is the unique component containing *every* sample within the
+    local surface-distance allowance.  No unique component means the curve
+    cannot be trustworthily placed: cutting anyway would bridge disconnected
+    geometry (§21.2), so the caller must keep the transition explicitly
+    unresolved.
+    """
+    components = set()
+    for point in points:
+        _, triangle_id, *_ = mesh._nearest_location(point)
+        components.add(int(mesh.component_ids[triangle_id]))
+    if len(components) == 1:
+        return next(iter(components)), None
+    viable = []
+    for component in sorted(components):
+        for point in points:
+            distance, _, _, _, _, edge_scale = mesh._nearest_location(
+                point, component=component
+            )
+            allowed = mesh.config.max_surface_distance_ratio * max(
+                edge_scale, mesh.config.snap_tolerance
+            )
+            if distance > allowed:
+                break
+        else:
+            viable.append(component)
+    if len(viable) == 1:
+        return viable[0], None
+    if not viable:
+        return None, (
+            f"companion T samples locate on disconnected surface components "
+            f"{sorted(components)} and no single component contains the whole "
+            "curve within the surface-distance allowance"
+        )
+    return None, (
+        f"companion T locates within the surface-distance allowance on "
+        f"multiple disconnected components {viable}; the assignment is "
+        "ambiguous"
+    )
+
+
 def _geometry_resolution_issue(mesh, transition, event_endpoint_indices=()):
     """Return why the current surface cannot represent ``T``, or ``None``."""
     parent = next(port for port in transition.ports if port.role == "parent")
     closed = _curve_is_closed(transition)
     edge_scales = []
-    curve_component = None
+    curve_component, component_issue = _consistent_curve_component(mesh, parent.points)
+    if component_issue is not None:
+        return component_issue
     for index, point in enumerate(parent.points):
         distance, triangle_id, ids, _, barycentric, edge_scale = mesh._nearest_location(
-            point
+            point, component=curve_component
         )
         allowed = mesh.config.max_surface_distance_ratio * max(
             edge_scale, mesh.config.snap_tolerance
@@ -1839,18 +2063,6 @@ def _geometry_resolution_issue(mesh, transition, event_endpoint_indices=()):
             return (
                 f"companion T is {distance:.3e} from the nearest surface "
                 f"triangle (allowed {allowed:.3e})"
-            )
-        component = int(mesh.component_ids[triangle_id])
-        if curve_component is None:
-            curve_component = component
-        elif component != curve_component:
-            # T lives on one connected sheet of the incoming surface; samples
-            # locating on two disconnected components mean the projection
-            # jumped components, and cutting across that jump would merge
-            # geometry §21.2 forbids merging.
-            return (
-                f"companion T samples locate on disconnected surface "
-                f"components {curve_component} and {component}"
             )
         distances = np.array(
             [
@@ -1944,6 +2156,93 @@ def _geometry_resolution_issue(mesh, transition, event_endpoint_indices=()):
     return None
 
 
+def _slit_wedge_labels(mesh, inserted, labels, next_label):
+    """Split the triangle fans around a non-separating slit into two banks.
+
+    A companion cut whose two ends terminate at interior events (for example
+    two degenerate curve endpoints, ADR 0008) is a genuine branch slit: the
+    surface stays globally connected around its ends, so component labels
+    cannot tell its sides apart, yet the parent and child banks are locally
+    well defined.  Triangles incident to an *interior* chain vertex are
+    assigned a bank by the chain's own orientation — a triangle containing
+    the directed chain edge in its winding is on one bank, the reversed edge
+    on the other — and the remaining fan triangles inherit the bank through
+    fan adjacency that never walks across the chain or around a tip.  The
+    tips stay shared by both banks, which is the slit's physical topology;
+    their incompatible one-sided limits go through the existing
+    unresolved-event-action path.  Returns ``(region, tips)`` and rewrites
+    ``labels`` in place, or ``None`` when no interior vertex exists (a
+    single-edge slit is below the mesh resolution) or the fan walk cannot
+    assign every triangle unambiguously.
+    """
+    chain_edges = {tuple(sorted(map(int, edge))) for edge in inserted.path_edges}
+    degree: dict[int, int] = {}
+    for first, second in chain_edges:
+        degree[first] = degree.get(first, 0) + 1
+        degree[second] = degree.get(second, 0) + 1
+    interior = {vertex for vertex, count in degree.items() if count >= 2}
+    tips = {vertex for vertex, count in degree.items() if count == 1}
+    if not interior:
+        return None
+    region = [
+        triangle_id
+        for triangle_id, triangle in enumerate(mesh.triangles)
+        if any(int(vertex) in interior for vertex in triangle)
+    ]
+    order = {vertex: parameter for vertex, parameter in inserted.vertex_u.items()}
+    sides: dict[int, int] = {}
+    for triangle_id in region:
+        triangle = list(map(int, mesh.triangles[triangle_id]))
+        for local in range(3):
+            first, second = triangle[local], triangle[(local + 1) % 3]
+            if tuple(sorted((first, second))) not in chain_edges:
+                continue
+            if first not in order or second not in order:
+                continue
+            forward = order[first] < order[second]
+            proposed = 0 if forward else 1
+            if sides.setdefault(triangle_id, proposed) != proposed:
+                return None
+    frontier = [triangle_id for triangle_id in region if triangle_id in sides]
+    if not frontier:
+        return None
+    region_set = set(region)
+    edge_owners: dict[tuple[int, int], list[int]] = {}
+    for triangle_id in region:
+        triangle = list(map(int, mesh.triangles[triangle_id]))
+        for local in range(3):
+            edge = tuple(sorted((triangle[local], triangle[(local + 1) % 3])))
+            edge_owners.setdefault(edge, []).append(triangle_id)
+    while frontier:
+        triangle_id = frontier.pop()
+        triangle = list(map(int, mesh.triangles[triangle_id]))
+        for local in range(3):
+            edge = tuple(sorted((triangle[local], triangle[(local + 1) % 3])))
+            if edge in chain_edges:
+                continue
+            # Fan adjacency only: crossing an edge that touches no interior
+            # chain vertex would walk around a tip and join the two banks.
+            if not any(vertex in interior for vertex in edge):
+                continue
+            for neighbor in edge_owners.get(edge, ()):
+                if neighbor == triangle_id or neighbor not in region_set:
+                    continue
+                if neighbor in sides:
+                    if sides[neighbor] != sides[triangle_id]:
+                        return None
+                    continue
+                sides[neighbor] = sides[triangle_id]
+                frontier.append(neighbor)
+    if any(triangle_id not in sides for triangle_id in region):
+        return None
+    base = {int(labels[triangle_id]) for triangle_id in region}
+    if len(base) != 1:
+        return None
+    for triangle_id in region:
+        labels[triangle_id] = next_label + sides[triangle_id]
+    return set(region), tips
+
+
 def _refresh_inserted_actions(mesh, triangles, labels, copy_id, assigned):
     """Refresh off-cut insertion descendants after branch actions are assigned.
 
@@ -2026,12 +2325,40 @@ def cut_surface_at_transitions(
         for transition in transitions
         if event_endpoints and _is_resolvable(transition)
     }
+    # Component-provenance enforcement: every insertion of one curve is
+    # restricted to the single component that holds the whole curve within
+    # the surface-distance allowance (§23 milestone 10.3, §21.2).
+    curve_components = {}
+    for transition in transitions:
+        if not _is_resolvable(transition) or preflight_issues.get(
+            transition.transition_id
+        ):
+            continue
+        assignments = {}
+        for role in ("parent", "child_3"):
+            port = next(port for port in transition.ports if port.role == role)
+            component, issue = _consistent_curve_component(mesh, port.points)
+            if issue is not None:
+                preflight_issues[transition.transition_id] = (
+                    issue if role == "parent" else f"{role}: {issue}"
+                )
+                break
+            assignments[role] = component
+        else:
+            curve_components[transition.transition_id] = assignments
     if event_endpoints:
         # All event anchors enter before constraints, so later incidence at a
         # true junction does not split/destroy an already constrained chain.
+        # A marginal anchor that cannot insert is skipped: without its shared
+        # vertex, an incident arc either still terminates consistently or
+        # fails its own degree checks and is demoted explicitly — never a
+        # silently branched junction.
         for points in _event_marginal_points:
             for point in points:
-                mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
+                try:
+                    mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
+                except ConstrainedCutError:
+                    continue
         for role in ("child_3", "parent"):
             for transition in transitions:
                 if not _is_resolvable(transition) or preflight_issues.get(
@@ -2039,11 +2366,24 @@ def cut_surface_at_transitions(
                 ):
                     continue
                 port = next(port for port in transition.ports if port.role == role)
-                for point in port.points:
-                    if port.role == "child_3":
-                        mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
-                    else:
-                        mesh.insert_point(point, preserve=True)
+                mesh.active_component = curve_components[transition.transition_id][
+                    "parent" if role == "parent" else "child_3"
+                ]
+                try:
+                    for point in port.points:
+                        if port.role == "child_3":
+                            mesh.insert_tagged_point(point, SurfaceMesh.G_ZERO)
+                        else:
+                            mesh.insert_point(point, preserve=True)
+                except ConstrainedCutError as error:
+                    # This transition's own anchors cannot enter the surface;
+                    # it is demoted with the recorded reason instead of
+                    # aborting every other transition on the slice.
+                    preflight_issues[transition.transition_id] = (
+                        f"{role} anchor insertion: {error}"
+                    )
+                finally:
+                    mesh.active_component = None
     inserted_transitions = []
     unresolved = []
     unresolved_reasons = []
@@ -2099,7 +2439,9 @@ def cut_surface_at_transitions(
         ):
             raise ConstrainedCutError("parent and child-1 do not share one companion T")
         closed = _curve_is_closed(transition)
+        components = curve_components.get(transition.transition_id, {})
         try:
+            mesh.active_component = components.get("parent")
             sample_ids, path_edges, vertex_u = _insert_curve(
                 mesh,
                 parent.points,
@@ -2110,6 +2452,7 @@ def cut_surface_at_transitions(
                 event_endpoint_indices=endpoint_indices,
                 adaptive_anchors=bool(event_endpoints),
             )
+            mesh.active_component = components.get("child_3")
             gamma_ids, _, gamma_vertex_u = _insert_curve(
                 mesh,
                 child_3.points,
@@ -2119,11 +2462,14 @@ def cut_surface_at_transitions(
                 tagged=True,
                 event_endpoint_indices=endpoint_indices,
             )
-        except _TransitionCutConflict as conflict:
+        except ConstrainedCutError as conflict:
             # Vertices this transition already inserted are harmless
             # on-surface refinements; its partially constrained chain stays
             # protected but never becomes a cut. The transition itself is an
-            # explicit unresolved hyperedge, not a dead pitch slice.
+            # explicit unresolved hyperedge, not a dead pitch slice. This
+            # covers projection and location failures of this transition's
+            # own insertion as well as chain conflicts: all are recorded
+            # per-transition reasons, never an aborted slice (§21.2).
             unresolved.append(transition.transition_id)
             unresolved_reasons.append(str(conflict))
             for port in transition.ports:
@@ -2137,6 +2483,8 @@ def cut_surface_at_transitions(
                     )
                 )
             continue
+        finally:
+            mesh.active_component = None
         inserted_transitions.append(
             _InsertedTransition(
                 transition,
@@ -2161,10 +2509,36 @@ def cut_surface_at_transitions(
             "insertions; the cut cannot be trusted"
         )
     while True:
-        pre_duplicate_labels = _triangle_components(mesh.triangles, blocked_edges)
+        base_labels = _triangle_components(mesh.triangles, blocked_edges)
+        pre_duplicate_labels = np.asarray(base_labels, dtype=np.int64).copy()
+        next_virtual = int(pre_duplicate_labels.max(initial=0)) + 1
+        wedge_regions: set[int] = set()
+        shared_tips: set[int] = set()
         all_cut_vertices = {vertex for edge in blocked_edges for vertex in edge}
         branch_components = {}
         demoted = None
+
+        def gamma_ambiguity(candidate):
+            # The child-3 return curve must border exactly one sheet; after
+            # neighboring cuts an under-resolved junction can leave it
+            # straddling two, which is ambiguous incidence to demote, not a
+            # dead slice (§21.2).
+            incidence = {
+                component
+                for index, vertex in enumerate(candidate.gamma_ids)
+                if index not in candidate.event_endpoint_indices
+                for component in _incident_components(
+                    mesh.triangles, base_labels, int(vertex)
+                )
+            }
+            if len(incidence) == 1:
+                return None
+            return (
+                "child-3 curve is incident to more than one sheet after "
+                "neighboring cuts; its return-sheet incidence is ambiguous "
+                "at this resolution"
+            )
+
         for inserted in inserted_transitions:
             try:
                 branch_components[inserted.transition.transition_id] = (
@@ -2173,8 +2547,56 @@ def cut_surface_at_transitions(
                     )
                 )
             except _TransitionCutConflict as conflict:
+                if "does not separate the surface" in str(conflict):
+                    # A branch slit: split its local fans into two banks and
+                    # retry with the bank labels; the tips stay shared, so
+                    # both one-sided limits land on one vertex and go through
+                    # the unresolved-event-action path.
+                    saved = pre_duplicate_labels.copy()
+                    wedge = _slit_wedge_labels(
+                        mesh, inserted, pre_duplicate_labels, next_virtual
+                    )
+                    if wedge is not None and not (wedge[0] & wedge_regions):
+                        next_virtual += 2
+                        try:
+                            branch_components[inserted.transition.transition_id] = (
+                                _branch_components(
+                                    mesh,
+                                    inserted,
+                                    pre_duplicate_labels,
+                                    all_cut_vertices,
+                                )
+                            )
+                            wedge_regions |= wedge[0]
+                            shared_tips |= wedge[1]
+                            ambiguity = gamma_ambiguity(inserted)
+                            if ambiguity is None:
+                                continue
+                            demoted = (inserted, ambiguity)
+                            break
+                        except _TransitionCutConflict as retry_conflict:
+                            pre_duplicate_labels[:] = saved
+                            conflict = retry_conflict
+                    elif wedge is not None:
+                        pre_duplicate_labels[:] = saved
                 demoted = (inserted, str(conflict))
                 break
+            ambiguity = gamma_ambiguity(inserted)
+            if ambiguity is not None:
+                demoted = (inserted, ambiguity)
+                break
+        if demoted is None:
+            # Nothing else demoted, so these labels are exactly what the
+            # duplication stage will use: run the last-resort side check
+            # here, where a failure can still withdraw one transition
+            # instead of aborting the whole cut.
+            demoted = _stabilized_side_demotion(
+                mesh,
+                inserted_transitions,
+                branch_components,
+                pre_duplicate_labels,
+                all_cut_vertices,
+            )
         if demoted is None:
             break
         # Side assignment for this transition is not trustworthy: withdraw
@@ -2201,6 +2623,13 @@ def cut_surface_at_transitions(
     copy_id = {}
     for vertex in sorted(all_cut_vertices):
         components = _incident_components(mesh.triangles, pre_duplicate_labels, vertex)
+        if vertex in shared_tips:
+            # A branch-slit tip is physically one point shared by both banks
+            # (the slit ends there); its incompatible one-sided limits are
+            # handled by the unresolved-event-action path, never by copies.
+            for component in components:
+                copy_id[(vertex, component)] = vertex
+            continue
         for index, component in enumerate(components):
             if index == 0:
                 new_id = vertex
@@ -2257,12 +2686,15 @@ def cut_surface_at_transitions(
         child_ids = np.array(
             [copy_id[(int(vertex), child_component)] for vertex in inserted.sample_ids]
         )
+        # The child-3 curve lives on one physical sheet; bank labels are a
+        # duplication artifact of a nearby slit, so its incidence is checked
+        # against the base component labels.
         gamma_components = {
             component
             for index, vertex in enumerate(inserted.gamma_ids)
             if index not in inserted.event_endpoint_indices
             for component in _incident_components(
-                mesh.triangles, pre_duplicate_labels, int(vertex)
+                mesh.triangles, base_labels, int(vertex)
             )
         }
         if len(gamma_components) != 1:
@@ -2353,6 +2785,20 @@ def cut_surface_at_transitions(
     label_map = {}
     for old, new in zip(pre_duplicate_labels, final_labels):
         if old in label_map and label_map[old] != new:
+            raise ConstrainedCutError("vertex duplication did not separate a cut sheet")
+        label_map[int(old)] = int(new)
+    # A small base component can be covered entirely by a slit's bank labels;
+    # its child-3 port still references the base label, whose banks rejoin
+    # into one final sheet.
+    for old, new in zip(base_labels, final_labels):
+        if int(old) in label_map:
+            continue
+        conflicting = {
+            int(other_new)
+            for other_old, other_new in zip(base_labels, final_labels)
+            if int(other_old) == int(old)
+        }
+        if len(conflicting) != 1:
             raise ConstrainedCutError("vertex duplication did not separate a cut sheet")
         label_map[int(old)] = int(new)
     ports = [

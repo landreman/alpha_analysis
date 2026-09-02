@@ -992,3 +992,52 @@ def test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit(monkeypatch
     assert resolved_signatures == [resolved_signatures[0]] * len(resolved_signatures)
     assert explicit_budget_reports >= 1
     assert adaptive_successes >= 1
+
+
+def test_stabilized_side_check_demotes_instead_of_raising():
+    """A cut-boundary arc vertex missing one side demotes its transition.
+
+    Regression for the matrix crash 3:0.5:gmsh:marching_tetrahedra: an arc
+    endpoint on an EDGE corner whose parent-side fan collapsed used to raise
+    ConstrainedCutError from the duplication stage after the demotion loop
+    had stabilized, aborting the whole case instead of recording an explicit
+    unresolved transition (SS21.2).
+    """
+    from types import SimpleNamespace
+
+    from alpha_analysis.j_connectivity import mesh_cut
+    from alpha_analysis.j_connectivity.refinement import classify_failure_reason
+
+    mesh = SimpleNamespace(triangles=[[0, 1, 2], [1, 3, 2]])
+    labels = np.array([0, 0])
+    inserted = mesh_cut._InsertedTransition(
+        SimpleNamespace(transition_id=7),
+        np.array([1]),
+        np.array([], dtype=np.int64),
+        {(1, 3)},
+        {1: 0.0},
+        {},
+    )
+    # Vertex 1 is incident only to component 0, so the parent side (1) has
+    # no fan: the transition must demote with a recorded reason.
+    demoted = mesh_cut._stabilized_side_demotion(
+        mesh, [inserted], {7: (1, 0)}, labels, {1, 3}
+    )
+    assert demoted is not None
+    assert demoted[0] is inserted
+    assert "lacks a parent-side fan" in demoted[1]
+    assert classify_failure_reason(demoted[1]) == "cut_conflict"
+    # Both sides present: the check stays silent, so any cut that never
+    # tripped the duplication-stage guard is untouched by construction.
+    assert (
+        mesh_cut._stabilized_side_demotion(
+            mesh, [inserted], {7: (0, 0)}, labels, {1, 3}
+        )
+        is None
+    )
+    # A vertex outside the cut has no copies at all: also demoted, matching
+    # the duplication stage's copy_id membership exactly.
+    assert (
+        mesh_cut._stabilized_side_demotion(mesh, [inserted], {7: (0, 0)}, labels, {3})
+        is not None
+    )

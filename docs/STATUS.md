@@ -140,6 +140,44 @@ move it into `docs/DESIGN.md` and delete it here.
   when extending curve/contact refinement. Early sampling stops now retain their
   uncertified source intervals for those consumers.
 
+- Milestone 10.3's coordinator (`j_connectivity.refinement`) converges each case
+  with matrix-wide bounded ladders and records every retry; see
+  `docs/validation/milestone10.3-real-equilibria.md` for the measured matrix.
+  The milestone's row stays unchecked pending proposed ADR 0009: 42/120 cases
+  (35.0%) end resolved-or-no-transitions against the §23 95% threshold, with
+  the residual dominated by per-case wall-budget exhaustion at the recorded
+  7200 s guard (46 cases; twelve re-verified genuine on an uncontended pass,
+  and the researcher has since capped acceptable per-case compute at 10
+  minutes) and by 1024-period cap ceilings (20 cases: DMercFail λₙ≥0.9,
+  d23p4 λₙ≥0.8 — the long-well physics recorded since milestone 9).
+  `test_matrix_report_meets_milestone_10_3_acceptance` encodes the criterion
+  and is deliberately red on the committed matrix. One case crashed under the
+  matrix revision (an escaped "lacks sides" `ConstrainedCutError` from the
+  duplication stage); `_stabilized_side_demotion` now demotes that transition
+  explicitly at the stabilized labels (regression:
+  `test_stabilized_side_check_demotes_instead_of_raising`), leaving completed
+  cases untouched by construction.
+  Things milestone 11 must carry:
+  - Two new certified §5.4 event kinds exist under proposed ADRs 0007/0008:
+    `"fold"` (one marginal point, continuous port limits, uncertainty interval
+    spanning the root-scan blind zone) and `"degenerate_endpoint"` (curve-terminal
+    annihilation; incident arcs stop one authoritative vertex short and the tip
+    vertex is shared by both banks with `NaN` action via
+    `unresolved_event_action_vertex_ids`). Consumers must treat every event node's
+    connectivity as unresolved regardless of kind.
+  - A branch slit whose ends terminate at interior events can leave parent and
+    child ports on the *same* sheet (`CutTransitionPort.sheet_id` equal for all
+    three roles); reachability transfer must support self-transitions rather than
+    assume the ports straddle two sheets.
+  - A case is `resolved` when `cut.unresolved_transition_ids` is empty; curves
+    wholly dissolved into endpoint events remain visible as arc-less `CutEvent`
+    rows and are counted resolved-with-explicit-events. Every other terminal
+    state carries `terminal_reasons` plus `failure_class_counts`; treat all of
+    them as unresolved connectivity, never as no connection.
+  - Local edge-split refinement (`refine_surface_near_curves`) never splits
+    periodic-seam or axis edges; a strip whose longest local edge is seam-locked
+    stays at the recorded refinement bound. Seam-twin splitting is future work.
+
 ## Accepted deviations
 
 Design decisions taken during implementation that differ from `docs/DESIGN.md` live in
@@ -149,3 +187,5 @@ Design decisions taken during implementation that differ from `docs/DESIGN.md` l
 - ADR 0004 — an open companion-cut endpoint within the local surface-distance allowance (`max_surface_distance_ratio` × local edge scale) is extended to the nearest `EDGE` boundary edge, splitting it, with the extension's `u`/action clamped to the endpoint sample; beyond that allowance the transition stays an explicit geometry-unresolved hyperedge.
 - ADR 0005 — a critical polyline reversal at sub-resolution strand separation is reordered by arc length along the true `B=b, g=0` curve only when a bounded certification walk confirms one simple arc; uncertified reversals stay as extracted and counted, the cut-time double-back guard is permanent, and wide reversals are genuine geometry that is never touched.
 - ADR 0006 — bounded robust event-junction insertion belongs in milestone 10.2 with the six-sheet acceptance unchanged; milestone 10.3 coordinates matrix-level refinement. Failed incident arcs and unknown action measure remain explicit.
+- ADR 0007 (proposed) — a localized count change may certify as a below-`b` fold: one marginal point, an annihilating interior pair strictly below `b`, continuous port limits; its uncertainty interval spans the root-scan blind zone and ambiguity with an equal-height solve stays uncertified.
+- ADR 0008 (proposed) — an open `GAMMA_MAX` polyline ending on a DEGENERATE-classified vertex terminates its companion cut at an explicit degenerate-endpoint event one authoritative vertex short of the annihilation; sub-resolution arms dissolve into their endpoint events.
