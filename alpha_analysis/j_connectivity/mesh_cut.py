@@ -1665,6 +1665,53 @@ def _incident_components(triangles, labels, vertex):
     )
 
 
+def _stabilized_side_demotion(
+    mesh,
+    inserted_transitions,
+    branch_components,
+    pre_duplicate_labels,
+    all_cut_vertices,
+):
+    """Last-resort side check at the stabilized component labels (§10.2).
+
+    Duplication gives every cut vertex one copy per incident component and
+    reads the parent- and child-side copies for each arc vertex.  An arc
+    vertex not incident to both branch components under exactly these labels
+    — typically an endpoint pinned to the mesh boundary whose one-sided fan
+    collapsed at a corner — has no trustworthy side assignment, so its
+    transition is demoted to an explicit unresolved hyperedge (§21.2) rather
+    than aborting the whole cut.  Evaluated only once every other demotion
+    criterion is silent, when the labels are final, so a cut that never
+    tripped the duplication-stage guard is untouched by construction.
+    Returns ``(inserted, reason)`` or ``None``.
+    """
+    for inserted in inserted_transitions:
+        parent_component, child_component = branch_components[
+            inserted.transition.transition_id
+        ]
+        for vertex, parameter in inserted.vertex_u.items():
+            incident = _incident_components(
+                mesh.triangles, pre_duplicate_labels, vertex
+            )
+            missing = [
+                side
+                for side, component in (
+                    ("parent", parent_component),
+                    ("child", child_component),
+                )
+                if vertex not in all_cut_vertices or component not in incident
+            ]
+            if missing:
+                return (
+                    inserted,
+                    f"arc {inserted.transition.transition_id} vertex {vertex} "
+                    f"u={parameter} lacks a {' and '.join(missing)}-side fan "
+                    "at the stabilized sheet labels; side assignment for "
+                    "this transition is untrustworthy at this resolution",
+                )
+    return None
+
+
 def _traced_side_action(mesh, component, triangle_labels, inserted):
     """Trace one well just inside ``component`` next to the inserted cut.
 
@@ -2538,6 +2585,18 @@ def cut_surface_at_transitions(
             if ambiguity is not None:
                 demoted = (inserted, ambiguity)
                 break
+        if demoted is None:
+            # Nothing else demoted, so these labels are exactly what the
+            # duplication stage will use: run the last-resort side check
+            # here, where a failure can still withdraw one transition
+            # instead of aborting the whole cut.
+            demoted = _stabilized_side_demotion(
+                mesh,
+                inserted_transitions,
+                branch_components,
+                pre_duplicate_labels,
+                all_cut_vertices,
+            )
         if demoted is None:
             break
         # Side assignment for this transition is not trustworthy: withdraw

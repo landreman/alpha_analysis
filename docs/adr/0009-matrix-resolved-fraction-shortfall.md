@@ -17,23 +17,49 @@ source budgets to full, localization bisections to 320, root-scan factors to
 4, four local refinement rounds, three background levels), and the measured
 matrix reaches:
 
-PLACEHOLDER-NUMBERS (filled from `docs/validation/milestone10.3-real-equilibria.json`)
+- 42/120 cases (35.0%) resolved or no-transitions (32 `no_transitions`,
+  10 `resolved`), against the ≥114/120 the criterion requires;
+- 77 cases unresolved with explicit terminals; 1 case crashed
+  (`3:0.5:gmsh:marching_tetrahedra`, the escaped "lacks sides"
+  `ConstrainedCutError` now fixed and regression-tested — see the
+  validation report);
+- 112.6 h of recorded case compute
+  (`docs/validation/milestone10.3-real-equilibria.md` has the full grid).
 
 Every remaining unresolved case terminates with a physically meaningful,
-machine-readable reason — the first acceptance sentence holds — but the
-resolved fraction is below 95%. The residual classes, each already at its
-ladder bound:
+machine-readable reason — the first acceptance sentence holds for 119/120 —
+but the resolved fraction is far below 95%. The residual classes, each
+already at its ladder bound:
 
-- genuine field-period cap ceilings (`MAX_PERIODS` persisting at 1024, the
-  behaviour `docs/STATUS.md` has recorded for structured DMercFail
-  \(\lambda_n=0.9\) and d23p4 \(\lambda_n=0.95\) since milestone 9);
-- localized count changes certifying as neither equal-height nor fold at
-  root-scan factor 4 (PCA \(\lambda_n=0.1\));
-- junction complexes whose companion slits do not separate the surface, or
-  whose child-3 return curves straddle sheets, at every background level
-  (TURBO, PCA near curve crossings);
-- boundary-exit critical points beyond every extracted component's boundary
-  allowance (TURBO \(\lambda_n=0.1\)).
+- per-case wall-budget exhaustion (46 cases at the recorded 7200 s guard:
+  PCA and n3are at every \(\lambda_n \ge 0.5\), TURBO \(\ge 0.8\), d23p4
+  structured at 0.5). Twelve of these were re-verified on an uncontended
+  second pass and re-capped at 7200 s of near-pure compute, so they are
+  genuine case costs under the full remediation ladders, not scheduling
+  artifacts; the researcher has since capped acceptable per-case compute at
+  10 minutes, which these cases exceed by more than an order of magnitude;
+- genuine field-period cap ceilings (20 cases: `MAX_PERIODS` persisting at
+  1024 for DMercFail \(\lambda_n \ge 0.9\) and d23p4 \(\lambda_n \ge 0.8\)
+  on all four backend×extractor combos — the long-well behaviour
+  `docs/STATUS.md` has recorded since milestone 9; correctly
+  background-exempt, since no background refinement changes it);
+- localized count changes certifying as neither equal-height (ADR 0003) nor
+  below-b fold (ADR 0007) at root-scan factor 4, plus empty event intervals
+  at full source budget (8 cases, PCA \(\lambda_n=0.1\));
+- a critical point 5.15e-02 from the nearest tagged edge of its extracted
+  component after four local-refinement rounds (4 cases, TURBO
+  \(\lambda_n=0.1\)) — a component-topology limit, not resolution;
+- the ADR 0001 thin-tube extraction limit (2 cases, DMercFail
+  \(\lambda_n=0.05\) gmsh) and non-separating companion slits /
+  curve-geometry demotions at background level 2 (2 cases).
+
+The cap-ceiling arithmetic alone settles the threshold's feasibility for
+this equilibrium set: the 20 `max_periods` cases are 16.7% of the matrix —
+more than three times the entire 5% unresolved allowance — and they are
+documented physics, not a budget anyone can raise (the coordinator already
+escalates 128→256→1024 and records every retry). Adding the certified
+wall-budget cases, no coordinator that keeps the §21.2 prohibitions can
+reach 95% on these five equilibria at these resolutions.
 
 Each further remediation this branch invented (fold certification, ADR 0007;
 degenerate-endpoint events, ADR 0008; branch-slit bank duplication;

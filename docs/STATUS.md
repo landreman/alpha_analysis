@@ -143,9 +143,20 @@ move it into `docs/DESIGN.md` and delete it here.
 - Milestone 10.3's coordinator (`j_connectivity.refinement`) converges each case
   with matrix-wide bounded ladders and records every retry; see
   `docs/validation/milestone10.3-real-equilibria.md` for the measured matrix.
-  The milestone's row stays unchecked pending proposed ADR 0009: every case
-  terminates explicitly, but the resolved fraction is below the §23 95%
-  threshold and the residual classes are at their ladder bounds.
+  The milestone's row stays unchecked pending proposed ADR 0009: 42/120 cases
+  (35.0%) end resolved-or-no-transitions against the §23 95% threshold, with
+  the residual dominated by per-case wall-budget exhaustion at the recorded
+  7200 s guard (46 cases; twelve re-verified genuine on an uncontended pass,
+  and the researcher has since capped acceptable per-case compute at 10
+  minutes) and by 1024-period cap ceilings (20 cases: DMercFail λₙ≥0.9,
+  d23p4 λₙ≥0.8 — the long-well physics recorded since milestone 9).
+  `test_matrix_report_meets_milestone_10_3_acceptance` encodes the criterion
+  and is deliberately red on the committed matrix. One case crashed under the
+  matrix revision (an escaped "lacks sides" `ConstrainedCutError` from the
+  duplication stage); `_stabilized_side_demotion` now demotes that transition
+  explicitly at the stabilized labels (regression:
+  `test_stabilized_side_check_demotes_instead_of_raising`), leaving completed
+  cases untouched by construction.
   Things milestone 11 must carry:
   - Two new certified §5.4 event kinds exist under proposed ADRs 0007/0008:
     `"fold"` (one marginal point, continuous port limits, uncertainty interval
