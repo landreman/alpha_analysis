@@ -2,8 +2,8 @@
 
 - **Status:** Draft for the researcher's decision (no code changed)
 - **Date:** 2026-09-03
-- **Scope:** replaces or reorders `docs/DESIGN.md` milestones 3–13 depending on the option chosen; the metric of §3 and the rules of §21.2 are untouched
-- **Evidence:** `docs/validation/*.md`, `docs/adr/0001–0009`, the recorded matrices, and the measurements in Appendix A (run on 2026-09-02/03 on the five `data/boozmn_*` files)
+- **Scope:** replaces or reorders `docs/DESIGN.md` milestones 3–14 depending on the option chosen; the metric of §3 and the rules of §21.2 are untouched
+- **Evidence:** `docs/validation/*.md`, `docs/adr/0001–0009`, the recorded matrices, and the measurements of Appendix A (run 2026-09-02/03 on the five `data/boozmn_*` files, scripts retained under the session scratchpad)
 
 ## 0. Summary and recommendation
 
@@ -18,40 +18,47 @@ converge under refinement (ADRs 0003–0008). Cost and failure coincide: 50 of t
 120 cases finish under 10 minutes and 49 of those are the no-transition or
 resolved cases; the other 70 are certification ladders that end at a bound.
 
-Three facts change the problem (§2): transitions are visible in the *forward*
-trace of every well; the incoming-bounce surface projects diffeomorphically
-onto the field-line chart \((s,\alpha)\), where the phase-space measure is
-exactly \(ds\,d\alpha\); and the total \(K\)-weighted measure of the whole
-surface is a plain volume integral, so every capped, failed or uncut well can
-be bounded without being traced.
+Five facts change the problem (§2), all checked numerically this week:
 
-Seven options are laid out in §3. My recommendation (§5) is:
+1. transitions are visible in the *forward* trace of every well, and more
+   sharply, the transition set at every pitch \(b\) is a level curve of smooth,
+   \(b\)-independent "extremum-height" fields on the field-line chart;
+2. the incoming-bounce surface projects diffeomorphically onto the field-line
+   chart \((s,\alpha)\), where the phase-space measure is exactly
+   \(ds\,d\alpha\);
+3. the total \(K\)-weighted measure of the whole surface is a plain volume
+   integral (restricted to surfaces whose maximum exceeds \(b\)), so every
+   capped, failed or uncut well can be bounded without being traced;
+4. codimension-two events carry no connectivity of their own, so they can be
+   bounded instead of certified;
+5. wells longer than 12 field periods carry at most 0.3% of the trapped phase
+   space on the two files checked, so the whole `max_periods` class that
+   blocks 16.7% of the matrix protects about 0.003 of \(f\).
 
-1. **Adopt the bounds-first framing now (option E).** Redefine success per
-   pitch slice as "\(Q(b)\) with a rigorous lower/upper gap below a tolerance
-   within the time budget", with the exact total-weight identity supplying the
-   upper bound. Nothing in §21.2 is loosened; this is what §11.3 and §12.5
-   already ask for. It makes the 20 `max_periods` cases and every event
-   certification a matter of measure rather than of veto.
-2. **Rebuild milestones 3–10 on the field-line chart (option C)**, with
-   per-line well lists, local count-change detection, one field-line scan per
-   line reused for every well on it, and event neighbourhoods left as bounded
-   cells. It removes every recorded geometric failure class and, combined with
-   the measured cost levers (option F), is the only option I can see reaching
-   the 10-minute budget on the hard levels.
-3. **Keep the direct contour tracer (option D) in the continuous field** as
-   the independent oracle and as the estimator of last resort inside cells
-   the flood fill leaves unresolved.
-4. **Do not finish milestone 10.3 as specified (option A)**: with the current
-   definition of "resolved" the 95% threshold is unreachable on these five
-   equilibria (ADR 0009's arithmetic), and each further certification kind
-   has moved 1–5 cases at hours per case.
+Options are laid out in §3. The recommendation (§5) is:
 
-Likelihoods I assign to reaching the researcher's goal ("\(f\) computed with a
-useful bound for > 95% of cases within 10 minutes per case"): A ≈ 10%,
-B ≈ 50–60%, C ≈ 75–85%, D alone ≈ 40%, each conditional on E and F being
-adopted with it; without E, no option exceeds ≈ 40% because the `max_periods`
-class alone is 16.7% of the matrix.
+1. **Adopt the bounds-first framing now (option E),** with the acceptance
+   stated in units of \(f\): the deterministic gap
+   \(f_{\rm upper}-f_{\rm lower}\le0.01\) per equilibrium within a
+   per-equilibrium time budget, every slice reporting its gap. Nothing in
+   §21.2 is loosened; this is what §11.3, §12.5 and §13.4 already ask for.
+2. **Rebuild milestones 3–10 on the field-line chart (option C),** with the
+   extremum-height fields as the detection core, orbit sampling of \(\alpha\)
+   so that one long scan serves many chart lines and the periodic seam is an
+   identity, and event neighbourhoods left as bounded cells.
+3. **Build reachability as a Reeb complex on the chart (option R)** instead of
+   the finite-atom flood fill: exact for the PL interpolant, with unresolved
+   cells as explicit wildcard nodes and the quadrature by the coarea formula.
+4. **Keep direct contour following (option D)** as the independent oracle, as
+   the gap estimator inside cells the chart leaves unresolved (a Monte Carlo
+   whose cost falls with the square of the gap), and, in its birth-particle
+   form, as the end-to-end validation of the whole calculation.
+5. **Do not finish milestone 10.3 as specified (option A).**
+
+Likelihoods for the researcher's goal (a useful bound on \(f\) for > 95% of
+cases within budget): A ≈ 10%; B ≈ 50–60%; C with its refinements ≈ 85%
+conditional on E and F; D alone ≈ 45–55% (deterministic bounds are not
+available from sampling alone); without E no option exceeds ≈ 40%.
 
 ## 1. Why the current algorithm cannot reach 95%
 
@@ -63,16 +70,15 @@ transition set as follows, and every recorded failure sits in steps 2–5:
 2. extract \(\Gamma_{\max}\) as chains of marching-triangle edges and classify
    by \(D_\parallel^2 B\) (milestone 8; ADR 0005 zigzags; ADR 0008 endpoints);
 3. sample \(\Gamma_{\max}\) at 8–16 vertices, trace backward from each
-   marginal point to the companion point \(a(u)\) (milestone 9, 10.1);
+   marginal point to the companion point \(a(u)\) (milestones 9, 10.1);
 4. bracket interior-maximum count changes between samples, bisect along
    \(u\), and certify each as a contact, a fold or a degenerate endpoint before
    any incident arc may cut (ADRs 0003, 0007, 0008; milestones 10.2–10.3);
 5. insert \(T\) as a constrained polyline, duplicate vertices, assign sides,
    union-find sheets (milestone 10; ADR 0004 endpoint snap; ADR 0006 corridors).
 
-What the matrix and the ADRs established (details and citations in
-`docs/validation/milestone10.3-real-equilibria.md` and the knowledge map
-that accompanies this proposal):
+What the matrix and the ADRs established (citations in the knowledge map that
+accompanies this proposal and in `docs/validation/milestone10.3-real-equilibria.md`):
 
 - **Nongeneric is the norm.** Only 6 of 164 real transition curves are free of
   a stepped-over count change; parent wells hold up to 103 interior maxima
@@ -99,7 +105,9 @@ that accompanies this proposal):
   curve.** DMercFail \(\lambda_n\ge0.9\) and d23p4 \(\ge0.8\) persist at 1024
   periods; each capped scan costs ~45 s at 128 periods; 20 cases spend 40–54
   minutes escalating one vertex's cap. These 20 cases alone are 16.7% of the
-  matrix.
+  matrix. (Forward traces from incoming points at the same levels never hit a
+  cap of 64 in this week's tests; the binding trace was the *backward* scan
+  from a marginal point.)
 - **Cost is the certification, not the physics.** Transition mapping is 91%
   of case time at \(\lambda_n=0.8\); the same cases took 5–471 s under 10.2
   controls and hours under the 10.3 ladders. A resolved DMercFail case costs
@@ -110,6 +118,10 @@ that accompanies this proposal):
 - **The backend × extractor axes carry little information.** Extractors agree
   on statuses in 25/25 surface and all \(\lambda_n=0.8\) cases; backends
   disagree on component counts near the global extrema and do not converge.
+- **The matrix weights cases equally, but \(f\) does not.** The levels that
+  always succeed (\(\lambda_n\le0.1\)) carry 0.2–19% of the trapped phase
+  space; \(\lambda_n\in[0.1,0.8]\), where almost nothing resolves, carries
+  72–92% (Appendix A.5).
 
 The conclusion of ADR 0009 is right: no coordinator that keeps §21.2 can reach
 95% *resolved cuts* on these equilibria. The way out is to stop requiring a
@@ -117,45 +129,55 @@ certified global cut before any weight can be counted.
 
 ## 2. Facts that reframe the problem
 
-These follow from the definitions in `docs/DESIGN.md` §§3–5 and §9 and were
-checked numerically (Appendix A).
+**F1. Transitions are visible from the forward trace of the well itself,
+and they are level curves of smooth \(b\)-independent fields.** The parent
+well \([a,d]\) contains the marginal maximum \(m\) as an interior maximum
+whose height reaches \(b\); on the child side the first maximum past the
+exit descends to \(b\), and the count of wells on the field line changes by
+one (the child-3 well \([m,d]\) appears). `WellTrace` already records the
+extrema heights. So \(T\) can be located by one-dimensional root finding along
+any curve in the state space, and the forward trace at the located point
+gives \(m\), \(A_W\), \(A_1\), \(A_3\) and the additivity check. Measured: on
+DMercFail \(\lambda_n=0.8\) five count-change edges of a 24×64 chart bisect to
+points with \(B-b=0\), \(|D_\parallel B|\le6\times10^{-15}\),
+\(D_\parallel^2B=-63.9\), and the additivity residual falls linearly with the
+offset from the crossing, \(3\times10^{-4}\) at \(10^{-1}\) to
+\(7\times10^{-8}\) at \(10^{-5}\) (A.2).
 
-**F1. Transitions are visible from the forward trace of the well itself.**
-The parent well \([a,d]\) contains the marginal maximum \(m\) as an interior
-maximum whose height reaches \(b\); on the child side the first maximum past
-the exit descends to \(b\), and the *count of wells on the field line* changes
-by exactly one (the child-3 well \([m,d]\) appears). `WellTrace` already
-records the extrema heights (`extrema_B`) and ADR 0003 already stores the
-barrier margin. So \(T\) can be located by one-dimensional root finding along
-any curve in the state space (a mesh edge or a chart-cell edge) without
-constructing it globally or matching it to \(\Gamma_{\max}\) by a common
-parameter, and the forward trace at the located point gives \(m\), \(A_W\),
-\(A_1\), \(A_3\) and the additivity check. A below-\(b\) fold (ADR 0007)
-changes the interior-maximum count but neither the well count nor \(A\): it is
-not an event for this indicator. Measured: on DMercFail \(\lambda_n=0.8\), four
-count-change edges of a 24×64 chart bisect to points with \(B-b=0\),
-\(|D_\parallel B|<10^{-14}\), \(D_\parallel^2B=-63.9\), and the additivity
-residual falls as the offset from the crossing: \(3\times10^{-4}\),
-\(3\times10^{-5}\), \(3\times10^{-6}\), \(7\times10^{-8}\) at offsets
-\(10^{-1}\ldots10^{-5}\) of the edge (Appendix A.2).
+The sharper statement: the along-line extrema of \(B\) do not depend on
+\(b\). On the chart, the height of the \(j\)-th along-line maximum,
+\(B_j(s,\alpha)\), is a smooth function with the envelope-theorem gradient
+\(\partial_\alpha B_j=\partial_\theta B|_{\max}\),
+\(\partial_sB_j=\partial_sB|_{\max}+\iota'(s)\zeta_j\,\partial_\theta B|_{\max}\)
+(checked to six digits against finite differences). At pitch \(b\), the
+transition curve and \(\Gamma_{\max}\) together are the level set
+\(\bigcup_j\{B_j=b\}\); the child-3 copy of the curve is its rigid shift by
+\(k\,\iota(s)L\) in \(\alpha\) (the deck transformation of the one-period
+quotient, identity checked to \(4\times10^{-15}\)). Checked on the crossing
+E2 had bisected: Newton on \(B_j(s,0)=b\) gives \(s^*=0.6196449011556\) in
+2 ms against the bisected \(0.6196449011557605\) in 4.2 s, and the level
+curve's width in \(\alpha\) reproduces the chart's count-0 hole and, after
+the shift, the parent band (A.2). Below-\(b\) folds (ADR 0007) are where a
+field's domain ends; degenerate endpoints (ADR 0008) are where a level curve
+meets that boundary (\(A_3\to0\)); equal-height contacts (ADR 0003) are
+intersections of two level curves; all are codimension-two points of one
+arrangement computed once per equilibrium, not per pitch and not per curve.
 
 **F2. The incoming surface projects diffeomorphically along field lines.**
 On \(\Sigma_b^-\), \(g=\mathbf b\cdot\nabla B<0\), so the surface is nowhere
 tangent to the field; the map \(\Sigma_b^-\to(s,\alpha)\),
 \(\alpha=\theta_--\iota(s)\zeta_-\), is a local diffeomorphism on the open
-incoming half. Its only singularities are the boundary curves \(g=0\), which
-are exactly the physical events. Each trapping sheet is an honest graph
-\(\zeta_-(s,\alpha)\) with boundary, and \(\omega=ds\wedge d\alpha\) pulled
-back to the surface is exactly \(ds\,d\alpha\) (§4.3): the measure of a chart
-cell is its area times the number of wells over it. (The folds of ADR 0006 are
-in the *extracted triangles* near \(g\to0\), where steep triangles straddle the
-tangency; they are an artifact of meshing the surface in 3-D first.) The price
-is the one-field-period quotient: the well with incoming point
-\((\alpha,\zeta_-=L)\) is the well \((\alpha+\iota L,0)\), so sheets carry a
-twisted seam not aligned with a grid in \(\alpha\). Decision 1 of §26 chose
-the 3-D surface to avoid this; the prototype in Appendix A.2 handles it with
-an extended scan window and "ghost" wells and finds it to be bookkeeping, not
-a topological problem.
+incoming half, singular only on the boundary curves \(g=0\), which are the
+physical events. Each trapping sheet is an honest graph \(\zeta_-(s,\alpha)\)
+with boundary, and \(\omega\) pulled back to the surface is exactly
+\(ds\,d\alpha\) (§4.3): the measure of a chart cell is its area times the
+number of wells over it. (The folds of ADR 0006 are in the *extracted
+triangles* near \(g\to0\); they are an artifact of meshing the surface in 3-D
+first.) The one-period quotient identifies the well with incoming point
+\((\alpha,\zeta_-=L)\) with \((\alpha+\iota L,0)\): a twisted seam. The
+prototype handled it with an extended scan window and ghost wells; sampling
+\(\alpha\) by orbits of the shift \(\alpha\to\alpha+\iota L\) makes the seam an
+identity between consecutive windows of one scan (option C).
 
 **F3. The total \(K\)-weighted surface integral is a volume integral.**
 \[
@@ -166,339 +188,424 @@ Q_{\rm total}(b):=\int_{\Sigma_b^-}hK\,|ds\,d\alpha|
 because at fixed \(s\) the map \((\theta,\zeta)\to(\alpha,\zeta)\) has unit
 Jacobian and, on a dense field line, the line integral of
 \((|C|/B)/\sqrt{1-B/b}\) over all \(B<b\) intervals is the sum of \(K\) over
-all wells on the line (each point of the line lies in exactly one well or in
-the \(B>b\) set). The restriction to surfaces with \(B_{\max}(s)>b\) matters:
-a particle with bounce field above its own surface's maximum never bounces
-and is passing, not on \(\Sigma_b^-\). Check: \(\Theta\equiv1\) gives
-\(f=(1/2V_h)\int Q_{\rm total}/b^2\,db=V_{\rm tr}(B_{\max})/V_h\), the trapped
-fraction, where \(V_{\rm tr}(b)=\int ds\,d\theta\,d\zeta\,(|C|/B^2)\,h\,
-\sqrt{\max(0,1-B/\min(b,B_{\max}(s)))}\); measured agreement \(4\times10^{-4}\)
-on d23p4 and \(1\times10^{-4}\) on DMercFail (Appendix A.3). Consequence: for
-any set of wells that failed, hit the period cap, or sit in unresolved cells,
-the \(K\)-weighted measure is bounded *exactly* as \(Q_{\rm total}\) minus the
-resolved part, without tracing them. Every §21.2 prohibition becomes a
-rigorous bound: \(Q_{\rm lower}\) = resolved and reachable,
-\(Q_{\rm upper}=Q_{\rm total}-\)(resolved and unreachable). The integrand's
-inverse-square-root edge at \(B=b\) is integrable and converges under
-tensor-product refinement (A.3).
+all wells on the line. The restriction to surfaces with \(B_{\max}(s)>b\) is
+essential: a particle with bounce field above its own surface's maximum never
+bounces. Verified three ways (A.3): two volume-side routes agree to
+0.01–0.13% at all levels; the surface-side sum of traced \(K\) over every
+incoming point agrees with the volume side to 0.02–0.05% (DMercFail
+\(\lambda_n=0.8\), 1128 wells) and converges as \(O(1/n)\) elsewhere; and
+\((1/2V_h)\int Q_{\rm total}/b^2\,db\) reproduces the trapped fraction
+\(V_{\rm tr}(B_{\max})/V_h\) to \(1\)–\(4\times10^{-4}\). Consequence: for any
+set of wells that failed, hit the period cap, or sit in unresolved cells, the
+\(K\)-weighted measure is bounded *exactly* as \(Q_{\rm total}\) minus the
+resolved part; the bound is as sharp as the quadrature error of the resolved
+part, which therefore needs its own error estimate and a support-aligned
+\(s\) integration. \(Q_{\rm total}(b)\) costs 2–3 s per level.
 
-**F4. Codimension-two events carry no connectivity of their own.**
-Equal-height contacts, degenerate \(\Gamma_{\max}\) endpoints (where
-\(A_3\to0\)) and crossings of two \(T\) curves are isolated points of the 2-D
-state space. Contours passing exactly through a point have measure zero;
-contours passing near it cross the incident \(T\) curves at generic simple
-points, which the local rule handles. An event cell can therefore be left
-"unresolved with bounds" and shrunk by refinement; its contribution to the
-bound gap vanishes with its measure. Certifying the event's *kind* (ADRs
-0003/0007/0008) is not needed for the bounds to converge. Caveat: a
-symmetry-enforced nongeneric structure (two maxima equal along a whole curve)
-would make an event curve rather than a point; its measure is still zero but
-the refinement is along a curve.
+**F4. Codimension-two events carry no connectivity of their own.** Equal-
+height contacts, degenerate endpoints and crossings of two \(T\) curves are
+isolated points of the 2-D state space. Contours through a point have measure
+zero; contours near it cross the incident curves at generic simple points,
+which the local rule handles. An event cell can be left "unresolved with
+bounds" and shrunk by refinement; certifying its *kind* is not needed for the
+bounds to converge. Near a transition curve the divergence of \(K\) has the
+analytic form \(K\simeq{\rm const}-(|C|/\sqrt b)\sqrt{2/|D_\parallel^2B|}\,
+\ln|B_j-b|\) (checked against four traced parent wells: \(-5.518\) per
+\(e\)-fold predicted, \(-5.520\) fitted), so the singular mass of a cell is
+bounded in closed form in terms of the smooth field \(B_j-b\).
 
-**F5. The cost levers, measured (Appendix A.1).** Field evaluation is 7–15 µs
-per point batched and 34–41 µs per scalar call; the scan step
-\(2\pi/(24\,\max|m\iota-n|)\) gives 447–460 samples per period on these files
-(≈1125 on the 3200-mode W7-X file). Reducing the scan density is safe but buys
-only 1.1–1.4×; amplitude-aware mode truncation is *not* physics-preserving
-(wrong topology within \(4\times10^{-3}B_{00}\) of a transition at threshold
-\(10^{-4}\)). What is measured to work: (i) 60–80% of a trace is the adaptive
-scalar quadrature; a batched composite Gauss–Legendre rule in the tracer's
-sine-squared coordinate with breakpoints at the scanned extrema gives \(A\) to
-\(10^{-15}\) and \(K\) to \(10^{-9}\) in 1–5 ms instead of 30–134 ms; (ii) a
-per-surface quintic tensor spline of \(B(\theta,\zeta)\) at fixed \(s\)
-(256×128 per period, built in 0.4–0.7 s) reproduces \(B\) to \(4\times10^{-10}\)
-and \(D_\parallel B\) to \(4\times10^{-7}\) relative, with identical itineraries
-on every test well including ones \(10^{-7}B_{00}\) from a transition, at
-0.4 µs per point (35–70× cheaper per point). Realistic per-trace gain 5–10×
-for sub-period wells and 10–20× for multi-period wells; the remaining lever
-for long wells is scanning each field line once for all wells on it.
+**F5. Where the mass is, and the cost levers.** Trapped fractions are 0.28–0.63
+of all particles; the band above \(\lambda_n=0.9\) carries 1.0–2.7% of the
+trapped mass and above 0.95, 0.3–0.7% (A.5). A birth-particle sampler that
+draws from the source directly (A.6) shows that wells longer than 12 field
+periods carry \(\le0.3\)% of the trapped mass on d23p4 and DMercFail, while
+wells of 2–6 periods carry 25% of it on d23p4: long-well cost must be paid for
+the mid band, and the very long tail can be bounded. Per trace, 60–80% of the
+time is the adaptive scalar quadrature; a batched composite Gauss–Legendre
+rule gives \(A\) to \(10^{-15}\) and \(K\) to \(10^{-9}\) in 1–5 ms instead of
+30–134 ms; a per-surface quintic spline of \(B(\theta,\zeta)\) is
+physics-preserving at 0.4 µs per point; amplitude-aware mode truncation is
+not physics-preserving (A.1). Scanning \(B\) along a line does not depend on
+\(b\), so one scan per line can serve every pitch slice.
 
 ## 3. Options
 
 Each option states what it changes in `docs/DESIGN.md`, how it handles
-transitions and events, how unresolved measure enters the bounds, its cost,
+transitions and events, how unresolved measure enters the bounds, cost,
 strengths, weaknesses, failure modes on the real equilibria, a likelihood, an
 effort estimate, and the cheapest experiment that would falsify it.
 
 ### Option A — Finish milestone 10.3 as specified (stay the course)
 
-*What it would take.* Junction complexes as first-class §5.4 structures
-(crossing \(\Gamma_{\max}\) curves, \(T\)-junctions where one companion curve
-terminates on another), event certifications beyond equal-height and fold,
-component-topology reconciliation near boundary exits, a faster tracer, and a
-coordinator that stops re-tracing (the cap escalation alone is 40–54 minutes
-per `max_periods` case). Accepting ADRs 0007 and 0008.
+*What it would take.* Junction complexes as first-class §5.4 structures,
+event certifications beyond equal-height and fold, component-topology
+reconciliation near boundary exits, a faster tracer, a coordinator that stops
+re-tracing, and accepting ADRs 0007 and 0008.
 
 *Transitions and events.* As today: certified geometry per event, cut per arc.
 
-*Bounds.* As today: unresolved hyperedges are retained but no bound on
-\(f\) exists until milestones 12–14.
+*Bounds.* None on \(f\) until milestones 12–14; unresolved hyperedges retained.
 
-*Cost.* Unchanged in structure; the certification multiplier (20–320 traces per
-bracket, source budgets to full, caps to 1024) is the cost. Even with a 10×
-faster tracer the 46 wall-budget cases would mostly remain over 10 minutes.
+*Cost.* The certification multiplier (20–320 traces per bracket, source
+budgets to full, caps to 1024) is the cost; a 10× faster tracer leaves most of
+the 46 wall-budget cases over 10 minutes.
 
-*Strengths.* No redesign; the numerics that exist are excellent where they
-apply (additivity \(7.8\times10^{-5}\) of tolerance; port actions exact on the
-mesh); the synthetic six-sheet arrangement cuts on six backgrounds.
+*Strengths.* No redesign; excellent numerics where they apply (additivity
+\(7.8\times10^{-5}\) of tolerance); the six-sheet synthetic case cuts.
 
-*Weaknesses and failure modes.* The 20 `max_periods` cases (16.7%) cannot be
-counted as resolved under the current definition, so 95% is unreachable
-regardless of geometry work. Each new certification kind has moved 1–5 cases.
-PL insertion has not converged under refinement on any real case with
-interacting transitions; no real cut with more than one transition curve
-exists. The extractor/backend axes will keep disagreeing near the extrema.
+*Weaknesses and failure modes.* The 20 `max_periods` cases cannot count as
+resolved under the current definition, so 95% is unreachable regardless of
+geometry work; each new certification kind moved 1–5 cases; no real cut with
+interacting transitions exists; PL insertion has not converged on any real
+case; the extractor and backend axes keep disagreeing near the extrema.
 
-*Likelihood of the goal.* ≈10% (≈30% if "resolved" is redefined to count
-physical terminals, per ADR 0009 option 2, and the 10-minute cap is waived).
-
-*Effort.* Open-ended; ADR 0009 calls the residual "research-scale".
-
-*Decisive experiment.* Already run: the 10.3 matrix.
+*Likelihood.* ≈10% (≈30% if "resolved" is redefined per ADR 0009 option 2 and
+the 10-minute cap is waived). *Effort.* Open-ended. *Decisive experiment.*
+Already run: the 10.3 matrix.
 
 ### Option B — Local, mesh-aligned cut on the existing surface mesh
 
-*Idea.* Keep milestones 3–8 (background, extraction, \(g=0\) split, tracer,
-refinement indicators, \(\Gamma_{\max}\) boundary) and replace milestones
-9–10.3 by local detection: every surface vertex already has a forward trace
-(milestone 7), so an edge whose endpoints have different lifted exits (a jump
-in \(\zeta_{\rm out}\) or in the well count on the line) crosses \(T\); locate
-the crossing by bisection *along the edge* (points projected to \(B=b\)); at
-the crossing the forward trace gives \(m\), \(A_W\), \(A_1\), \(A_3\). Split
-each straddling triangle along the chord between its two edge crossings (a
-marching-triangles operation on a continuous indicator, not a constrained
-insertion); triangles with more than one crossing per edge, three distinct
-itineraries, or a crossing whose \(m\) points sit on different
-\(\Gamma_{\max}\) components are event triangles: leave them unresolved and
-refine. Child-3 ports are the \(m\) points, inserted as boundary vertices on
-the \(\Gamma_{\max}\) boundary polyline (a boundary edge split, not an
-interior insertion), with actions from their own traces.
+*Idea.* Keep milestones 3–8 and replace 9–10.3 by local detection on the
+surface mesh: every vertex has a forward trace, so an edge whose endpoints
+have different lifted exits crosses \(T\); locate the crossing by bisection
+along the edge (or, better, evaluate the extremum-height fields of F1 at the
+vertices, which lie on field lines, and march the level set); split each
+straddling triangle along the chord between its two edge crossings (a
+marching-triangles operation, not a constrained insertion); leave triangles
+with more than one crossing per edge or three distinct itineraries as
+unresolved event triangles. Child-3 ports are the \(m\) points, inserted as
+boundary vertices on the \(\Gamma_{\max}\) boundary polyline.
 
 *What changes.* §10.2–10.5 replaced; §5.4 events become bounded cells;
-ADRs 0003–0008 retired; milestones 9, 10, 10.1–10.3 replaced by one
-"local transition detection and cut" milestone; 11–16 unchanged in design.
-
-*Transitions and events.* Generic crossings: exact local hyperedge (edge
-crossing ↔ \(m\) on the boundary). Multiway, degenerate endpoints, thin
-strips: bounded cells (F4). Seam: the existing periodic mesh adjacency.
+ADRs 0003–0008 retired; milestones 9–10.3 replaced by one milestone; 11–16
+unchanged in design.
 
 *Bounds.* Unresolved triangles and capped vertices carry \(\Theta\in[0,1]\);
 the \(K\)-weight of capped vertices is bounded through F3.
 
-*Cost.* One forward trace per vertex (already required) plus a few traces
-per straddling edge; no backward traces, no curve certification. DMercFail
-\(\lambda_n=0.8\): ~15 s of tracing for 1182 vertices today, 2–3 s with the
-batched quadrature.
+*Cost.* One forward trace per vertex plus a few per straddling edge; no
+backward traces, no curve certification (DMercFail \(\lambda_n=0.8\): ~15 s of
+tracing today, 2–3 s with the batched quadrature).
 
-*Strengths.* Smallest change; reuses the exhaustively tested locator,
-measure, persistence; removes failure mechanisms M1–M3, M5–M9, M12 of the
-knowledge map.
+*Strengths.* Smallest change; reuses the tested locator, measure and
+persistence; removes M1–M9 and M12 of the knowledge map.
 
 *Weaknesses and failure modes.* Keeps 3-D extraction and its resolution
 problems (thin tubes near \(B_{\min}\), G_JUMP splits, backend disagreement,
 sliver-controlled allowances, folded boundary triangles); needs the
-\(\Gamma_{\max}\) boundary polyline to be resolved well enough to receive
-child-3 ports (projection tolerance is a new control); the edge indicator can
-miss two crossings on one edge (detected by the midpoint interpolation error,
-otherwise a resolution gap); the \(K|\omega|\) quadrature on triangles stays.
+\(\Gamma_{\max}\) boundary polyline resolved well enough to receive child-3
+ports; the edge indicator can miss two crossings on one edge; the
+\(K|\omega|\) triangle quadrature stays; the extractor/backend matrix axes stay.
+The computational-topology review recommends dropping B: its indicator is
+strictly weaker than the level-curve predicate of F1 and it gains nothing
+over C except code reuse.
 
-*Likelihood.* ≈50–60% with E and F.
-
-*Effort.* One large milestone (detection + local split + ports) plus
-adaptation of the flood fill's port model; roughly the size of milestone 10.
-
-*Decisive experiment.* On DMercFail \(\lambda_n=0.8\) with surface-wide
-traces: do the edge crossings reproduce the two-sheet graph and the port
-actions of the reference cut, and does the W7-X \(b=2.7781394\) surface show
-the two events as isolated event triangles whose measure shrinks under local
-refinement?
+*Likelihood.* ≈50–60% with E and F. *Effort.* One large milestone plus the
+flood-fill port model. *Decisive experiment.* On DMercFail \(\lambda_n=0.8\)
+with surface-wide traces, do the edge crossings reproduce the two-sheet graph
+and the reference port actions, and does the W7-X \(b=2.7781394\) surface
+show its two events as isolated event triangles whose measure shrinks?
 
 ### Option C — Field-line chart with per-line well lists (recommended)
 
-*Idea.* Replace the 3-D surface by the chart of F2. For each pitch \(b\), lay
-a grid in \((s,\alpha)\) (rows of constant \(s\); \(\alpha\) uniform on
-\([0,2\pi)\)); on each line scan \(B\) along \(\theta=\alpha+\iota(s)\zeta\)
-over an extended window \([-L,2L)\), find every incoming crossing, and trace
-every well whose incoming point lies in \([0,L)\). Each grid point carries a
-finite list of wells with \(\zeta_-\), \(A\), \(K\), exit, extrema, status.
-Match wells between neighbouring grid points by \(\zeta_-\) continuity (ghost
-wells outside \([0,L)\) recognise a well drifting through the seam) and by
-continuity of the exit. Classify each cell edge: REGULAR (all matched, exit
-continuous), COUNT_CHANGE (one chart well unmatched: a \(\Gamma_{\max}\)
-split or a \(\Gamma_{\min}\) birth, told apart by the located point's
-\(D_\parallel^2B\)), EXIT_JUMP (matched incoming point, lifted exit displaced
-by more than a fraction of \(L\): the parent/child-1 side of \(T\)),
-IRREGULAR (anything else, including an interior-maximum count jumping by two
-or more). The prototype showed that the well count alone is not a sufficient
-detector and that \(|\Delta A|/A\) is not a usable one (it reaches 0.5–0.9 on
-genuinely regular edges near the axis), while the exit displacement separates
-\(T\) cleanly (0.15–0.25 rad on regular edges versus 1.4–3.8 rad on \(T\)).
-Locate crossings by bisection along the edge; build the sheet complex as
-cells × wells with the transition hyperedge linking the EXIT_JUMP crossing at
-\((s^*,\alpha_a)\) to the COUNT_CHANGE crossing of the child-3 well, which
-lives on the line \(\alpha_a+k\iota L\) (the parent's forward trace gives
-\(m\) and hence \(k\); the prototype verified the shift to within one cell at
-every \(s\) row). Put the window boundary away from the stellarator-symmetry
-planes \(\zeta=0,L/2\) (e.g. \([L/4,5L/4)\)): all located \(\Gamma_{\max}\)
-points on DMercFail sat exactly on \(\zeta=0\), the worst case for a
-\([0,L)\) window. Refine cells touching IRREGULAR edges (quadtree in the chart)
-until they are regular or their measure is below tolerance; leave the rest as
-bounded cells. The flood fill (§11) runs on the cell complex with
-\(\omega\equiv1\); the seam is an identity-action link between the clipped
-\(\zeta_-=L\) and \(\zeta_-=0\) edges of the sheet, found by the same
-matching.
+*Idea.* Replace the 3-D surface by the chart of F2. Rows of constant \(s\);
+on each row a per-surface quintic spline of \(B(\theta,\zeta)\) (0.4–0.7 s to
+build). Sample \(\alpha\) by orbits of the period-shift map
+\(\alpha\to\alpha+\iota(s)L\): one long scan of a physical field line over
+\(N+M\) periods yields \(N\) chart lines each with \(M\) periods of coverage,
+the seam between consecutive windows is an identity, and a well's exit is
+read from the same scan however many windows away (near low-order rational
+\(\iota\) the orbit clusters, measured at 6–16× the uniform gap on a few rows,
+so such rows use several orbits or a uniform fallback). Put the window
+boundary away from the stellarator-symmetry planes \(\zeta=0,L/2\): all
+located \(\Gamma_{\max}\) points on DMercFail sat exactly on \(\zeta=0\).
+
+Scan each line once, independently of \(b\): list the along-line extrema
+(\(\zeta_k\), \(B_k\), kind, \(D_\parallel^2B\)), polish by Newton on
+\(D_\parallel B=0\) bracketed between scanned neighbours, and attach the
+Lipschitz certificate that no extremum hides between samples. Match extrema
+between \(\alpha\)-neighbours by continuity of \((\zeta_k,B_k)\), with fold
+detection where a maximum–minimum pair annihilates; this yields the labelled
+height fields \(B_j(s,\alpha)\) and \(B_k^{\min}(s,\alpha)\) on domains
+bounded by fold curves (about one along-line maximum per field period on
+these files; a 103-maximum parent well is a ~100-period well).
+
+Per pitch \(b\): marching squares on \(B_j-b\) over cell edges, root on an
+edge by Newton on the smooth \(B_j\) (~1 ms). Classify each cell as REGULAR
+if every field satisfies the certified Taylor band
+\(|B_j({\rm centre})-b|>|\nabla B_j|\,r+Mr^2/2\) (an interval predicate, no
+traces), GENERIC if exactly one level curve crosses transversally, EVENT if
+two curves meet, a fold point lies inside, or a curve meets a fold; quadtree-
+refine EVENT cells until their measure is below tolerance and leave the rest
+bounded. Wells at level \(b\) on each line come from the line's merge tree
+(sublevel-set components of \(B\) along the line, which merge at maxima as
+\(b\) rises); the crossings are polished between the bracketing extrema and
+\(A\), \(K\) are computed by the batched Gauss–Legendre rule with breakpoints
+at the extrema. Sheets are unions of cells with a constant merge-tree branch
+label; the child-3 copy of a transition is the shift by an integer number of
+windows. The transition hyperedge links parent (\(B_j\) slightly below
+\(b\)), child-1 (same line, exit before \(m\)) and child-3 (well starting
+after \(m\), \(k\) windows downstream), with \(u\) = arc length along
+\(\{B_j=b\}\) and additivity checked at the located point. The well count and
+exit-displacement signals of the prototype remain as an independent check of
+the level-curve predicate, not as the detector (the prototype showed the
+count alone is insufficient and \(|\Delta A|/A\) is unusable near the axis).
 
 *What changes.* Decision 1 of §26 reversed by ADR; §4.4, §8 and §10 replaced;
 milestones 3, 4, 5, 7 (as surface refinement), 8, 9, 10.x retired; the tracer
-(6) becomes a per-line scanner that reuses one scan for all wells on the
-line; 11–16 kept in design with triangles → chart cells; the validation
-matrix loses the backend × extractor axes (5 files × 6 levels = 30 cases, or
-more levels) and gains grid-refinement convergence.
+(6) becomes a per-line scanner plus a batched quadrature; 11–14 replaced by
+option R (or re-based on cells); 15–17 re-based; the validation matrix loses
+the backend and extractor axes and gains chart-refinement levels.
 
-*Transitions and events.* Generic: exact local hyperedges from bisection,
-with additivity checked at the crossing (F1). Equal-height contacts,
-\(T\)-junctions, degenerate endpoints: cells that stay IRREGULAR under
-refinement, bounded (F4). Thin strips near `EDGE`: one-dimensional refinement
-in \(s\) (T ends at \(s=1\) exactly because field lines preserve \(s\)).
-Thin tubes near \(B_{\min}\): short \(\zeta\)-intervals on a line, no
-triangle to bridge sheets. Axis: rows at small \(s\) where wells are nearly
-\(\alpha\)-independent; the first row's measure \(s_1\) is bounded if not
-resolved. Seam: identity links (above).
+*Transitions and events.* Generic crossings: exact, on a smooth function with
+a certified gradient; the three ports are the same \((s,\alpha)\) point and
+an integer shift, so nothing is matched by a common parameter. Folds,
+degenerate endpoints, \(T\)-junctions and equal-height contacts are
+codimension-two points of the arrangement (F1, F4), entering only as bounded
+EVENT cells. Thin strips near `EDGE`: refinement in \(s\) (T ends at \(s=1\)
+exactly). Thin tubes near \(B_{\min}\): short \(\zeta\)-intervals on a line.
+Axis: rows at small \(s\) where wells are nearly \(\alpha\)-independent; the
+first row's measure is bounded if not resolved. A symmetry-enforced event
+curve (two level curves coinciding) is detected by the matching and refined
+along the curve.
 
-*Bounds.* Per slice, \(Q_{\rm lower}\) and \(Q_{\rm upper}\) from the
-finite-atom flood fill on regular cells; IRREGULAR cells, capped wells, failed
-traces and the axis row enter with \(\Theta\in[0,1]\) and their \(K\)-weight
-bounded by F3 (exact measure \(ds\,d\alpha\) is known for every cell;
-\(K\) need not be).
+*Bounds.* Per slice, \(Q_{\rm lower}\) and \(Q_{\rm upper}\) from option R on
+resolved cells; EVENT cells, capped wells, failed traces and the axis row
+enter with \(\Theta\in[0,1]\), their measure known exactly and their
+\(K\)-weight bounded by F3 globally and by the analytic log model of F4 per
+cell.
 
-*Cost (measured components, Appendix A.2, A.1).* DMercFail \(\lambda_n=0.8\),
-24×64 chart with the *current* tracer: 142 s for 1536 lines (2.3 M field
-evaluations; 33 ms per line for the 3\(L\) scan plus ~45 ms per traced
-well), all traces regular, five crossings bisected in 4–6 s each. TURBO
-\(\lambda_n=0.5\), 24×64: 99 s. d23p4 \(\lambda_n=0.5\), 8×16: 10 s, but 31%
-of cells flagged at that resolution (grid-limited; must shrink under
-refinement). A 64×256 chart with the current tracer would be ~20 min per
-slice. With the batched quadrature and a per-row spline (built once per
-\(s\) row, 0.4–0.7 s), the per-line cost is projected to fall from ~50–80 ms
-to ~5–10 ms; a 1024-period scan of one line at 230 samples per period on the
-spline is ~0.1 s instead of ~25 s, and it serves every well on the line.
-Projected (not yet measured end to end): 1–2 min per slice at 64×256 for the
-easy levels, several minutes for the long-well levels; the outer integral
-over 20–40 slices then fits in hours on a laptop, in parallel over slices.
+*Cost (measured components in A.1–A.3; combination projected).* Scanning: one
+orbit of \(96+128\) periods per row at 460 samples per period on the spline is
+~40 ms; \(96+1024\) periods ~0.2 s; 32 rows ~7 s per equilibrium for full
+1024-period coverage of every chart line, against ~10 minutes with
+independent lines at the same spline speed and hours with the current tracer.
+Height-field matching and level-curve extraction: milliseconds per slice.
+\(A\), \(K\) for 3000–6000 wells at 1–5 ms: 5–30 s per slice; a 1024-period
+well costs ~50 ms. With the *current* tracer the 24×64 prototype took 142 s
+(DMercFail \(\lambda_n=0.8\)) and 99 s (TURBO \(\lambda_n=0.5\)) per slice, all
+traces regular, five crossings bisected in 4–6 s each. Projected per
+equilibrium at 30 slices: 3–15 minutes plus long-well quadrature.
 
 *Strengths.* Removes every geometric failure mechanism in the knowledge map
-(M1–M12) and the extraction mechanisms (M10, M11); exact measure; transitions
-local and self-certifying by additivity; long wells scanned once; the
-diagnostic is the physicist's familiar \(J(\psi,\alpha)\) map per well class;
-grid refinement is a clean §21.3 convergence dimension; the K-singularity at
-\(\Gamma_{\max}\) is on a known curve (the count-change curve) for graded
-quadrature.
+(M1–M12) and the extraction mechanisms (M10, M11); exact measure; the
+transition set is a certified predicate on smooth functions rather than a
+tolerance on traced quantities; location cost ~\(10^3\) lower than trace
+bisection; all event kinds are geometry computed once per equilibrium; the
+seam is an identity; long wells are scanned once per line and once for all
+\(b\); the diagnostic is the physicist's \(J(\psi,\alpha)\) map per well
+class; chart refinement is a clean §21.3 dimension; the breakpoints of
+\(F(b)=Q/b^2\) in \(b\) (critical values of the height fields and the
+\(B_{\max}(s)\) crossings) are known in advance for the outer quadrature.
 
-*Weaknesses and failure modes.* The twisted seam is real bookkeeping (ghost
-wells, identity links, child-3 at a shifted label) and must be tested with a
-mutation; dense arrangements of count-change curves at high \(\lambda_n\)
-(many maxima near \(b\)) need deep local refinement and may leave a larger
-bounded measure there; root-scan aliasing of shallow extrema persists
-(M13) as §21.3 dimension 5; near-tangent exits trigger `QUADRATURE_FAILURE`
-in the current tracer (fix identified, A.1); the α-grid is uniform in a
-coordinate whose natural scale varies (adaptive rows/columns mitigate); the
-\(K\)-weighted quadrature near \(\Gamma_{\min}\) (\(A\to0\), \(K\) finite) and
-\(\Gamma_{\max}\) (\(K\to\infty\)) needs §12.4's graded rules on chart cells;
-milestones 11–16 must be re-based on cells and the seam links.
+*Weaknesses and failure modes.* Extremum matching across \(\alpha\) is a new
+labelling problem: shallow ripples give many fold curves, the 3200-mode W7-X
+file has more maxima per period, and a label can retire through a below-\(b\)
+fold without any physical event; this bookkeeping needs mutation tests. Newton
+on \(D_\parallel B\) must be bracketed on dense ripples. Pairs below the scan
+certificate (root-scan aliasing, M13) remain a §21.3 dimension; their effect
+is bounded in measure. The near-tangent-exit `QUADRATURE_FAILURE` of the
+current tracer (A.1) must be fixed before cut-vertex values are assigned. Rows
+near low-order rationals need several orbits. Dense arrangements at high
+\(\lambda_n\) still need deep local refinement, now along known smooth
+curves. Milestones 11–17 must be re-based.
 
-*Likelihood.* ≈75–85% with E and F; the main residual risk is the cost of the
-nearly-passing levels (\(\lambda_n\ge0.9\)), which E bounds if not resolved.
+*Likelihood.* ≈85% with E and F (the prototype's own risks, seam bookkeeping
+and dense arrangements, were reduced to integer shifts and refinement along
+known curves by the level-curve formulation). The residual is the matching
+machinery and the mid-band long wells.
 
-*Effort.* Three milestones: (C1) per-line scanner and chart builder with
-sheets, edges, crossings, seam links and diagnostics; (C2) cell-complex flood
-fill with bounds and the total-weight check (re-based 12–14); (C3) slice
-pipeline, outer quadrature, validation matrix (re-based 15–17). C1 is a
-week-scale prototype away from a measured answer on all five files.
+*Effort.* Three milestones: (C1) scanner, height fields, level curves, cells,
+sheets, hyperedges, diagnostics; (C2) reachability and bounds (option R) with
+the total-weight check; (C3) slice pipeline, outer integral, validation
+matrix. C1 is a week-scale prototype away from a measured answer on all five
+files.
 
-*Decisive experiment.* Run the chart on all five files at the six levels at
-32×96 with the current tracer (cap 128) and report per case: fraction of
-IRREGULAR measure after two refinement rounds, additivity residuals at every
-crossing, capped measure, and wall time. The option is falsified if the
-IRREGULAR measure does not shrink under refinement on the resolved reference
-cases, or if seam matching produces spurious count changes.
+*Decisive experiment.* Build the height fields on all five files at 32×96
+(\(b\)-independent, minutes), extract the level curves at the six levels, and
+compare (a) with the prototype's flagged edges on DMercFail 0.8 and TURBO 0.5,
+(b) with the milestone-9 \(\Gamma_{\max}\) polylines and companion samples of
+the resolved references (DMercFail 0.8, TURBO 0.5, d23p4 0.5, W7-X
+\(b=2.7781394\) whose two events at \(s=0.1184\) and \(0.3189\) must appear as
+level-curve intersections or fold contacts), (c) on d23p4 0.5, where the
+prototype saw interior-maximum counts jump by two across one cell, the two
+curves must be resolved individually with EVENT measure shrinking under
+refinement. Falsified if a transition seen by the surface pipeline is not a
+level curve of some matched field, or if the matching produces spurious folds
+on a set of measure that does not shrink.
 
-### Option D — Direct contour following in the continuous field
+### Option R — Reeb-complex reachability with coarea quadrature (the engine of C2)
 
-*Idea.* Do not build a global structure. Sample trapped states in the chart
-with weight \(hK\,ds\,d\alpha\) (or uniformly, weighting by \(hK\)); from each,
-follow the constant-\(A\) contour as an ODE in \((s,\alpha)\) using the
+*Idea.* On each sheet \(A\) is continuous and PL; its Reeb graph (each level-
+set component contracted to a point) encodes exactly the connectivity the
+direct contour tracer explores, for every contour at once. The image of
+`EDGE` in the graph is a union of arcs; without transitions \(\Theta\) is the
+indicator of the connected component of that image — no atoms, no snapping,
+exact for the PL interpolant. A monotone transition segment is three
+continuous paths from \([u_0,u_1]\) into the parent, child-1 and child-3
+graphs, glued pointwise; the reachable set is the connected component of the
+`EDGE` image in the glued 1-complex. \(Q\) follows from the coarea formula:
+per arc, the cumulative mass function of the arc's level-set components,
+computed once per triangle, with the log-singular boundary triangles handled
+by the analytic model of F4. Unresolved cells are holes: the lower bound
+treats a hole as boundary, the upper bound as one wildcard node joining every
+arc that touches it; the gap contribution of a cell is exactly the mass of
+arcs reachable only through the wildcard (two union-finds), which is option
+E's refinement criterion, computed exactly.
+
+*What changes.* §11.2–11.4 (interval sets, atoms, bitmasks, inner/outer
+snapping, affine preimages) and §12.1 (polygon clipping) replaced; §11.3's
+semantics (common parameter \(u\) preserved, action not; periodic adjacency
+explicit; no connection by numerical overlap) unchanged; §11.5 handled by
+symbolic perturbation on vertex index.
+
+*Transitions and events.* Generic transitions are exact gluings; event cells
+and capped or failed wells are wildcard holes; nothing is certified. The one
+place discretization enters is a genuine transition cycle (a gluing that
+composes to a self-map of an arc interval), where the reachable set is the
+orbit of an interval map, iterated with a geometrically decreasing remainder
+that is added to the gap; the upper bound runs the same iteration on the
+complement with the inverse maps.
+
+*Bounds.* Lower and upper \(Q\) per slice; the gap has exactly two sources,
+unresolved-cell mass and the cycle remainder, both reported. A capped well is
+a hole with its F3-bounded mass; a missing transition would be a missing
+gluing (a mutation test).
+
+*Cost.* Reeb graph \(O(n\log n)\) with a sweep or \(O(nm)\) naively:
+milliseconds to a second for \(10^4\) cells; negligible against tracing.
+Effort: one milestone merging the re-based 11–14; the direct tracer (11)
+becomes a sampled cross-check.
+
+*Strengths.* The oracle and the production path coincide on regular sheets;
+the non-termination worry of §11.3 is isolated to genuine cycles and handled
+as a convergent series; the refinement criterion is exact; the Reeb graph is
+the physicist's diagnostic (which \(J\) contours on which sheet reach the
+edge, ranked by persistence); representation-agnostic (works on C's cells,
+B's mesh, or as D's memo).
+
+*Weaknesses.* New code on surfaces with boundary, loops and a seam; CLAUDE.md's
+"no framework abstractions" argues for the simplest \(O(nm)\) version first;
+the cycle remainder needs its own mutation test on the ADR 0006 six-sheet
+field; it does not help locate \(T\) or trace wells.
+
+*A lighter cousin (H3).* Enumerate the finite list of critical values of \(A\)
+per sheet (saddles and extrema of \(A\), port extrema along \(T\) arcs — the
+subdivision points §10.4 already prescribes — and `EDGE` extrema), and classify
+each band between consecutive values by one or two direct contour traces;
+bisect in \(A\) when they disagree. Cheaper to implement than either the
+finite-atom flood fill or the Reeb complex, exact in the continuous field,
+but 20 s to 15 min of contour following per slice and only as complete as the
+critical-value list.
+
+*Likelihood and role.* Changes bound quality, not the resolution rate; raises
+C's chance of meeting a per-slice gap tolerance within budget. *Decisive
+experiment.* With \(A\) on the DMercFail \(\lambda_n=0.8\) chart, compute the
+Reeb graphs of the two sheets and the glued complex and compare \(\Theta\) on
+200 random regular points with direct contour following (exact agreement
+required); then on the ADR 0006 six-sheet field compare with a finite-atom
+implementation at two atom resolutions (the Reeb result must lie inside the
+atom bounds and be tighter; removing one gluing must flip \(\Theta\)).
+
+### Option D — Direct contour following in the continuous field (oracle, gap estimator, validation)
+
+*Idea.* Follow a constant-\(A\) contour as an ODE in \((s,\alpha)\) using the
 analytic gradient of \(A\) (bounce integrals of \(\partial_sB\),
 \(\partial_\theta B\) with the same endpoint regularization as \(K\)); detect
-edge arrival, closure, and transitions (the well's highest interior maximum
-reaching \(b\), or the exit becoming tangent) along the way; branch to
-child-1 and child-3 (or the parent) using the forward trace at the crossing;
-memoize by (well identity, \(A\)). \(\Theta\) per sample; \(Q(b)\) by
-stratified Monte Carlo with a statistical error, or by contour bands
-(reachability is constant along a contour, so one trace classifies a curve).
+edge arrival, closure and transitions (the well's highest interior maximum
+reaching \(b\), or the exit becoming tangent) along the way; branch at
+transitions with the forward-trace rule; memoize by (sheet, \(A\)-band).
+Three roles:
 
-*What changes.* Decision 3 of §26 reversed for production; milestones 8–14
-replaced by a sampler, a contour integrator, and a variance-reduced estimator;
-11 (direct tracer) becomes the production path.
+*D1, the oracle.* Sampled cross-check of C+R on regular points; exact
+agreement required (milestone 11's purpose).
 
-*Transitions and events.* Handled when encountered, locally, by the same
-forward-trace rule; nongeneric events are measure-zero for the sampler and
-appear as rare branching ambiguities that are reported per sample.
+*D2, the gap estimator (H1).* Everything the chart resolves is deterministic;
+what remains is the gap set (EVENT cells, capped and failed wells, cycle
+remainders), each with exactly known measure and F3-bounded mass. Estimate
+\(\Theta\) statistically *only* there, with samples drawn proportional to
+\(hK\,ds\,d\alpha\,db\) and the contour follower as oracle. With
+\(f=f_{\rm lower}+\sum_c m_c\,p_c\), the variance is at most \(G^2/4n\) for a
+gap \(G=f_{\rm upper}-f_{\rm lower}\), so \(\sigma_f=0.005\) needs
+\(n=10^4G^2\) contours per equilibrium: 25 at \(G=0.05\), 900 at \(G=0.3\).
+The chart only has to make the gap small; sampling closes it at a cost that
+falls with \(G^2\). A cost-aware rule per cell (refine while the gap mass
+halves per round, else sample) bounds the deep-quadtree risk of dense
+arrangements. The deterministic \([f_{\rm lower},f_{\rm upper}]\) is never
+widened; \(\hat f\pm2\sigma\) is a point estimate inside it; samples whose
+contour fails stay in the deterministic bound, never at \(\Theta=0\).
 
-*Bounds.* Failed samples are unresolved measure; the estimator's statistical
-error is separate from the bound; F3 bounds capped wells.
+*D3, birth-particle validation (H2).* Draw birth particles from the source
+directly: \(\mathbf x\) with density \(h|C|/B^2\), pitch \(\xi\) uniform,
+\(b=B(\mathbf x)/(1-\xi^2)\); the particle is passing iff \(b\ge B_{\max}(s)\).
+The sampling density is then exactly \(hK/(2b^2)\,ds\,d\alpha\,db\), so
+\(K\), \(\omega\), the surface, the slice and the \(b\)-quadrature are never
+computed (verified this week: trapped fraction \(0.633\pm0.012\) against
+0.630 on DMercFail; band shares match A.5). \(f\) is one number, so ±0.01 at
+two sigma needs \(N\le10^4\) particles in total, of which only the trapped
+36–63% need a contour. This is the strongest end-to-end validation available
+(it checks \(\Theta\), whereas the \(\Theta\equiv1\) benchmark checks only the
+measure) and the fallback if C1's matching fails; it cannot give
+deterministic bounds, so it is not the production deliverable.
 
-*Cost.* One trace per right-hand-side evaluation, ~4 per RK step; contours
-on a stellarator sheet need hundreds of steps → ~10³ traces per contour,
-1–20 s per contour with the measured levers; \(10^3\)–\(10^4\) contours per
-slice for 1% → hours per slice on one core. [Appendix A.4 will report the
-measured contour cost when experiment E4 completes.]
+*Cost.* One trace per right-hand-side evaluation, 2–3 per predictor–corrector
+step, hundreds of steps per contour → 1–20 s per contour with the F levers;
+D2 needs 25–900 contours per equilibrium; D3 needs 3600–6300 contours per
+equilibrium for ±0.01 (3–8 h single core, 1–2 h on four cores; 20–50 min for
+±0.03). The draft's earlier estimate of "hours per slice" counted contours
+per slice instead of per equilibrium and overstated D by 20–40×. Contour
+following itself is unmeasured on real fields (experiment E4 did not
+complete); it is the key unknown for D2, D3 and H3.
 
-*Strengths.* Nothing global to certify; every failure is local and honest;
-trivially parallel; the ideal oracle for options B and C and the natural
-estimator inside cells they leave unresolved.
+*Strengths.* Nothing global to certify; every failure local and honest;
+trivially parallel; failure modes disjoint from C's, so agreement is a
+genuine validation of both; D3's by-product is the per-particle well-length
+distribution (F5).
 
-*Weaknesses and failure modes.* Cost and statistical error; contour closure
-detection under drift; branching trees at dense transition arrangements;
-the same long-well cost.
+*Weaknesses.* Statistical error inside the gap; contour closure under drift
+and branching trees at dense arrangements unproven; contours drift in \(s\),
+so the per-surface spline must become a 3-D spline or be rebuilt along the
+way; long wells in the mid band dominate cost on d23p4-like files.
 
-*Likelihood.* ≈40% as the sole production estimator; high value as oracle.
+*Likelihood.* As sole production estimator under the deterministic-bounds
+rule ≈45–55%; ≈60–70% if confidence bounds are acceptable; as D1/D2/D3
+alongside C, high value. *Effort.* One milestone for the integrator and the
+oracle; one for D2/D3. *Decisive experiment.* Three contours on DMercFail
+\(\lambda_n=0.8\): closure, edge arrival, one transition crossing with
+additivity, wall time; then 300 birth particles on DMercFail with the
+completion rate and median time per contour (pass: ≥90% complete, median
+< 20 s).
 
-*Effort.* One milestone for the integrator and oracle; one more for the
-production sampler if chosen.
-
-*Decisive experiment.* Follow three contours on DMercFail \(\lambda_n=0.8\):
-closure, edge arrival, one transition crossing with additivity, and wall time.
-
-### Option E — Bounds-first computation (cross-cutting; recommended with B, C or D)
+### Option E — Bounds-first computation (cross-cutting; required)
 
 *Idea.* Make the deliverable of every slice the pair
-\((Q_{\rm lower}(b),Q_{\rm upper}(b))\), computed from the finite-atom flood
-fill's inner/outer sets on resolved cells and from F3 for everything else, and
-of the whole run the pair \((f_{\rm lower},f_{\rm upper})\). Spend refinement
-effort where the gap is largest (a cell's gap is its \(hK\,ds\,d\alpha\)
-measure if unresolved, plus the action band of contours through it). Stop at
-the time budget and report the gap.
+\((Q_{\rm lower}(b),Q_{\rm upper}(b))\) and of the run the pair
+\((f_{\rm lower},f_{\rm upper})\), computed from option R on resolved cells
+and from F3 for everything else; add \(\hat f\pm\sigma_f\) from D2 inside the
+gap when requested. Spend refinement effort where the gap contribution (not
+the cell's own measure) is largest, allocate the time budget across slices in
+proportion to mass × gap, stop at the budget and report the gap.
 
-*What changes.* §23 milestone 10.3's acceptance ("≥95% resolved") becomes
-"≥95% of cases reach a gap below tolerance within the budget; every case
-reports its gap"; §11.3/§12.5/§13.4 unchanged; §9.3 satisfied literally.
+*Acceptance, restated.* Milestone 10.3's "≥95% resolved" becomes: for each
+equilibrium, \(\sum_b w_b\,(Q_{\rm upper}-Q_{\rm lower})/(2V_hb^2)\le0.01\)
+within the per-equilibrium budget, every slice reporting its gap; ≥95% of the
+(equilibrium, level) cases in the matrix reach a per-slice gap below a stated
+fraction of \(Q_{\rm total}(b)\). The per-case 10-minute cap becomes a
+per-equilibrium budget allocated unevenly (the mid band deserves most of it).
 
 *Why it is not a loosening.* §21.2 forbids *silent* loss; a bound that
 contains the truth by construction is the opposite. ADR 0009's option 2
-("exclude physical terminals from the denominator") becomes unnecessary: a
-capped well is inside the bound.
+becomes unnecessary: a capped well is inside the bound. ADRs 0007 and 0008
+become moot.
 
 *What accuracy is useful.* For optimization use, \(f\) to ±0.01 absolute is
-likely sufficient. The nearly-passing band above \(\lambda_n=0.95\) carries
-0.3–0.7% of the trapped phase space (an \(f\) uncertainty of 0.001–0.005 if
-left bounded) and the band above 0.9 carries 1.3–2.7% (0.004–0.017)
-(Appendix A.5); the former can be left bounded, the latter should be resolved
-with the per-line scan where it is cheap and bounded where it is not.
+likely sufficient. The band above \(\lambda_n=0.95\) carries 0.3–0.7% of the
+trapped mass (≤0.005 on \(f\) if left bounded) and above 0.9, 1.0–2.7%
+(≤0.017); wells longer than 12 periods carry ≤0.3% (A.5, A.6).
 
-*Failure mode.* A large region whose only route to the edge passes through
-an unresolved cell inflates the gap; refinement of that cell (not the region)
-fixes it, which is why the refinement criterion must be the gap contribution,
-not the cell's own measure.
+*Failure mode.* A large region whose only route to the edge passes through an
+unresolved cell inflates the gap; option R's wildcard construction finds
+exactly that cell.
 
 ### Option F — Cost engineering (cross-cutting; measured)
 
@@ -509,27 +616,27 @@ existing sine-squared coordinate with breakpoints at the scanned extrema,
 \(10^{-5}B_{00}\) of \(b\), with an \(n\)-vs-\(2n\) error estimate and the
 existing endpoint-difference evaluation (30–134 ms → 1–5 ms); (2) cache the
 coefficient vector per \(s\) and evaluate \(B\) and \(D_\parallel B\) jointly
-(scalar calls 34–41 → 7–9 µs); (3) per-surface quintic spline for the scan
-(0.4 µs per point; physics-preserving; bicubic is not); (4) one scan per field
-line reused by every well on it (option C gives this for free; option B can
-cache by line); (5) vectorize the per-period crossing/extremum bracketing;
-(6) Numba last, after profiling. Do *not* truncate the mode set by amplitude.
-Also fix the near-tangent-exit `QUADRATURE_FAILURE` (0.5–0.9 s each, at
-default settings) by decoupling the endpoint window from the scan step.
+(scalar calls 34–41 → 7–9 µs); (3) a per-surface quintic spline for the scan
+(0.4 µs per point; bicubic is not acceptable); (4) one \(b\)-independent scan
+per field line, shared by every well and every slice (option C's orbit
+sampling gives \(N+M\) instead of \(N\times M\)); (5) vectorize the per-period
+crossing/extremum bracketing; (6) Numba last. Do *not* truncate the mode set
+by amplitude. Fix the near-tangent-exit `QUADRATURE_FAILURE` (default
+settings, 0.5–0.9 s each; a retry with `quadrature_rtol` \(10^{-8}\) or 48
+samples per wavelength recovers the identical \(K\)).
 
 ### Option G — Physics shortcuts for the nearly-passing band
 
-For \(b\) close to \(B_{\max}(s)\) the wells are ergodically long (about
-\(1/p\) periods where \(p\) is the area fraction of \(B>b\) on the surface).
-Two honest treatments: (i) bound the whole band \([b^*,B_{\max}]\) by F3's
-volume integral (exact, cheap) and report it as unresolved measure; (ii) trace
-with the per-line scan and spline, where a 1024-period line costs ~0.1 s. The
-band's share of trapped phase space is in Appendix A.5. A third idea, using
-the ergodic average of \(J\) (which makes contours nearly flux-surface-aligned
-and hence confined) is *not* admissible as a computation of \(\Theta\) but
-is a good diagnostic of what the bound is hiding. Symmetry can halve the
-chart (stellarator symmetry maps \((\theta,\zeta)\to(-\theta,-\zeta)\)); use
-only after the unsymmetrized code is validated.
+Bound the band above a chosen \(\lambda_n\) by F3 (exact, cheap) and report
+it; trace the mid band with the shared scan, where a 1024-period line costs
+~0.2 s; cap the tail at 8–16 periods and bound the remainder (worth ≤0.3% of
+the trapped mass). Use the known breakpoints of \(F(b)\) (critical values of
+the height fields and the \(B_{\max}(s)\) crossings) to replace much of the
+adaptive midpoint tree of §13.3 by Gauss rules between breakpoints, or use
+stratified randomized \(b\)-nodes for an unbiased outer integral with an
+honest error (§21.3 dimension 12 is otherwise silent). Stellarator symmetry
+can halve the chart but conflicts with orbit sampling; use only after the
+unsymmetrized code is validated.
 
 ## 4. Comparison
 
@@ -537,43 +644,53 @@ only after the unsymmetrized code is validated.
 |---|---|---|---|---|---|---|
 | A stay the course | no | no | veto | none until M12–14 | open-ended | ≈10% |
 | B local cut on mesh | yes | no | bounded (E) | yes (E) | 1 large milestone | ≈50–60% |
-| C field-line chart | yes | yes | one scan per line; bounded (E) | yes (E), exact measure | 3 milestones | ≈75–85% |
-| D contour following | n/a | yes | bounded (E) | statistical + bound | 1–2 milestones | ≈40% alone; oracle for B/C |
+| C field-line chart (height fields, orbit scan) | yes | yes | one scan per line and per \(b\); bounded tail | yes (E, R), exact measure | 3 milestones | ≈85% |
+| R Reeb-complex reachability | — | — | — | exact PL bounds; gap = cells + cycle remainder | 1 milestone (replaces 12–14) | raises C's per-slice gap odds |
+| D contour following | n/a | yes | bounded (E) | statistical inside the gap | 1–2 milestones | ≈45–55% alone; required as oracle/estimator/validation |
 | E bounds-first | — | — | — | required | small, cross-cutting | prerequisite |
-| F cost levers | — | — | 10–20× per trace | — | 1 milestone | prerequisite for 10 min |
+| F cost levers | — | — | 10–20× per trace; \(N+M\) scans | — | 1 milestone | prerequisite for the budget |
 | G band shortcuts | — | — | bound or cheap scan | — | small | supporting |
 
 ## 5. Recommended path and acceptance criteria
 
-1. **ADR: bounds-first acceptance (E).** Restate milestone 10.3's threshold as
-   a bound gap: for each (equilibrium, \(b\)) case,
-   \(Q_{\rm upper}-Q_{\rm lower}\le\varepsilon\,Q_{\rm total}(b)\) within 10
-   minutes, with \(\varepsilon\) set by the researcher (I suggest 0.02), and
-   \(f_{\rm upper}-f_{\rm lower}\le0.01\) for the outer integral. Decide ADRs
-   0007/0008 as moot under the new design and ADR 0009 by this restatement.
+1. **ADR: bounds-first acceptance (E)** in \(f\) units, with the per-
+   equilibrium budget; decide ADRs 0007/0008 as moot and ADR 0009 by this
+   restatement; redefine the validation matrix as five files × levels ×
+   chart-refinement levels, keeping the recorded 10.2/10.3 matrices as the
+   baseline of what the old pipeline could do.
 2. **Milestone F0: tracer cost levers** (batched quadrature, coefficient
    cache, joint \(B\)/\(D_\parallel B\), near-tangent-exit fix), validated by
-   bit-level agreement with the current tracer on the milestone-9 sample set.
-3. **Milestone C1: chart builder** (per-line scanner, well lists, matching
-   with ghosts, edge classes, crossing bisection with additivity, seam links,
-   count-map and \(J\)-map diagnostics), validated on the DMercFail
-   \(\lambda_n=0.8\) two-sheet reference, the W7-X \(b=2.7781394\) two-event
-   reference, and the ADR 0006 six-sheet synthetic field.
-4. **Milestone C2: cell-complex flood fill with bounds** (re-based 12–14)
-   with F3 as an exact check of the total weight on every slice.
-5. **Milestone C3: slice pipeline and outer integral** (re-based 15–17), with
-   the direct contour tracer (D) as the oracle on sampled points.
+   agreement with the current tracer on the milestone-9 sample set.
+3. **Milestone C1: chart builder** — per-row spline, orbit scanner, extrema
+   and height fields with matching and fold detection, level curves per
+   \(b\), cell classes, merge-tree well lists, sheets, hyperedges, seam,
+   count-map and \(J\)-map diagnostics — validated on DMercFail
+   \(\lambda_n=0.8\) (two sheets), the W7-X \(b=2.7781394\) two-event reference,
+   the ADR 0006 six-sheet synthetic field and the ADR 0007 fold field, with
+   mutation tests on the matching (retire a label wrongly), the seam (drop the
+   shift) and the predicate (widen the Taylor band).
+4. **Milestone C2: Reeb-complex reachability with bounds (R)**, with F3 as an
+   exact check of the total weight on every slice and the direct contour
+   tracer (D1) as the sampled oracle.
+5. **Milestone C3: slice pipeline, outer integral, D2 gap estimator, D3
+   birth-particle validation**, and the validation matrix.
 6. Keep option B as the fallback if C1's decisive experiment fails on the
-   seam or on dense arrangements; it shares F0, E and the flood-fill re-base.
+   matching or on dense arrangements; keep D3 as the fallback estimator if
+   C1 fails altogether.
 
 Early experiments in order (each under an hour): C1's decisive experiment on
-all five files; the F3 identity on two files (Appendix A.3); the band
-fractions (A.5); D's three contours (A.4).
+all five files (height fields and level curves versus the recorded
+\(\Gamma_{\max}\) and companion samples); D's three contours on DMercFail
+\(\lambda_n=0.8\) (the one unmeasured ingredient); R's Reeb-versus-contour
+agreement on the DMercFail chart; the orbit-scan check on d23p4
+\(\lambda_n=0.8\) (one row, one orbit of \(96+1024\) periods, bit-level
+agreement of \(A\), \(K\), exits with the current tracer on 20 windows).
 
-Open questions for the researcher: the tolerance \(\varepsilon\) and the
-\(f\) tolerance; whether the validation matrix should drop the backend and
-extractor axes in favour of grid-refinement levels; whether the axis row is
-bounded or resolved; disposition of ADRs 0007–0009.
+Open questions for the researcher: the tolerance on \(f\) (0.01 assumed) and
+whether a probabilistic point estimate inside a deterministic bound is
+acceptable; whether the validation matrix should drop the backend and
+extractor axes; whether the axis row is bounded or resolved; the per-
+equilibrium time budget; disposition of ADRs 0007–0009.
 
 ## Appendix A. Measurements (2026-09-02/03)
 
@@ -582,94 +699,100 @@ bounded or resolved; disposition of ADRs 0007–0009.
 Two equilibria (d23p4 \(\lambda_n=0.5\), DMercFail \(\lambda_n=0.8\)), 30
 regular wells each plus 36 constructed near-transition wells, profiled and
 re-timed single-process. Field evaluation 7–15 µs per point batched, 34–41 µs
-per scalar call; coefficient-spline re-evaluation 28–30% of field time.
-Scan density 447–460 samples per period. Per trace: 31–40 ms (sub-period),
-78 ms (1 period), 121 ms (2 periods); 60–80% in the adaptive scalar
-quadrature. Levers: samples per wavelength 24→8 safe, 1.1–1.4×; mode
+per scalar call; coefficient-spline re-evaluation 28–30% of field time. Scan
+density 447–460 samples per period (equivalent to a \(10^{-5}B_{00}\)
+interpolation tolerance). Per trace: 31–40 ms (sub-period), 78 ms (1 period),
+121 ms (2 periods); 60–80% in the adaptive scalar quadrature. Levers:
+samples per wavelength 24→8 safe on all 96 wells but only 1.1–1.4×; mode
 truncation at \(10^{-4}\) changes \(A\) by up to \(8\times10^{-4}\), \(K\) by
 \(2\times10^{-2}\), itineraries on 1–2 of 30 wells and gives wrong topology
-near transitions (rejected); quintic per-surface spline 256×128: \(B\) to
-\(4\times10^{-10}\), \(D_\parallel B\) to \(4\times10^{-7}\), identical
-itineraries on all tests, 0.4 µs per point; batched composite Gauss–Legendre
-with breakpoints at extrema: \(n=64\) gives \(A\) to \(10^{-15}\), \(K\) to
-\(10^{-9}\) in 1–5 ms (near-transition segments need 128–256 nodes). Combined
-realistic gain 5–10× (sub-period) to 10–20× (multi-period). Eight of 36
-near-tangent-exit wells return `QUADRATURE_FAILURE` at default settings.
+within \(4\times10^{-3}B_{00}\) of a transition (rejected); quintic per-
+surface spline 256×128 per period: \(B\) to \(4\times10^{-10}\),
+\(D_\parallel B\) to \(4\times10^{-7}\), identical itineraries on every test
+including wells \(10^{-7}B_{00}\) from a transition, 0.4 µs per point, 0.4–0.7 s
+to build; batched composite Gauss–Legendre with breakpoints at extrema:
+\(n=64\) gives \(A\) to \(10^{-15}\), \(K\) to \(10^{-9}\) in 1–5 ms (near-
+transition segments need 128–256 nodes). Combined realistic gain 5–10×
+(sub-period) to 10–20× (multi-period) per trace. Eight of 36 near-tangent-
+exit wells return `QUADRATURE_FAILURE` at default settings.
 
-### A.2 Field-line chart prototype (experiment E2, first run)
+### A.2 Field-line chart prototype (experiment E2, two runs, bit-identical)
 
-DMercFail \(\lambda_n=0.8\), \(b=10.6483680108\), grid 24×64 in
-\((s\in[0.05,1],\alpha)\), extended window \([-L,2L)\), cap 128, current
-tracer: 142 s wall, 2.27 M field evaluations, 1536 lines, all traces REGULAR;
-102 of 1536 lines have an interior maximum, minimum gap \(b-B_{\max,\rm int}=
-1.1\times10^{-3}\). Count map: one well per line except a region of two wells
-(the child-3 sheet) bounded by COUNT_CHANGE edges and a region where the
-parent/child-1 sheet shows A_JUMP edges — the same transition seen at two
-chart labels separated by the seam shift. Four count-change edges bisected
-(4–7 s each) to bracket width \(10^{-9}\): every located point has
-\(B-b=0\), \(|D_\parallel B|\le6\times10^{-15}\), \(D_\parallel^2B\approx-63.9\)
-(a \(\Gamma_{\max}\) point). Additivity \(|A_W-A_1-A_3|/A_W\) at offsets
-\(10^{-1},10^{-2},10^{-3},10^{-4},10^{-5}\) of the edge: \(3.4\times10^{-4}\),
+Grid 24×64 in \((s\in[0.05,1],\alpha)\), extended window \([-L,2L)\), ghost
+wells for seam matching, cap 128, current tracer. DMercFail \(\lambda_n=0.8\):
+142 s wall (33 ms per line for the scan plus ~45 ms per traced well), 2.27 M
+field evaluations, 1536 lines, all 1504 traces regular, 0–2 wells per line,
+at most one period; 102 lines carry an interior maximum, minimum gap
+\(b-B_{\max,\rm int}=1.1\times10^{-3}\). Structure: count 1 for \(s<0.62\); a
+count-0 hole at \(\alpha\in[-0.2,0.2]\), \(s\ge0.62\), bounded by COUNT_CHANGE
+edges (the new incoming point \(m\) leaves the window); a parent band at
+\(\alpha\in[4.52,4.91]\) with doubled \(A\) (22.3–22.5) and an interior maximum
+within 0.003–0.056 of \(b\), bounded by EXIT_JUMP edges (the companion curve);
+band and hole coincide after the shift \(\alpha\to\alpha+\iota(s)L\) to within
+one cell at every \(s\) row; cutting along the band boundary gives exactly the
+two sheets of the reference. 45 of 3072 edges flagged, all explained; 3.06%
+of the measure touches a flagged edge. Five count-change edges bisected
+(4–6 s each) to bracket width \(10^{-9}\): every located point has \(B-b=0\),
+\(|D_\parallel B|\le6\times10^{-15}\), \(D_\parallel^2B\approx-63.9\), and all
+sit on \(\zeta=0\) (the symmetry plane and the window boundary). Additivity
+\(|A_W-A_1-A_3|/A_W\) at offsets \(10^{-1}\ldots10^{-5}\): \(3.4\times10^{-4}\),
 \(4.2\times10^{-5}\), \(5.0\times10^{-6}\), (quadrature failure),
-\(6.6\times10^{-8}\) on one edge; \(1.5\times10^{-4}\ldots2.5\times10^{-7}\) on
-another. TURBO \(\lambda_n=0.5\), 24×64: 99 s, all regular, zero
-non-regular edges at this grid; with rows down to \(s=0.002\) (16×64), 12
-COUNT_CHANGE and 3 IRREGULAR edges near the axis, bisecting to
-\(\Gamma_{\min}\) points (\(D_\parallel^2B>0\), well births with \(A\to0\)),
-measure fraction 1.6% before refinement. An independent search of
-\(\{D_\parallel B=0,\ D_\parallel^2B<0\}\) on a 40×96×64 grid finds no
-along-line maximum within 0.057 of \(b\) for \(s\ge0.02\): the surface has no
-\(\Gamma_{\max}\) there, so the "two transitions" the pipeline records for
-this case at coarse background resolution are confined to \(s<0.02\) or are
-resolution artifacts. The rerun reproduced every number above bit for bit.
-Structure of the DMercFail chart: count 1 everywhere for \(s<0.62\); a
-count-0 "hole" at \(\alpha\in[-0.2,0.2]\), \(s\ge0.62\), bounded by
-COUNT_CHANGE edges (the \(\Gamma_{\max}\) side: the new incoming point
-\(m\) leaves the window); a "parent band" at \(\alpha\in[4.52,4.91]\) of
-lines whose single well has doubled \(A\) (22.3–22.5) and an interior
-maximum within 0.003–0.056 of \(b\), bounded by EXIT_JUMP edges (the
-companion curve \(T\)); band and hole coincide after the shift
-\(\alpha\to\alpha+\iota(s)L\) to within one cell at every \(s\) row. Cutting
-along \(T\) separates the parent band (a disk touching \(s=1\)) from the
-rest: exactly the two sheets and one transition curve of the existing
-reference. 45 of 3072 edges flagged, all explained; 3.1% of the
-\(ds\,d\alpha\) measure touches a flagged edge at this grid. TURBO's count-0
-band (19% of lines) is a pure window artifact of its QH-like helical well
-(\(\zeta_-\) drifts as \((\alpha-\alpha_0)/(4-\iota)\)) and is correctly
-REGULAR under ghost matching. d23p4 \(\lambda_n=0.5\) at 8×16 shows
-interior-maximum counts jumping by two across single edges (two transition
-curves in one coarse cell): refinement, not certification, is the response.
-[The hard-case run E2b will be added here.]
+\(6.6\times10^{-8}\) on one edge and similar on the others, i.e. linear in the
+offset. The extremum-height field \(B_j\) built afterwards reproduces the
+located crossing (\(s^*=0.6196449011556\) by Newton in 2 ms versus
+\(0.6196449011557605\) by bisection in 4.2 s), the hole's width in \(\alpha\)
+(0.008 at \(s=0.62\) to 0.215 at \(s=1\)) and the parent band after the shift
+(\([4.48,4.93]\) versus \([4.52,4.91]\) at a grid spacing of 0.098).
+
+TURBO \(\lambda_n=0.5\), 24×64: 99 s, all regular, zero flagged edges; an
+independent 3-D search finds no along-line maximum within 0.057 of \(b\) for
+\(s\ge0.02\), so any transition sits at \(s<0.02\); the count-0 band (19% of
+lines) is a window artifact of the QH-like helical well and is REGULAR under
+ghost matching. Rows down to \(s=0.002\): 12 COUNT_CHANGE and 3 IRREGULAR
+edges near the axis, bisecting to \(\Gamma_{\min}\) points
+(\(D_\parallel^2B>0\), well births with \(A\propto\) offset). d23p4
+\(\lambda_n=0.5\), 8×16: 10 s; 31% of cells flagged (grid-limited); interior-
+maximum counts jump by two across single edges (two transition curves in one
+cell).
 
 ### A.3 Total-weight identity (experiment E3)
 
-Volume side (complete): \(Q_{\rm total}(b)\) evaluated directly as the
-integral of F3 over the support \(B_{\max}(s)>b\) converges under doubling of
-each grid direction to \(\le3\times10^{-4}\) relative at every level; the
-outer integral \((1/2V_h)\int Q_{\rm total}/b^2\,db\) with 48 Gauss points
-gives 0.396317 (d23p4) and 0.629512 (DMercFail) against the trapped fractions
-\(V_{\rm tr}(B_{\max})/V_h=0.396148\) and 0.629588 — agreement to
-\(4\times10^{-4}\) and \(1\times10^{-4}\), limited by the outer quadrature. The
-unrestricted integral (no support cutoff) gives 0.464 and 0.648: it counts
-passing particles with \(B_{\max}(s)<B_b<B_{\max}^{\rm global}\), which is why
-the restriction in F3 is essential. Support at the matrix levels: d23p4
-\(s\ge0.46\) at \(\lambda_n=0.8\), \(\ge0.71\) at 0.9, \(\ge0.85\) at 0.95;
-DMercFail all \(s\) up to \(\lambda_n=0.8\), \(s\ge0.17\) at 0.9, \(\ge0.51\)
-at 0.95 — the incoming surface at the long-well levels is an outer annulus,
-which is also where the chart rows must be refined. [Chart-side sum of
-\(hK\) over traced wells versus \(Q_{\rm total}\): pending.]
+Volume side: two independent routes (finite differences of \(V_{\rm tr}\) and
+the direct singular quadrature over the support \(B_{\max}(s)>b\)) agree to
+0.01–0.06% at all five levels on DMercFail and 0.02–0.13% on d23p4 once the
+\(V\)-grid has ≥192 \(\zeta\) points per period; the unrestricted integral
+overshoots by factors 1.7/3.0/5.7 at d23p4 \(\lambda_n=0.8/0.9/0.95\).
+Surface side: the midpoint-rule sum of traced \(K\) over every incoming point
+of an \((s,\alpha)\) grid agrees with the volume side to 0.016% (12×24) and
+0.048% (24×48) on DMercFail \(\lambda_n=0.8\) (281 and 1128 wells, all
+regular), and 0.74% → 0.37% on d23p4 \(\lambda_n=0.5\) (214 → 858 wells,
+\(O(1/n)\)); at d23p4 \(\lambda_n=0.8\) the residual (+4.5%, +0.6%, −0.9% at
+12, 48, 96 rows) is the unaligned support cut \(s^*=0.456\). The outer
+integral \((1/2V_h)\int Q_{\rm total}/b^2\,db\) gives 0.396317 (d23p4) and
+0.629512 (DMercFail) against trapped fractions 0.396148 and 0.629588. The
+bound in action: at d23p4 \(\lambda_n=0.95\) with a deliberately low cap of 16,
+the one failed well (16 periods, 17 interior maxima, closest maximum
+\(5\times10^{-4}\) below \(b\); a default-tolerance `QUADRATURE_FAILURE`
+recoverable with `quadrature_rtol` \(10^{-8}\)) has true weight 1.800 and the
+deficit \(Q_{\rm total}-Q_{\rm resolved}=2.114\) bounds it; the remaining
+0.314 is the resolved sum's own discretization error. No `MAX_PERIODS` well
+occurred at any level with cap 64 (longest well 22 periods at d23p4
+\(\lambda_n=0.8\)). Support at the matrix levels: d23p4 \(s\ge0.46\) at
+\(\lambda_n=0.8\), \(\ge0.71\) at 0.9, \(\ge0.85\) at 0.95; DMercFail
+\(s\ge0.17\) at 0.9, \(\ge0.51\) at 0.95.
 
 ### A.4 Contour following (experiment E4)
 
-[Pending: three contours on DMercFail \(\lambda_n=0.8\).]
+Not completed (the agent that would have run it was cut off by usage
+limits); the analytic-gradient integrator exists in prototype form. This is
+the one unmeasured ingredient of options D, D2, D3 and H3 and is the first
+early experiment of §5.
 
 ### A.5 Where the trapped phase space sits (experiment E5, band fractions)
 
 From \(V_{\rm tr}(b)\) of F3 (Gauss–Legendre 64 in \(s\), 128×64 periodic in
 \(\theta,\zeta\), per-surface maxima on a 256×128 grid; \(V_h\) converged to
-\(10^{-9}\)), the trapped fraction of all particles and the share of trapped
-phase space per \(\lambda_n\) band, with the absolute uncertainty on \(f\)
-that leaving a top band bounded rather than resolved would cost:
+\(10^{-9}\)):
 
 | file | trapped fraction | \(\lambda_n<0.1\) | \([0.1,0.5]\) | \([0.5,0.8]\) | \([0.8,0.9]\) | \([0.9,0.95]\) | \(>0.95\) | \(\Delta f\), band \(>0.9\) | \(\Delta f\), band \(>0.95\) |
 |---|---|---|---|---|---|---|---|---|---|
@@ -679,23 +802,28 @@ that leaving a top band bounded rather than resolved would cost:
 | TURBO | 0.367 | 0.4% | 44.5% | 44.6% | 7.8% | 2.0% | 0.71% | 0.0100 | 0.0026 |
 | n3are | 0.278 | 0.2% | 54.9% | 38.9% | 4.8% | 1.0% | 0.29% | 0.0036 | 0.0008 |
 
-The levels that always succeed today (\(\lambda_n\le0.1\), no transitions)
-carry 0.2–19% of the trapped mass; \(\lambda_n\in[0.1,0.8]\), where the
-current pipeline resolves almost nothing, carries 72–92%; the levels where
-every case with a transition fails (\(\lambda_n\ge0.8\)) carry 5–10%. Leaving
-the band above \(\lambda_n=0.95\) bounded rather than resolved costs at most
-0.001–0.005 on \(f\); above 0.9, 0.004–0.017. The mass per unit
-\(\lambda_n\) peaks at 0.42–0.56 on four files (0.05 on DMercFail). [The
-capped-well fraction of \(ds\,d\alpha\) at the long-well levels is pending
-from the second part of E5.]
+The mass per unit \(\lambda_n\) peaks at 0.42–0.56 on four files (0.05 on
+DMercFail). [The capped-well fraction of the chart measure at the long-well
+levels is being measured separately.]
 
-### A.6 Matrix statistics computed from `milestone10.3-real-equilibria.json`
+### A.6 Birth-particle check (from the sampling review)
+
+Sampling \(\mathbf x\) with density \(h|C|/B^2\) and \(\xi\) uniform, with
+\(b=B/(1-\xi^2)\) and passing iff \(b\ge B_{\max}(s)\), gives a trapped
+fraction \(0.633\pm0.012\) on DMercFail (direct: 0.630) and band shares
+19.7/50.2/21.6/6.0/1.8/0.7% (direct: 19.0/50.3/21.5/6.4/2.0/0.73%); on d23p4
+\(0.360\pm0.015\) (direct 0.396, 2.4σ low at \(N=1000\) with a crude per-
+surface maximum; to be repeated with the milestone-2 extrema). Per-particle
+well lengths: wells ≥1 period carry 5.6% (DMercFail) and 30.8% (d23p4) of the
+trapped mass, ≥4 periods 0.6% and 11.4%, >12 periods ≤0.3% on both.
+
+### A.7 Matrix statistics computed from `milestone10.3-real-equilibria.json`
 
 50 of 120 cases finish under 600 s: all 32 no-transition cases, 9 of 10
-resolved, 9 unresolved with quick terminals (event geometry, empty interval,
-cut conflict, non-separating slit). 68 of the 69 slower cases are unresolved.
-Every case with a transition at \(\lambda_n\ge0.8\) is unresolved; no case
-at \(\lambda_n\in\{0.9,0.95\}\) finishes under 600 s. Resolved cases: TURBO
-0.5 (3–110 s), DMercFail 0.05 (259–261 s), DMercFail 0.8 (30–71 s), d23p4 0.5
-gmsh:PV (5490 s). Remediation attempts: cap escalation 40, background 25,
-thin-strip 15, source budget 13, local projection 8, scan resolution 4.
+resolved, 9 unresolved with quick terminals. 68 of the 69 slower cases are
+unresolved. Every case with a transition at \(\lambda_n\ge0.8\) is unresolved;
+no case at \(\lambda_n\in\{0.9,0.95\}\) finishes under 600 s. Resolved cases:
+TURBO 0.5 (3–110 s), DMercFail 0.05 (259–261 s), DMercFail 0.8 (30–71 s),
+d23p4 0.5 gmsh:PV (5490 s). Remediation attempts: cap escalation 40,
+background 25, thin-strip 15, source budget 13, local projection 8, scan
+resolution 4.
