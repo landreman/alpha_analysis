@@ -106,8 +106,9 @@ accompanies this proposal and in `docs/validation/milestone10.3-real-equilibria.
   periods; each capped scan costs ~45 s at 128 periods; 20 cases spend 40–54
   minutes escalating one vertex's cap. These 20 cases alone are 16.7% of the
   matrix. (Forward traces from incoming points at the same levels never hit a
-  cap of 64 in this week's tests; the binding trace was the *backward* scan
-  from a marginal point.)
+  cap of 64 in this week's tests — 79 wells on d23p4 \(\lambda_n\ge0.9\) and
+  DMercFail \(\lambda_n=0.9\), longest 15 periods, A.5 — so the binding trace
+  was the *backward* scan from a marginal point.)
 - **Cost is the certification, not the physics.** Transition mapping is 91%
   of case time at \(\lambda_n=0.8\); the same cases took 5–471 s under 10.2
   controls and hours under the 10.3 ladders. A resolved DMercFail case costs
@@ -803,8 +804,21 @@ From \(V_{\rm tr}(b)\) of F3 (Gauss–Legendre 64 in \(s\), 128×64 periodic in
 | n3are | 0.278 | 0.2% | 54.9% | 38.9% | 4.8% | 1.0% | 0.29% | 0.0036 | 0.0008 |
 
 The mass per unit \(\lambda_n\) peaks at 0.42–0.56 on four files (0.05 on
-DMercFail). [The capped-well fraction of the chart measure at the long-well
-levels is being measured separately.]
+DMercFail).
+
+Capped-well measure at the long-well levels (forward traces from every
+incoming crossing on a 6×16 chart over the trapped support, cap 64 then 256):
+
+| case | support | wells | statuses | capped | periods median / p90 / max | wall |
+|---|---|---|---|---|---|---|
+| d23p4 \(\lambda_n=0.9\) | \(s\ge0.71\) | 18 | 18 regular | 0 | 4 / 5 / 10 | 6 s |
+| d23p4 \(\lambda_n=0.95\) | \(s\ge0.85\) | 15 | 14 regular, 1 quadrature failure | 0 | 4 / 11 / 15 | 11 s |
+| DMercFail \(\lambda_n=0.9\) | \(s\ge0.17\) | 46 | 46 regular | 0 | 1 / 3 / 4 | 8 s |
+
+No forward well reached the 64-period cap at any level where the pipeline
+records `max_periods` at 1024: the binding traces there were the backward
+scans from marginal points. The one quadrature failure is the near-marginal
+bug of A.1.
 
 ### A.6 Birth-particle check (from the sampling review)
 
