@@ -106,7 +106,7 @@ accompanies this proposal and in `docs/validation/milestone10.3-real-equilibria.
   periods; each capped scan costs ~45 s at 128 periods; 20 cases spend 40–54
   minutes escalating one vertex's cap. These 20 cases alone are 16.7% of the
   matrix. (Forward traces from incoming points at the same levels never hit a
-  cap of 64 in this week's tests — 79 wells on d23p4 \(\lambda_n\ge0.9\) and
+  cap of 64 in this week's tests — 110 wells on d23p4 \(\lambda_n\ge0.8\) and
   DMercFail \(\lambda_n=0.9\), longest 15 periods, A.5 — so the binding trace
   was the *backward* scan from a marginal point.)
 - **Cost is the certification, not the physics.** Transition mapping is 91%
@@ -814,11 +814,12 @@ incoming crossing on a 6×16 chart over the trapped support, cap 64 then 256):
 | d23p4 \(\lambda_n=0.9\) | \(s\ge0.71\) | 18 | 18 regular | 0 | 4 / 5 / 10 | 6 s |
 | d23p4 \(\lambda_n=0.95\) | \(s\ge0.85\) | 15 | 14 regular, 1 quadrature failure | 0 | 4 / 11 / 15 | 11 s |
 | DMercFail \(\lambda_n=0.9\) | \(s\ge0.17\) | 46 | 46 regular | 0 | 1 / 3 / 4 | 8 s |
+| d23p4 \(\lambda_n=0.8\) | \(s\ge0.46\) | 31 | 31 regular | 0 | 3 / 4 / 5 | 6 s |
 
 No forward well reached the 64-period cap at any level where the pipeline
-records `max_periods` at 1024: the binding traces there were the backward
-scans from marginal points. The one quadrature failure is the near-marginal
-bug of A.1.
+records `max_periods` at 1024 (110 wells, longest 15 periods): the binding
+traces there were the backward scans from marginal points. The one quadrature
+failure is the near-marginal bug of A.1.
 
 ### A.6 Birth-particle check (from the sampling review)
 
