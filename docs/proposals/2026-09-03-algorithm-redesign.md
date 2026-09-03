@@ -643,8 +643,21 @@ curves in one coarse cell): refinement, not certification, is the response.
 
 ### A.3 Total-weight identity (experiment E3)
 
-[Pending: \(2b^2\,dV/db\) versus the chart-side sum of \(hK\) over all wells,
-and \(V(B_{\max})/V_h\) versus the trapped fraction, on d23p4 and DMercFail.]
+Volume side (complete): \(Q_{\rm total}(b)\) evaluated directly as the
+integral of F3 over the support \(B_{\max}(s)>b\) converges under doubling of
+each grid direction to \(\le3\times10^{-4}\) relative at every level; the
+outer integral \((1/2V_h)\int Q_{\rm total}/b^2\,db\) with 48 Gauss points
+gives 0.396317 (d23p4) and 0.629512 (DMercFail) against the trapped fractions
+\(V_{\rm tr}(B_{\max})/V_h=0.396148\) and 0.629588 — agreement to
+\(4\times10^{-4}\) and \(1\times10^{-4}\), limited by the outer quadrature. The
+unrestricted integral (no support cutoff) gives 0.464 and 0.648: it counts
+passing particles with \(B_{\max}(s)<B_b<B_{\max}^{\rm global}\), which is why
+the restriction in F3 is essential. Support at the matrix levels: d23p4
+\(s\ge0.46\) at \(\lambda_n=0.8\), \(\ge0.71\) at 0.9, \(\ge0.85\) at 0.95;
+DMercFail all \(s\) up to \(\lambda_n=0.8\), \(s\ge0.17\) at 0.9, \(\ge0.51\)
+at 0.95 — the incoming surface at the long-well levels is an outer annulus,
+which is also where the chart rows must be refined. [Chart-side sum of
+\(hK\) over traced wells versus \(Q_{\rm total}\): pending.]
 
 ### A.4 Contour following (experiment E4)
 
