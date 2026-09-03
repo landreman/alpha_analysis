@@ -157,23 +157,30 @@ the 3-D surface to avoid this; the prototype in Appendix A.2 handles it with
 an extended scan window and "ghost" wells and finds it to be bookkeeping, not
 a topological problem.
 
-**F3. The total \(K\)-weighted surface integral is a volume integral.** With
+**F3. The total \(K\)-weighted surface integral is a volume integral.**
 \[
-V(b)=\int ds\,d\theta\,d\zeta\,\frac{|C|}{B^2}\,h(\sqrt s)\,
-\sqrt{\max(0,\,1-B/b)},
-\qquad
-Q_{\rm total}(b):=\int_{\Sigma_b^-}hK\,|ds\,d\alpha| = 2b^2\,\frac{dV}{db},
+Q_{\rm total}(b):=\int_{\Sigma_b^-}hK\,|ds\,d\alpha|
+=\int_{\{s:\,B_{\max}(s)>b\}}ds\int d\theta\,d\zeta\,
+\frac{|C|}{B}\,\frac{h(\sqrt s)}{\sqrt{1-B/b}}\,[B<b],
 \]
-because the velocity-space fraction at \(\mathbf x\) with bounce field
-\(\le b\) is \(\sqrt{1-B/b}\), and at fixed \(s\) the field-line integral of
+because at fixed \(s\) the map \((\theta,\zeta)\to(\alpha,\zeta)\) has unit
+Jacobian and, on a dense field line, the line integral of
 \((|C|/B)/\sqrt{1-B/b}\) over all \(B<b\) intervals is the sum of \(K\) over
-all wells on the line. Check: \(\Theta\equiv1\) gives \(f=V(B_{\max})/V_h\),
-the trapped fraction, as §17's benchmark requires. Consequence: for any set of
-wells that failed, hit the period cap, or sit in unresolved cells, the
-\(K\)-weighted measure is bounded *exactly* as \(Q_{\rm total}\) minus the
-resolved part. Every §21.2 prohibition becomes a rigorous bound:
-\(Q_{\rm lower}\) = resolved and reachable, \(Q_{\rm upper}=Q_{\rm total}-\)
-(resolved and unreachable). [Numerical check: Appendix A.3.]
+all wells on the line (each point of the line lies in exactly one well or in
+the \(B>b\) set). The restriction to surfaces with \(B_{\max}(s)>b\) matters:
+a particle with bounce field above its own surface's maximum never bounces
+and is passing, not on \(\Sigma_b^-\). Check: \(\Theta\equiv1\) gives
+\(f=(1/2V_h)\int Q_{\rm total}/b^2\,db=V_{\rm tr}(B_{\max})/V_h\), the trapped
+fraction, where \(V_{\rm tr}(b)=\int ds\,d\theta\,d\zeta\,(|C|/B^2)\,h\,
+\sqrt{\max(0,1-B/\min(b,B_{\max}(s)))}\); measured agreement \(4\times10^{-4}\)
+on d23p4 and \(1\times10^{-4}\) on DMercFail (Appendix A.3). Consequence: for
+any set of wells that failed, hit the period cap, or sit in unresolved cells,
+the \(K\)-weighted measure is bounded *exactly* as \(Q_{\rm total}\) minus the
+resolved part, without tracing them. Every §21.2 prohibition becomes a
+rigorous bound: \(Q_{\rm lower}\) = resolved and reachable,
+\(Q_{\rm upper}=Q_{\rm total}-\)(resolved and unreachable). The integrand's
+inverse-square-root edge at \(B=b\) is integrable and converges under
+tensor-product refinement (A.3).
 
 **F4. Codimension-two events carry no connectivity of their own.**
 Equal-height contacts, degenerate \(\Gamma_{\max}\) endpoints (where
@@ -316,16 +323,25 @@ every well whose incoming point lies in \([0,L)\). Each grid point carries a
 finite list of wells with \(\zeta_-\), \(A\), \(K\), exit, extrema, status.
 Match wells between neighbouring grid points by \(\zeta_-\) continuity (ghost
 wells outside \([0,L)\) recognise a well drifting through the seam) and by
-continuity of \(A\) and of the exit. Classify each cell edge: REGULAR (all
-matched, \(A\) continuous), COUNT_CHANGE (one well appears: a
-\(\Gamma_{\max}\) split or a \(\Gamma_{\min}\) birth, told apart by the
-located point's \(D_\parallel^2B\)), A_JUMP (matched incoming point, exit
-jumps: the parent/child-1 side of \(T\)), IRREGULAR (anything else). Locate
-crossings by bisection along the edge; build the sheet complex as
-cells × wells with the transition hyperedge linking the A_JUMP crossing at
+continuity of the exit. Classify each cell edge: REGULAR (all matched, exit
+continuous), COUNT_CHANGE (one chart well unmatched: a \(\Gamma_{\max}\)
+split or a \(\Gamma_{\min}\) birth, told apart by the located point's
+\(D_\parallel^2B\)), EXIT_JUMP (matched incoming point, lifted exit displaced
+by more than a fraction of \(L\): the parent/child-1 side of \(T\)),
+IRREGULAR (anything else, including an interior-maximum count jumping by two
+or more). The prototype showed that the well count alone is not a sufficient
+detector and that \(|\Delta A|/A\) is not a usable one (it reaches 0.5–0.9 on
+genuinely regular edges near the axis), while the exit displacement separates
+\(T\) cleanly (0.15–0.25 rad on regular edges versus 1.4–3.8 rad on \(T\)).
+Locate crossings by bisection along the edge; build the sheet complex as
+cells × wells with the transition hyperedge linking the EXIT_JUMP crossing at
 \((s^*,\alpha_a)\) to the COUNT_CHANGE crossing of the child-3 well, which
-lives on the line \(\alpha_a-k\iota L\) (the forward trace gives \(m\) and
-hence \(k\)). Refine cells touching IRREGULAR edges (quadtree in the chart)
+lives on the line \(\alpha_a+k\iota L\) (the parent's forward trace gives
+\(m\) and hence \(k\); the prototype verified the shift to within one cell at
+every \(s\) row). Put the window boundary away from the stellarator-symmetry
+planes \(\zeta=0,L/2\) (e.g. \([L/4,5L/4)\)): all located \(\Gamma_{\max}\)
+points on DMercFail sat exactly on \(\zeta=0\), the worst case for a
+\([0,L)\) window. Refine cells touching IRREGULAR edges (quadtree in the chart)
 until they are regular or their measure is below tolerance; leave the rest as
 bounded cells. The flood fill (§11) runs on the cell complex with
 \(\omega\equiv1\); the seam is an identity-action link between the clipped
@@ -357,14 +373,18 @@ bounded by F3 (exact measure \(ds\,d\alpha\) is known for every cell;
 
 *Cost (measured components, Appendix A.2, A.1).* DMercFail \(\lambda_n=0.8\),
 24×64 chart with the *current* tracer: 142 s for 1536 lines (2.3 M field
-evaluations), all traces regular, four crossings bisected in 4–7 s each.
-TURBO \(\lambda_n=0.5\), 24×64: 99 s. With the batched quadrature and a
-per-row spline (built once per \(s\) row, 0.4–0.7 s), the per-line cost falls
-from ~50 ms to ~5–10 ms; a 1024-period scan of one line at 230 samples per
-period on the spline is ~0.1 s instead of ~25 s, and it serves every well on
-the line. Projected: 5–20 s per slice at 32×96 for the easy levels, 1–3 min
-for the long-well levels; the outer integral over 20–40 slices then fits in
-hours on a laptop, in parallel over slices.
+evaluations; 33 ms per line for the 3\(L\) scan plus ~45 ms per traced
+well), all traces regular, five crossings bisected in 4–6 s each. TURBO
+\(\lambda_n=0.5\), 24×64: 99 s. d23p4 \(\lambda_n=0.5\), 8×16: 10 s, but 31%
+of cells flagged at that resolution (grid-limited; must shrink under
+refinement). A 64×256 chart with the current tracer would be ~20 min per
+slice. With the batched quadrature and a per-row spline (built once per
+\(s\) row, 0.4–0.7 s), the per-line cost is projected to fall from ~50–80 ms
+to ~5–10 ms; a 1024-period scan of one line at 230 samples per period on the
+spline is ~0.1 s instead of ~25 s, and it serves every well on the line.
+Projected (not yet measured end to end): 1–2 min per slice at 64×256 for the
+easy levels, several minutes for the long-well levels; the outer integral
+over 20–40 slices then fits in hours on a laptop, in parallel over slices.
 
 *Strengths.* Removes every geometric failure mechanism in the knowledge map
 (M1–M12) and the extraction mechanisms (M10, M11); exact measure; transitions
@@ -469,9 +489,11 @@ contains the truth by construction is the opposite. ADR 0009's option 2
 capped well is inside the bound.
 
 *What accuracy is useful.* For optimization use, \(f\) to ±0.01 absolute is
-likely sufficient; the nearly-passing band above \(\lambda_n=0.9\) carries
-[Appendix A.5: fraction of trapped phase space, to be filled from experiment
-E5] and could be left bounded rather than resolved if it is expensive.
+likely sufficient. The nearly-passing band above \(\lambda_n=0.95\) carries
+0.3–0.7% of the trapped phase space (an \(f\) uncertainty of 0.001–0.005 if
+left bounded) and the band above 0.9 carries 1.3–2.7% (0.004–0.017)
+(Appendix A.5); the former can be left bounded, the latter should be resolved
+with the per-line scan where it is cheap and bounded where it is not.
 
 *Failure mode.* A large region whose only route to the edge passes through
 an unresolved cell inflates the gap; refinement of that cell (not the region)
@@ -502,7 +524,7 @@ For \(b\) close to \(B_{\max}(s)\) the wells are ergodically long (about
 Two honest treatments: (i) bound the whole band \([b^*,B_{\max}]\) by F3's
 volume integral (exact, cheap) and report it as unresolved measure; (ii) trace
 with the per-line scan and spline, where a 1024-period line costs ~0.1 s. The
-band's share of trapped phase space is [Appendix A.5]. A third idea, using
+band's share of trapped phase space is in Appendix A.5. A third idea, using
 the ergodic average of \(J\) (which makes contours nearly flux-surface-aligned
 and hence confined) is *not* admissible as a computation of \(\Theta\) but
 is a good diagnostic of what the bound is hiding. Symmetry can halve the
@@ -594,8 +616,30 @@ another. TURBO \(\lambda_n=0.5\), 24×64: 99 s, all regular, zero
 non-regular edges at this grid; with rows down to \(s=0.002\) (16×64), 12
 COUNT_CHANGE and 3 IRREGULAR edges near the axis, bisecting to
 \(\Gamma_{\min}\) points (\(D_\parallel^2B>0\), well births with \(A\to0\)),
-measure fraction 1.6% before refinement. [The second run of E2 and the
-hard-case run E2b will be added here.]
+measure fraction 1.6% before refinement. An independent search of
+\(\{D_\parallel B=0,\ D_\parallel^2B<0\}\) on a 40×96×64 grid finds no
+along-line maximum within 0.057 of \(b\) for \(s\ge0.02\): the surface has no
+\(\Gamma_{\max}\) there, so the "two transitions" the pipeline records for
+this case at coarse background resolution are confined to \(s<0.02\) or are
+resolution artifacts. The rerun reproduced every number above bit for bit.
+Structure of the DMercFail chart: count 1 everywhere for \(s<0.62\); a
+count-0 "hole" at \(\alpha\in[-0.2,0.2]\), \(s\ge0.62\), bounded by
+COUNT_CHANGE edges (the \(\Gamma_{\max}\) side: the new incoming point
+\(m\) leaves the window); a "parent band" at \(\alpha\in[4.52,4.91]\) of
+lines whose single well has doubled \(A\) (22.3–22.5) and an interior
+maximum within 0.003–0.056 of \(b\), bounded by EXIT_JUMP edges (the
+companion curve \(T\)); band and hole coincide after the shift
+\(\alpha\to\alpha+\iota(s)L\) to within one cell at every \(s\) row. Cutting
+along \(T\) separates the parent band (a disk touching \(s=1\)) from the
+rest: exactly the two sheets and one transition curve of the existing
+reference. 45 of 3072 edges flagged, all explained; 3.1% of the
+\(ds\,d\alpha\) measure touches a flagged edge at this grid. TURBO's count-0
+band (19% of lines) is a pure window artifact of its QH-like helical well
+(\(\zeta_-\) drifts as \((\alpha-\alpha_0)/(4-\iota)\)) and is correctly
+REGULAR under ghost matching. d23p4 \(\lambda_n=0.5\) at 8×16 shows
+interior-maximum counts jumping by two across single edges (two transition
+curves in one coarse cell): refinement, not certification, is the response.
+[The hard-case run E2b will be added here.]
 
 ### A.3 Total-weight identity (experiment E3)
 
@@ -606,10 +650,31 @@ and \(V(B_{\max})/V_h\) versus the trapped fraction, on d23p4 and DMercFail.]
 
 [Pending: three contours on DMercFail \(\lambda_n=0.8\).]
 
-### A.5 Long-well measure (experiment E5)
+### A.5 Where the trapped phase space sits (experiment E5, band fractions)
 
-[Pending: capped-well fraction of \(ds\,d\alpha\) and of trapped phase space at
-\(\lambda_n\in\{0.5,0.8,0.9,0.95\}\) for d23p4 and DMercFail; ergodic estimate.]
+From \(V_{\rm tr}(b)\) of F3 (Gauss–Legendre 64 in \(s\), 128×64 periodic in
+\(\theta,\zeta\), per-surface maxima on a 256×128 grid; \(V_h\) converged to
+\(10^{-9}\)), the trapped fraction of all particles and the share of trapped
+phase space per \(\lambda_n\) band, with the absolute uncertainty on \(f\)
+that leaving a top band bounded rather than resolved would cost:
+
+| file | trapped fraction | \(\lambda_n<0.1\) | \([0.1,0.5]\) | \([0.5,0.8]\) | \([0.8,0.9]\) | \([0.9,0.95]\) | \(>0.95\) | \(\Delta f\), band \(>0.9\) | \(\Delta f\), band \(>0.95\) |
+|---|---|---|---|---|---|---|---|---|---|
+| d23p4 | 0.396 | 6.5% | 56.8% | 31.0% | 4.3% | 1.0% | 0.34% | 0.0055 | 0.0014 |
+| DMercFail | 0.630 | 19.0% | 50.3% | 21.5% | 6.4% | 2.0% | 0.73% | 0.0174 | 0.0046 |
+| PCA | 0.385 | 1.5% | 54.1% | 37.3% | 5.3% | 1.3% | 0.44% | 0.0068 | 0.0017 |
+| TURBO | 0.367 | 0.4% | 44.5% | 44.6% | 7.8% | 2.0% | 0.71% | 0.0100 | 0.0026 |
+| n3are | 0.278 | 0.2% | 54.9% | 38.9% | 4.8% | 1.0% | 0.29% | 0.0036 | 0.0008 |
+
+The levels that always succeed today (\(\lambda_n\le0.1\), no transitions)
+carry 0.2–19% of the trapped mass; \(\lambda_n\in[0.1,0.8]\), where the
+current pipeline resolves almost nothing, carries 72–92%; the levels where
+every case with a transition fails (\(\lambda_n\ge0.8\)) carry 5–10%. Leaving
+the band above \(\lambda_n=0.95\) bounded rather than resolved costs at most
+0.001–0.005 on \(f\); above 0.9, 0.004–0.017. The mass per unit
+\(\lambda_n\) peaks at 0.42–0.56 on four files (0.05 on DMercFail). [The
+capped-well fraction of \(ds\,d\alpha\) at the long-well levels is pending
+from the second part of E5.]
 
 ### A.6 Matrix statistics computed from `milestone10.3-real-equilibria.json`
 
