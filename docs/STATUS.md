@@ -54,8 +54,8 @@ do not relax the fast/full test-suite budgets.
   and [ADR 0009](adr/0009-matrix-resolved-fraction-shortfall.md). Its deliberately
   failing acceptance test and branch-specific fixes need explicit treatment in
   R0's gate migration. Preserve the historical failure as evidence and keep the
-  scientific regression checks; do not relabel 10.3 complete or claim the present
-  branch has a green gate.
+  scientific regression checks; do not relabel 10.3 complete or claim that
+  PR #24 met its acceptance gate.
 - Existing public functions, CLI entry points and legacy mesh/extractor tests
   remain compatibility obligations. The old numerical path is also a useful
   reference on cases it resolves; it is not the production prerequisite for R2–R8.
