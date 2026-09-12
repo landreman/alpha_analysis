@@ -47,8 +47,14 @@ def plot_forward_catalogue(catalogue, query, *, field_label: str, output_path=No
         )
     axis.set_xlabel(r"physical scan distance $u$ [rad]")
     axis.set_ylabel("B [field units]")
+    short_label = (
+        field_label
+        if len(field_label) <= 50
+        else f"{field_label[:28]}…{field_label[-18:]}"
+    )
     axis.set_title(
-        f"{field_label}: b={query.b:.6g}, {len(query.wells)} complete wells, "
+        f"{short_label}\n"
+        f"b={query.b:.6g}, {len(query.wells)} complete wells, "
         f"{query.status.name} (window={query.scanned_periods} periods)"
     )
     axis.grid(alpha=0.3)
