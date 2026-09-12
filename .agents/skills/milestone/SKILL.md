@@ -1,172 +1,103 @@
 ---
 name: milestone
-description: Implement one numbered milestone from docs/DESIGN.md §23 end to end — branch, test-first implementation, verification, STATUS.md update, and PR. Use whenever the user asks to work on a milestone, implement the next milestone, continue the plan, or names a milestone number like 3 or 14.
+description: Implement one active milestone from docs/DESIGN.md §23 through tests, verification, STATUS.md and a PR marked ready after CI passes. Use for an explicit milestone implementation or "next milestone" request; planning-only revisions do not start implementation.
 ---
 
-# Implement one milestone
+# Implement an active milestone
 
-The user will either name a milestone (`3`) or say "next". If they say next, take the
-lowest-numbered unchecked row in `docs/STATUS.md`.
+Read `AGENTS.md`, `docs/STATUS.md` and the selected entry in `docs/DESIGN.md` §23.
+The active sequence is **R0–R8**. For "next", select the first unchecked active
+row whose listed dependencies are complete. Do not choose historical 10.3 or
+11–18, and do not treat retired work as an unfinished prerequisite.
 
-Work on exactly one milestone. Follow `AGENTS.md` for environment, commands, definition
-of done, test speed, and STOP conditions.
+If the user names an old number, explain its replacement using §23's mapping.
+Proceed with the matching active work when intent is clear; clarify only genuinely
+ambiguous scope. A request to edit planning documents does not authorize implementing
+all milestones or merging a PR.
 
-## 1. Orient
+## Orient and choose the baseline
 
-Read the milestone's entry in `docs/DESIGN.md` §23, then the sections of
-`docs/DESIGN.md` it depends on. §23 gives you goal, changes, and acceptance criteria;
-the acceptance criteria are usually one line and the physics behind them is elsewhere in
-the document. Read that too — the whole point of the design document is that you do not
-have to guess the physics.
+Read the relevant physics/algorithm sections and the current STATUS notes. The
+accepted `docs/adr/0010-branch-atlas-and-bounded-f.md` supersedes the old cut-first
+roadmap. Its decision is already authorized; do not reopen its resolved STOP merely
+because old ADRs or historical notes contain a contrary instruction.
 
-Also read the "Notes for the next milestone" section of `docs/STATUS.md`.
+Active dependencies require completed acceptance and green GitHub `Tests` on the
+code being used. R0 is the explicit migration entry: no green 10.3 gate is required.
+Follow DESIGN §2.1 when the working tree is on PR #24's draft branch. Prefer the
+plan-bearing main baseline, preserve uncommitted work, and selectively port only
+needed fixes with regressions. Do not merge #24 as-is or import its whole coordinator
+as an implied dependency. The narrow obsolete-test policy migration is specified
+in §2.1; unrelated test failures remain real failures.
 
-If the previous milestone's row in `docs/STATUS.md` is unchecked, or its GitHub Actions
-`Tests` workflow was not green, stop and say so. A failed or unavailable `Claude Code
-Review` workflow does not block the next milestone.
+Inspect `.claude/commands/review-milestone.md` for the scientific review criteria.
+Optional Claude review availability does not determine readiness of dependencies.
 
-The pull request you generate will be reviewed by an AI agent following the instructions
-in `.claude/commands/review-milestone.md`. So, read that document, and in planning your
-implementation, anticipate any objections the review agent might raise, to ensure that
-your work will pass review.
+## Work on one milestone
 
-## 2. Branch
+Use an isolated checkout/worktree when another task or user edits share the current
+checkout. Otherwise branch from the verified plan-bearing baseline; default branch
+name `codex/<milestone>-<slug>`. Do not blindly switch to main or pull over existing
+work. Follow an explicit user branch instruction.
 
-```bash
-git checkout main && git pull
-git checkout -b milestone/<number>-<slug>
-```
+Derive a small set of tests from §23 acceptance and §20, using analytic or independent
+expectations. First confirm the relevant tests fail for the intended missing behavior.
+Then implement the milestone and preserve existing public APIs. Docstrings state
+conventions, units, and the active design equation/section.
 
-## 3. Write the tests first
+The physical metric remains §3. New geometry is a root-labelled local atlas; global
+surface cutting is not a prerequisite. An action graph cannot permit changes of J
+between transitions. Unknown links affect the whole reachable population, not just
+local cell weight. Follow the numerical-bound scopes and no-silent-loss rules in §21.
 
-Derive them from `docs/DESIGN.md`, not from the implementation you are about to write.
-§20 lists what is worth testing for each area; the acceptance criteria in §23 say which
-of those this milestone owes. Prefer the tests §20 calls out for this area over tests
-you invent, and prefer a test that pins an invariant (§25) or an analytic value on a
-synthetic field (§20.1) over one that pins whatever the code happens to produce.
+## Verify and record
 
-Then confirm the tests fail for the right reason. Run them against the unimplemented
-stub and check that the failure is the physics you are about to add, not an import
-error or a typo in a fixture.
+Use the clean `.venv` and run `make check`; run `make smoke` when packaging or optional
+imports change. Preserve §22.5's fast/full budgets. Apply the one or two meaningful
+physics mutations, watch the intended test go red, revert, and record the evidence.
+Do not pad the suite with implementation-mirroring checks or hide failures with
+markers, looser tolerances, or reduced scientific coverage.
 
-## 4. Implement
+Run the milestone's required bounded real-field experiments under AGENTS and §20.3.
+The active matrix has 30 physical file/pitch cases. Backend/extractor comparisons
+apply when legacy geometry is changed or supplies reference data. Matrix experiments
+are not all rerun inside the five-minute test suite. Record field/source identities,
+controls, error scope, failures and wall times; do not call a wide interval a success.
 
-The minimum that satisfies the milestone. Docstrings carry the design section number,
-the equation, the conventions, and the units.
+Update only the implemented active row in STATUS when its definition of done is met.
+Add brief notes future work actually needs; put permanent decisions in DESIGN or ADRs.
+No archived milestone is marked complete to smooth the migration.
 
-Do not refactor code the milestone does not touch. Existing public functions and CLI
-entry points stay backward compatible (`docs/DESIGN.md` §2).
+## Pull request and CI
 
-## 5. Verify
+Within the user's authorized repository-work scope, push the implementation branch
+and open/update a **draft** PR with:
 
-```bash
-make check
-```
+- the active milestone, concrete behavior and baseline;
+- each acceptance criterion and its named test;
+- measured accuracy, runtime, unresolved limits and real-field provenance;
+- mutations verified and the tests that caught them;
+- fast/full durations and justified changes to existing tests;
+- relevant ADRs and any remaining blockers.
 
-Then verify the tests can fail. Pick the one or two mutations that matter for this
-milestone — the ones that would produce a plausible wrong answer rather than a crash.
-Good candidates: flip a sign, drop a term from a derivative, replace an analytic
-derivative with a first-order finite difference, skip the endpoint regularization in the
-bounce quadrature, treat a failed trace as unreachable, merge two surface components
-that should stay separate. Apply each, confirm the suite goes red and that the test that
-went red is the one you expected, revert. Record which mutations you checked and which
-test caught each; this goes in the PR body.
+Wait for GitHub `Tests`, fix failures and verify the final code revision. Do not
+claim CI passed because an earlier revision passed. Never merge without user
+instruction. Once the applicable milestone gates and GitHub `Tests` pass on the
+final revision, automatically mark the PR ready with `gh pr ready <number>` to
+trigger Claude Code Review; do not wait for another user request or for Claude
+review before marking ready. Unresolved STOP conditions still leave the PR draft.
 
-Re-run `make smoke` if you touched packaging or added an optional dependency.
+When Claude review runs, address applicable findings and record disagreements with
+evidence. For a further review pass after fixes, convert the PR to draft, push the
+fixes, wait for `Tests` to pass on that revision, then mark it ready again. Avoid
+repeatedly toggling readiness merely to solicit an unchanged review. Leave the PR
+ready when finished; do not merge. Claude review's absence or failure is not a
+dependency gate.
 
-Then check the budget (`docs/DESIGN.md` §22.5, `AGENTS.md` "Test speed"): `make test`
-under 2 minutes, no single fast test over about 20 s in the durations report it prints;
-`make test-full` under 5 minutes, no single `slow` test over about 90 s. If your new
-tests blow it, make them cheaper before you consider marking anything `slow` — lower the
-mesh or Fourier resolution, shrink the pitch or field-line grid, move an expensive
-fixture to module scope, cache the loaded field. Copy the durations tail into the PR
-body.
+## New STOP conditions
 
-A `slow` test must not be the only live evidence for an acceptance criterion. If you
-mark one, the same physics keeps a fast test on the production code path that fails
-under a mutation. A fast test that only checks a shape, a schema, or that nothing raised
-does not count.
-
-This repository does not aim for exhaustive coverage, so do not pad the suite. Adding
-tests that cost wall-clock without being able to fail is worse than adding none.
-
-## 6. Run the GitHub Actions Tests workflow
-
-Push the branch to GitHub and let the `Tests` workflow run. Check that it passes. If it
-fails, fix the issue, push again, and iterate until the `Tests` workflow is green. The
-optional `Claude Code Review` workflow is not part of this gate.
-
-## 7. Record
-
-Update `docs/STATUS.md`: mark the milestone's row, fill in the PR number, and add a line
-under "Notes for the next milestone" for anything the next milestone needs to know.
-
-If `docs/DESIGN.md` turned out to be wrong or stale about something you implemented, fix
-that section in the same PR and say so in the body. Do not leave the design document
-describing code that no longer exists.
-
-## 8. Open the PR
-
-```bash
-gh pr create --fill --draft
-```
-
-Open it as a **draft**. `claude-code-review.yml` triggers only on `ready_for_review`
-(and `reopened`) — not on `opened` or on every push — so a draft PR, and any commits you
-push while it stays draft, does not consume a review. Mark it ready only when you want a
-Claude Code review pass (step 9).
-
-PR body must contain, in this order:
-
-- milestone number and one-line summary
-- each acceptance criterion, and the test that demonstrates it
-- measured numbers
-- mutations verified to turn the suite red, and which test caught each
-- `make test` and `make test-full` wall-clock, and the slowest-test list; any test you
-  newly marked `slow`, sped up, or deleted, and why
-- open ADRs blocking merge, or "none"
-- anything you were unsure about and want the reviewer to look at hardest
-
-## 9. Address Claude review findings
-
-The review only runs when the PR transitions to ready-for-review, so trigger it
-explicitly once the PR is in the state you want reviewed, by first converting the
-PR to draft if it is not already, and then running
-
-```bash
-gh pr ready <number>
-```
-
-If the review workflow is configured and runs, periodically check for the
-`claude-review` workflow run. Address findings flagged as `blocking` or `should-fix`
-when appropriate. While doing so, anticipate any objections the review agent might
-raise in the next round of review, considering the review instructions in
-`.claude/commands/review-milestone.md`, to ensure that your work will pass review.
-A failed, unavailable, or unconfigured Claude review must not block
-the milestone or the start of the next one; only the `Tests` workflow is required.
-Before pushing more commits that you don't want reviewed immediately (e.g. you're still
-iterating on the same round of fixes), convert the PR back to draft:
-
-```bash
-gh pr ready <number> --undo
-```
-
-Push your fixes, then mark it ready again (after converting it to a draft if it is not
-already a draft) to trigger the next review pass.
-
-If the claude review workflow suceeds and recommends "fix-first" instead of "merge", 
-then iterate until the review recommends "merge". For items flagged as `note`, it is up to your
-judgement whether to address them. If you disagree with a finding, write an ADR and name
-it in the PR body.
-
-Once any desired Claude review pass is complete, stop, leaving the PR marked ready for
-review if appropriate. Do not merge. A clean `Tests` workflow permits the next
-milestone regardless of Claude review status.
-
-## If you hit a STOP condition
-
-The STOP conditions are in `AGENTS.md`. Write the ADR in `docs/adr/` using
-`docs/adr/template.md`, commit it, push the branch, open the PR as a draft with the ADR
-named in the body, and end your turn. Do not choose an option and proceed. Relaxing a
-tolerance, marking a test `xfail`, or narrowing its inputs to get to green is never the
-answer.
+For a new ambiguity affecting physics, an unachievable acceptance requirement,
+a new base dependency/core-boundary crossing, or a failure that could only be hidden,
+follow AGENTS: record a proposed ADR and leave the implementation PR draft for the
+researcher's decision. Distinguish this from executing an already accepted decision.
+Do not use the approved redesign as permission to weaken unrelated invariants.

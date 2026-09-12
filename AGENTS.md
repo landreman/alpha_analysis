@@ -8,6 +8,13 @@ so.
 `docs/STATUS.md` records which milestones are done. `docs/adr/` records decisions taken
 during implementation that `docs/DESIGN.md` did not settle.
 
+The active plan is the R0–R8 sequence in `docs/DESIGN.md` §23, adopted by accepted
+`docs/adr/0010-branch-atlas-and-bounded-f.md`. All redesign milestones are initially
+unchecked; R0 is next. Legacy 10.3 is retired **without completion** and legacy
+11–18 are superseded. Do not restart the old lowest-numbered unchecked milestone.
+Historical notes in `docs/history/` are nonnormative. Approval of the redesign does
+not assert that its numerical machinery is implemented or accept PR #24 as-is.
+
 ## Environment
 
 * Use the existing conda environment `20220806-03` (Python 3.10.5). Do not create a
@@ -79,35 +86,56 @@ boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMer
 boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc
 boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc
 ~~~~
-For each boozmn file, try both the structured mesh backend and gmsh backend, and try both the
-MarchingTetrahedraExtractor and PyVistaSurfaceExtractor surface extractors.
-Downsampling of the surfaces using `downsample_surface()` is recommended to keep these calculations from taking too long.
-Likewise, when the machinery reaches `map_transitions()`, set
-`TransitionMappingConfig.max_curve_samples` to bound how many `GAMMA_MAX` vertices are
-mapped. A sample whose field-line scan runs to the 128-field-period cap costs tens of
-seconds on its own, so a whole critical curve can take over half an hour, while an
-8- to 12-vertex budget can keep the same curve affordable. The mapper adaptively
-certifies intervals using existing critical-curve vertices; `total_u_length` and
-source vertex IDs remain authoritative. `BUDGET_INSUFFICIENT` means certification
-did not finish: retain the unresolved transition and do not cut. Use
-`map_transitions_budget_sweep()` to reuse traces across budgets 8, 10, 16, and full.
-Certified runs must preserve the sheet graph; budget sensitivity remains a §21.3
-convergence signal to report, not a knob to tune (see ADR 0005 and milestone 10.1).
 If the new machinery is specific to one value of \(b = B_{bounce}\), then
 exercise the functionality for
 \(\lambda_n = 0.05, 0.1, 0.5, 0.8, 0.9, 0.95\) where \(\lambda_n\) is defined by
 \(b = B_{min} + \lambda_n * (B_{max} - B_{min})\) and \(B_{min}\) and \(B_{max}\) are radially global
 (extrema over all radii).
 
-Inspect the results to see if they make sense, check that results are consistent between the
-different backends and surface extractors, and generally look for problems. Diagnose and fix any
-problems before considering the task complete.
+The active atlas validation matrix is these **30 physical cases** (five files ×
+six levels), with the resolution and uncertainty comparisons required by the
+current milestone. Early milestones exercise the machinery available at that
+stage and report limitations; do not claim completed \(f\) acceptance before R8.
+The initial acceptance source is \(h=1\), the existing design default. The final
+contract in `docs/DESIGN.md` §23 requires full \(f\)-interval width at most 0.01,
+at least 29/30 successful slice cases under its normalized gap criterion, and
+explicit treatment of independently certified zero trapped population.
+
+For final-candidate benchmarking, the initial guard is 600 seconds per equilibrium
+including loading and shared setup, with a 600-second hard slice limit. Record
+60-, 300- and 600-second snapshots where the calculation remains active. A bound
+that remains too wide when a budget expires is an accuracy failure, not a resolved
+case. Use the full accounting and timing rules in `docs/DESIGN.md` §23; these
+benchmark guards do not replace the test-suite budgets above.
+
+When touching the **legacy mesh, extraction or cut path**, also exercise the
+affected real cases with both structured/Gmsh backends and both
+MarchingTetrahedraExtractor/PyVistaSurfaceExtractor extractors. Preserve existing
+cross-backend, cross-extractor and public-API regression tests. Those four
+combinations are implementation comparisons, not four independent physical
+cases in the new 30-case acceptance denominator.
+
+For legacy runs, downsampling before cutting can bound cost. Keep
+`TransitionMappingConfig.max_curve_samples` as a unique-vertex work budget:
+`BUDGET_INSUFFICIENT` retains all ports and forbids a cut. Use
+`map_transitions_budget_sweep()` for the 8, 10, 16 and full comparisons when
+sampling is affected. Preserve `total_u_length`, source IDs and certified sheet
+graphs; never downsample after cutting. Detailed legacy conventions are archived
+in `docs/history/STATUS-pre-redesign.md` and the validation reports.
+
+Inspect the diagnostics, test physical identities, and compare resolutions and
+independent algorithms as required by the active milestone. Diagnose discrepancies
+and retain honest uncertainty; a missing transition may affect connectivity far
+beyond the local cell's own measure.
 
 ## Definition of done
 
 A milestone is done when all of these hold:
 
-1. `make check` is green, inside the test budget above.
+1. Its active dependencies in `docs/DESIGN.md` §23 are satisfied, and `make check`
+   is green inside the test budget above. Retired legacy milestones are not
+   prerequisites. R0 owns the explicit baseline and gate migration; this planning
+   change does not claim the current PR #24 branch is green.
 2. The milestone's acceptance criteria in `docs/DESIGN.md` §23 are each demonstrated by
    a named test — not by a plot, and not by a residual that got small.
 3. You verified the tests can fail: applied the one or two mutations that matter for
@@ -121,7 +149,18 @@ A milestone is done when all of these hold:
 7. Every deviation from `docs/DESIGN.md` is either an accepted ADR or written up in the
    PR body.
 
+For PR #24, retain its branch and failure evidence; do not merge it as-is or
+automatically accept its proposed ADRs. Land the planning documentation separately
+on `main`. R0 must verify the accepted baseline and selectively carry forward only
+needed fixes with regression evidence. Preserve the failed 10.3 matrix result and
+scientific tests when migrating its retired acceptance gate; do not relabel the
+milestone complete or weaken the new accuracy criteria.
+
 ## STOP conditions
+
+Accepted ADR 0010 already authorizes the stated algorithm and milestone migration;
+do not ask the researcher to approve that same decision again. Apply the following
+STOP conditions to a new ambiguity or deviation beyond that approved scope.
 
 Stop, write an ADR in `docs/adr/`, open the PR as a draft naming it, and end your turn
 — do not choose an option and proceed — when:

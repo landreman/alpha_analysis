@@ -1,0 +1,195 @@
+> **Historical archive; nonnormative.** This is the pre-redesign `docs/STATUS.md`, preserved verbatim below. Its next-milestone instructions and proposed decisions are historical, not the active implementation plan. Use `docs/DESIGN.md` section 23, the current `docs/STATUS.md`, and accepted ADR 0010 for current work.
+
+---
+
+# Milestone status
+
+The single source of truth for what is done. `docs/DESIGN.md` §23 defines what each
+milestone *is* — goal, changes, acceptance criteria. This file records only whether it
+has landed.
+
+`[x]` means the milestone's acceptance criteria are satisfied by the pull request that
+sets the marker. A milestone's own implementation pull request is what flips its row,
+in the same commit range that satisfies the criteria; do not mark a row ahead of the
+work, and do not touch another milestone's row.
+
+Milestones are ordered. Unless the researcher says otherwise, the next milestone is the
+lowest-numbered unchecked row.
+
+| # | Milestone | Goal | Done | PR |
+| --- | --- | --- | --- | --- |
+| 0 | Baseline and design scaffolding | Establish package skeleton without changing numerical behavior | [x] | #3 |
+| 1 | General Boozer field derivatives and asymmetric modes | Provide the field interface needed by all later work | [x] | #4 |
+| 2 | Denominator \(V_h\) and global \(B\) bounds | Implement the independent normalization calculation | [x] | #5 |
+| 3 | Deterministic periodic background mesh | Build the axis-regular logical mesh without Gmsh | [x] | #6 |
+| 4 | Gmsh background backend | Add the production mesher behind the same interface | [x] | #7 |
+| 5 | \(B=b\) surface extraction | Extract all level-surface components and incoming/outgoing halves | [x] | #8 |
+| 6 | Regular well tracer | Trace every regular surface vertex, not only the well near \(\pi/N_{\mathrm{fp}}\) | [x] | #10 |
+| 7 | Surface data, refinement, and sheet candidates | Evaluate action data over a whole pitch surface and refine discontinuity candidates | [x] | #12 |
+| 8 | Critical curves | Robustly extract and classify \(\Gamma_{\min}\), \(\Gamma_{\max}\), and degenerate portions | [x] | #13 |
+| 9 | Transition mapping and action additivity | Construct \(T\) and matched parent/child ports without yet cutting the full mesh | [x] | #14 |
+| 10 | Constrained cuts and sheet IDs | Insert \(T\), duplicate vertices, and make \(A\) continuous on each sheet | [x] | #19 |
+| 10.1 | Sampling-robust cut geometry | Make the sheet graph invariant to the transition sample budget, or explicitly budget-limited | [x] | #21 |
+| 10.2 | Contact localization and segment-level cutting | Cut the resolved arcs of curves with localized §5.4 events instead of vetoing whole curves | [x] | #22 |
+| 10.3 | Failure-directed refinement and matrix convergence | Converge the five-equilibrium matrix unattended via per-failure-class remediation | [ ] | |
+| 11 | Direct contour tracer | Build the correctness oracle | [ ] | |
+| 12 | Interval primitives and bounded ordinary flood fill | Classify edge-connected action ranges without transitions using a finite algorithm with lower and upper bounds | [ ] | |
+| 13 | Transition-aware bounded flood fill | Add common-parameter transfer through hyperedges while preserving finite termination and bounds | [ ] | |
+| 14 | Reachable-polygon and surface quadrature | Compute \(Q(b)\) | [ ] | |
+| 15 | Pitch-slice pipeline and HDF5 | Produce a restartable `PitchSliceResult` end to end | [ ] | |
+| 16 | Adaptive outer quadrature and parallel execution | Compute final \(f\) | [ ] | |
+| 17 | Full validation suite | Establish scientific credibility on synthetic and repository data | [ ] | |
+| 18 | Profiling and Numba acceleration | Optimize only measured bottlenecks | [ ] | |
+
+## Notes for the next milestone
+
+Anything a later milestone needs to know that is not already in `docs/DESIGN.md` goes
+here — a convention settled during implementation, a data file that has to be
+regenerated, a known-shaky tolerance. Keep it short; when an entry becomes permanent,
+move it into `docs/DESIGN.md` and delete it here.
+
+- Milestone 10.2 is complete in PR #22 under **accepted ADR 0006**, with its six-sheet
+  acceptance unchanged. Bounded insertion through adjacent triangle faces now
+  completes the synthetic arrangement; the DMerc sampling regression is fixed.
+  Event vertices carrying incompatible one-sided limits in a partially cut
+  arrangement remain explicit unknown action, with all port limits preserved.
+  Local validation passes: 174 tests, four mutation checks, all six ADR grids, and the
+  100-case matrix (explicit unresolved outcomes, not matrix convergence).
+  Reports are in `docs/validation/milestone10.2-*.md`. GitHub
+  [Tests](https://github.com/landreman/alpha_analysis/actions/runs/33379169289)
+  passed on implementation commit `e39c5a1` (lint, Python 3.10–3.12, and full suite).
+
+- The real-equilibrium matrix now carries a sixth radially global level,
+  `lambda_n = 0.8`, alongside `0.05, 0.1, 0.5, 0.9, 0.95`: five files x two
+  backends x two extractors x six levels is 120 cases, and `docs/DESIGN.md`
+  §23 milestone 10.3 counts them that way. The milestone 9/10/10.1/10.2 reports
+  under `docs/validation/` predate the new level and describe 100 cases; they are
+  records of what was run, not a target to match. The twenty new cases are recorded
+  in `docs/validation/lambda-n-0p8-matrix.md`: all completed, no new failure class,
+  extractors agreeing on every transition status. Two things for 10.3 to carry —
+  `d23p4` at this level hits the 128-field-period cap on all four combinations, and
+  the largest relative flux drift during event insertion, `4.13e-3` on the coarse
+  gmsh TURBO surface, is above the `8.77e-4` the 10.2 matrix recorded.
+
+- Keep milestone 10.3 within the existing test budget. The W7-X tests that used to
+  dominate it now run on `boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc`, the same
+  equilibrium as `boozmn_W7-X_without_coil_ripple_beta0p05_d23p4_tm_reference.nc`
+  at 512 rather than 3200 Boozer modes: global `B` bounds agree to 1e-4, and the
+  event fixture reproduces the same four contacts and two events at `b=2.7781394`.
+  That cut the full suite roughly threefold; spend the headroom on physics, not on
+  slower tests. Tests still on the high-resolution file are the ones pinned to it:
+  the boozmn/wout consistency checks, and the `_polish_g_crossing` and
+  near-threshold-well regressions whose recorded points lie on that field's `B=b`
+  surface. Event insertion's existing-vertex snap has a chord-scaled allowance
+  (DESIGN §10.3), so it is still a surface-resolution control. Critical-curve
+  projection now uses a centered `1e-6` Jacobian step to avoid relative-step
+  stagnation near `zeta=0`; accepted `B` and `g` residual tolerances are unchanged.
+- A `CutEvent.sample_indices` entry denotes a one-sided event limit only when its
+  referenced port has `sheet_id >= 0`. An unresolved port may retain the full
+  source mapping for diagnosis; its indexed finite action is not an event limit.
+  Keep that port's connectivity unresolved when 10.3 consumes event incidence.
+- The legacy (non-event) `constrain_edge` path also gains safety checks: existing
+  vertex snaps are component-scoped and bounded in full 3-D, and the common-component
+  endpoint check runs before the snap shortcut. Existing mesh-cut tests pass unchanged.
+
+- Milestone 0 established base-only `j_connectivity` imports; optional features must use `optional_import()` so missing extras provide an install command.
+- Milestone 1's `BoozerFieldLike.B()` uses pointwise NumPy broadcasting; legacy `compute_B()` retains its outer-`s` grid semantics.
+- Milestone 2's `find_global_B_bounds()` returns refined extrema, a safety-margin bracket, and radial extrema profiles on the configured `s` grid for later background-mesh diagnostics.
+- Milestone 3's `BackgroundMesh.boundary_tags` is a point-located bit mask; periodic pairs are explicit `(zeta=0, zeta=L_zeta)` node IDs, and the Gmsh backend must satisfy the same array and orientation invariants.
+- Milestone 4's Gmsh backend embeds the logical axis, returns exact lower/upper seam pairs, supports axis/critical/low-gradient sizing, and finalizes its owned Gmsh session before returning plain arrays; full background-resolution convergence remains Milestone 17 validation work.
+- Milestone 5's signed-half meshes include the shared `G_ZERO` closure; regular incoming vertices have physical `g<0`, split-created vertices use parent edge `(-1, -1)`, and periodic cells require local zeta unwrapping.
+- Milestone 5's common extractor contract runs against both marching tetrahedra and real PyVista/VTK in CI; PyVista empty levels return empty meshes, seam copies are matched one-to-one, `OUTER` provenance uses a dedicated indicator because VTK interpolates packed masks arithmetically, each VTK contour point is matched one-to-one to its active background edge and polished by the same bracketed edge solve as marching tetrahedra, and parent provenance IDs intentionally remain `-1`.
+- Milestone 5 uses a temporary centered Cartesian finite difference for the axis gradient only as a projection direction, followed by residual checks; near-axis `dB_dtheta / s` amplification also remains uncontrolled.
+- The §7.3 option-1 axis-regular interpolation is implemented: `BoozerField` continues `m != 0` coefficients below the innermost half-grid surface with the `s^{|m|/2}` harmonic scaling (ADR 0002), so `|B|` is single-valued at the axis; values at `s >= s0` are unchanged.
+- `g=0` split-point polishing backs the planar Newton solve with bracketed, locality-bounded fallbacks (projected chord solve, plane-curve continuation over a pencil of cutting planes returning the nearest in-disk crossing, and — when the `g=0` curve exits the domain near the outer boundary — a trace of the surface's boundary curve on the `x^2+y^2=1` cylinder; ADR 0001). Thin-tube levels near `min B` extract for the W7-X reference file at every swept `b` on structured and gmsh meshes, with split points local to their parent edge and inside `x^2+y^2<=1`; boundary-exit split points carry `EDGE|G_ZERO` provenance.
+- A marching triangle that bridges two sheets of an under-resolved surface (coarse gmsh meshes near `min B`) has no local `g=0` point; its split vertex is placed at the `g` sign discontinuity, tagged `G_JUMP`, excluded from the `g=0` curve, and counted in `SurfaceExtraction.n_unresolved_splits` with status `UNRESOLVED` (ADR 0001). Downstream milestones must treat `UNRESOLVED` extractions as needing background refinement before production use.
+- Milestone 6 traces in the physical direction `sign(G + iota I)`, stores authoritative half-bounce `A` and `K` plus lifted exits and extrema itineraries, and leaves `MAX_PERIODS` action/time as `NaN` with an explicit scanned-period count; downstream surface/pipeline stages must carry that status into unresolved-weight bounds rather than `Theta=0`.
+- Milestone 6's conservative Fourier-aware scan includes every retained mode regardless of amplitude (about 1125 samples per field period on the W7-X reference surface); Milestone 7 should profile this cost and add a demonstrated amplitude-aware cutoff before batch tracing if needed.
+- Milestone 6's `quadrature_error_K` is an adaptive-subdivision estimate, not a floating-point cancellation bound near an internal maximum with `B_max` close to `b`; Milestones 8–9 own special treatment of that `Gamma_max` band, and surface-wide tracing should track its explicit failure fraction.
+- Pitch surfaces can be downsampled before Milestone 7's batch traces with topology-preserving shortest-edge collapses. Moved vertices are reprojected to `B=b`; physical, periodic-seam, and `g=0` boundary vertices remain fixed; each face remains close to its original normal; drift in the scalar axis-regular `|ds wedge d alpha|` measure is bounded globally and per connected component; the achieved reduction and rejection reasons are reported; and changed provenance is explicitly invalidated rather than guessed. The scalar budgets do not control local or within-component cancellation or weighted bounce integrals, so later refinement and convergence remain necessary. This is a staged utility rather than a pipeline caller; Milestone 10 must continue to forbid coarsening after transition cuts.
+- Milestone 7's `SurfaceRefinementResult.edge_indicators` retains final edge IDs, midpoint `A`/`K` interpolation errors, and unquantized-itinerary candidate flags for Milestone 8; any non-regular endpoint or midpoint stays a candidate, projected refinement invalidates changed provenance, and edges shared by a tagged boundary remain explicitly `refinement_blocked` until Milestone 8 can refine them on the boundary curve. The extrema-height comparison is normalized by `b` using the global itinerary tolerance; Milestone 8 should assess local `b-B_extremum` gap scaling while resolving critical curves.
+- Five-equilibrium validation through Milestone 7 showed that failed local midpoint projection/evaluation (including leaving the domain or crossing to `g>0`) and face-invalid bisections must also remain explicit `refinement_blocked` candidates; their separate `projection_failed` and `face_validity_failed` diagnostics prevent a different level-set root, an inverted child, or a machine-epsilon sliver from being accepted. `unresolved_edge_count` now includes every blocked edge even when its already-computed interpolation errors are finite. The same sweep established that long regular wells may require extrema-delimited quadrature with a summed global error budget, and that `max_field_periods` remains a convergence control: the nfp=4 low-resolution case at radially global `lambda_n=0.95` converges at 180 field periods with a cap of 256 (and agrees at 512), while the default cap of 128 correctly remains `MAX_PERIODS`.
+- Milestone 8's `CriticalCurves` stores point and segment classifications plus ordered, cumulative-arc-length polylines using global vertex IDs. Production seam continuity is established by surface extraction's canonical seam vertex IDs; critical-curve stitching additionally supports uniquely matched lower/upper degree-one endpoints carrying `PERIODIC_SEAM` provenance for staged callers. Vertex and intrinsic-midpoint `D_parallel^2 B` sampling drives direct `B-b=g=D_parallel^2 B=0` junction solves, including a true-fold, nonzero-iota production-path synthetic test with independently derived analytic coordinates. `GAMMA_MAX` polylines are ready for Milestone 9's common-parameter transition mapping, while failed local degenerate-point solves and all other `DEGENERATE` or `UNRESOLVED` results remain explicit rather than being mapped as generic transitions.
+- Milestone 8 refines standalone critical-curve arrays. Inserting those vertices into `SurfaceMesh` and clearing Milestone 7's boundary `refinement_blocked` edges is deferred to Milestone 10's constrained cuts. Milestone 9 verifies the limiting port actions from both sides as the local `b-B_extremum` gap shrinks and controls the cumulative piecewise-linear `u` parameter with an 8-to-16-sample convergence test. The combined pitch-surface diagnostic must add `EDGE`/`AXIS` overlays when Milestone 15 assembles the pipeline view.
+- Five-equilibrium validation through Milestone 8 covered both background backends, both surface extractors, and radially global `lambda_n = 0.05, 0.1, 0.5, 0.9, 0.95`. It exposed two cross-stage assumptions that are now explicit: PyVista root polishing must remain on the originating background edge so a nonlinear solve cannot jump to a nearby `B=b` sheet, and every accepted incoming surface vertex is polished to the nearby exact field-line root before evaluating the endpoint-singular `K` integral. Incoming-root motion is bounded by the explicit `incoming_root_max_offset` control; an accepted `B` residual that does not localize the root within that distance is `ROOT_FAILURE`, not a silently relocated quadrature point. The two extractors agree on a finer background for the sensitive low-`b` case (six components and six `Gamma_min` arms, with total curve length agreeing to `2.2e-5` relative). Component and critical-arm counts near the global extrema remain background-resolution controlled, and capped near-transition wells remain explicit `MAX_PERIODS`; Milestone 9 must carry those convergence controls and statuses rather than infer a transition or zero weight.
+- Milestone 8's junction refinement no longer relies on the chord-local solve alone. A
+  marching-triangle segment can bridge the neck of a fold of `B=b, g=0`, so its junction
+  lies several chord lengths off the chord: the segment is then resolved by a bounded
+  predictor-corrector walk of the curve from both endpoints, and the junction is accepted
+  only when the two independent walks agree on it. Segment midpoints that make a segment
+  ambiguous are resampled on the curve instead of on the `(s, theta, zeta)` chord, which
+  removes ambiguities that were chord artifacts. When the arms leave `s <= 1` before
+  meeting, the junction is outside the plasma and the bridging segment is replaced by two
+  arms that each end on a solved `EDGE` point with `s = 1`; nothing is merged across the
+  neck, and `CriticalCurveReport` counts both outcomes (`curve_walk_junction_count` and
+  `boundary_exit_split_count`). Milestone 10 must carry those `EDGE` vertices through the
+  constrained cut rather than reconnecting the two arms.
+- Milestone 9's pre-cut `TransitionCurve` keeps parent and child-1 samples on `T`, child-3 samples on `GAMMA_MAX`, and all three ports in one common-`u` array ordering with an authoritative lifted `(s, alpha)` identity; parent/child-1 source IDs and all `sheet_id` values remain `-1` until Milestone 10 inserts and duplicates the constrained curve.
+- Milestone 9 traces tangent events in the physical `sign(G+iota I)` direction, retains failed and multiway mappings with `NaN` actions, and verifies both action-additivity convergence and the 8-to-16-sample convergence of the piecewise-linear `u` circumference. Milestone 10 must preserve these identities and statuses while cutting; monotone action subdivision remains later interval-transfer work.
+- Milestone 9 records root-scan resolution, root tolerances, and the 128-field-period cap in each `TransitionCurve.controls`; those §21.3 dimensions are not yet convergence-controlled and must be swept by the production convergence report. Cap exhaustion is distinct `TransitionStatus.MAX_PERIODS`, and slice-global critical status is retained as metadata without vetoing a locally regular `GAMMA_MAX` polyline.
+- Bound the cost of `map_transitions()` with `TransitionMappingConfig.max_curve_samples`: it is now a unique-vertex work budget with adaptive midpoint certification, not a uniform-subset geometry knob. `BUDGET_INSUFFICIENT` curves retain their samples, uncertified intervals, and all ports but cannot be cut. `map_transitions_budget_sweep()` reuses unique vertex traces with all other controls fixed. Long capped field-line samples still cost tens of seconds, so full mapping remains a deliberate convergence run rather than a cheap default on real equilibria.
+- The cut-plotting example defaults to a work budget of 16 (previously 10), preserving its DMercFail `--lambda-n 0.8` two-sheet demonstration under sampling certification. The real-reference test reads that CLI default and requires it to resolve; explicitly smaller insufficient budgets still remain unresolved.
+- The pre-cut transition record extends §10.4 with sampled logical points, lifted zeta, per-port quadrature errors, `child_1`/`child_3` roles, and source critical-curve IDs because constrained mesh vertex IDs do not exist until Milestone 10. Equal-height contacts and duplicate `GAMMA_MAX` components mapping to the same lifted `T` are detected now, including a contact that falls *between* two adjacent samples: each sample records `interior_maximum_count` and `barrier_margin` from its parent well, adjacent regular samples whose counts differ are bracketed in `contact_sample_pairs`, and such a curve is `MULTIWAY` even when every sample is regular (ADR 0003). The reference W7-X equilibrium has four such contacts on the single `GAMMA_MAX` curve at `b=2.7781394`. Milestone 10 conservatively retains every such `MULTIWAY` curve as an explicit unresolved hyperedge under §5.4 rather than locating an under-resolved event or arbitrarily decomposing it; the finite port actions and per-sample statuses remain available for later refinement. Detection resolution is the critical-curve vertex spacing along the curve, which no transition-side control refines, and the root-scan step along the field line (§21.3 dimension 5), since `interior_maximum_count` counts the maxima the scan detected rather than the well's. On real equilibria this is the common case rather than a corner case: regenerating the milestone-9 sweep in `docs/validation/milestone9-real-equilibria.md` (five equilibria, five levels, two backends, two extractors, 8 samples per curve) leaves only 6 of its 164 curves free of a stepped-over event, and moves 53 curves from `REGULAR` to `MULTIWAY` while every sample status and failure reason is unchanged -- so downstream callers must branch on `contact_sample_pairs` and `sample_status`, not on `status is REGULAR`. A bracket is an equal-height contact when its `barrier_margin` is near zero and a fold (also a §5.4 event) when it is not, but that discriminator holds only when the count change belongs to the highest barrier, which `barrier_margin` measures; a count change straddling a non-regular sample is not bracketed at all.
+- The five-equilibrium Milestone 9 follow-up covered all 100 combinations of the required backends, extractors, and radially global bounce levels; the reproducible controls and convergence probes are recorded in `docs/validation/milestone9-real-equilibria.md`. Transition outcomes are now per-sample, so a degenerate endpoint no longer erases regular samples on the same curve. Child and parent actions use every traced internal extremum as a quadrature breakpoint, and duplicate-companion detection compares regular sample masks. Remaining mesh-sensitive topology and capped traces stay explicit; in particular, structured `20260406-01-262` at `lambda_n=0.9` and structured `d23p4` at `lambda_n=0.95` remain `MAX_PERIODS` even at a 1,024-period cap.
+- Milestone 10's NumPy-only `CutSurface` stores duplicated parent/child action vertices, cell-located union-find sheet IDs, constrained cut edges, and common-`u` port vertex IDs; its versioned NPZ round trip uses `allow_pickle=False`, while PyVista and the coarse NetworkX multigraph remain diagnostic adapters. Downsampling remains forbidden after these IDs exist.
+- Failed, multiway, or geometry-underresolved Milestone 10 transitions retain all ports with `sheet_id=-1`, vertex IDs `-1`, mapped actions/statuses, and an explicit reason; Milestone 11 must propagate this as unresolved connectivity, never as no connection. The 100-case real matrix reproduced all 164 Milestone 9 curves, but its six locally regular TURBO curves still lack a resolved `T`-to-`EDGE` strip even under the targeted finer probes, so no plausible zero-width real cut was manufactured (`docs/validation/milestone10-real-equilibria.md`).
+- Before Milestone 11 consumes `CutSurface`, preserve source-vertex IDs through cutting so trace status, itinerary hash, `K`, and regularity remain joinable; restrict child-3 routing to its authoritative `GAMMA_MAX` source polyline; validate mesh-aligned fallback deviation; exercise multiple intersecting transitions (a same-slice crossing now demotes the later transition via `_TransitionCutConflict`; representing a genuine crossing as a surface-curve arrangement is milestone 10.2/10.3 territory); and bound the cut triangle-quality degradation before tracing or quadrature consumes slivers. These are the remaining latent-path hardening items from the Milestone 10 review; the analytic production cut's minimum logical triangle area decreased by a factor of 28 without becoming degenerate or changing total area materially. Done on the ADR 0005 branch (2026-08-30): the decisive parent/child side-assignment margin (`side_assignment_margin_ratio`, indecisive transitions demoted to explicit unresolved, probe traces honoring the caller's `trace_config`), component-provenance filtering of the open-endpoint boundary snap plus a same-component requirement across companion samples, the post-insertion re-check of the ADR 0004 snap allowance at its point of use, and the `insert_point`/`_split_edge` constrained-chain guards — one conflicted transition is demoted instead of aborting the slice.
+- ADR 0005 is decided (2026-08-30): `extract_critical_curves` repairs sub-resolution chain reversals only when a bounded walk of the true `B=b, g=0` curve certifies a simple arc; certification failures stay untouched and counted (`reversal_repaired_count` / `reversal_unrepaired_count` in `CriticalCurveReport`), and the cut-time double-back guard remains the permanent backstop. Repaired ordering changes `u` and `total_u_length`, so milestone-9-recorded per-curve numbers are superseded where a repair fired. The DMercFail λₙ=0.8 reference cuts once sampling certification finishes (`test_dmerc_reference_sheet_graph_is_budget_invariant_or_explicit`); structured 8/10-vertex budgets now honestly report insufficiency rather than accepting a coarser cut. Milestones 10.2–10.3 own contact localization with segment-level cutting and failure-directed refinement; Milestone 11 should still branch on `contact_sample_pairs` and `sample_status`, and must treat every demoted/unresolved transition as unresolved connectivity, never as no connection.
+- Milestone 10.1's cut gate requires both `status is REGULAR` and `sampling_certified`, in addition to the per-sample/contact checks described above; per-sample regularity alone is insufficient. It preserves insertion action stencils and refreshes off-cut descendants after branch-limit assignment, using only source copies on the same sheet. A genuinely cross-sheet stencil remains `NaN` and must be counted as unresolved action downstream. The 100-case real matrix and four-backend/extractor DMercFail budget sweep are recorded in `docs/validation/milestone10.1-real-equilibria.md`; certification is relative to authoritative critical-curve and root-scan resolution, not a guarantee about sub-vertex features.
+
+- The sampling itinerary comparison is redundant with final between-sample contact
+  bracketing; both remain intentional safeguards. Near-self-contact refinement is a
+  heuristic trigger, not a certified global separation bound, and currently has no
+  isolated analytic mutation test. Milestones 10.2/10.3 should retain this limitation
+  when extending curve/contact refinement. Early sampling stops now retain their
+  uncertified source intervals for those consumers.
+
+- Milestone 10.3's coordinator (`j_connectivity.refinement`) converges each case
+  with matrix-wide bounded ladders and records every retry; see
+  `docs/validation/milestone10.3-real-equilibria.md` for the measured matrix.
+  The milestone's row stays unchecked pending proposed ADR 0009: 42/120 cases
+  (35.0%) end resolved-or-no-transitions against the §23 95% threshold, with
+  the residual dominated by per-case wall-budget exhaustion at the recorded
+  7200 s guard (46 cases; twelve re-verified genuine on an uncontended pass,
+  and the researcher has since capped acceptable per-case compute at 10
+  minutes) and by 1024-period cap ceilings (20 cases: DMercFail λₙ≥0.9,
+  d23p4 λₙ≥0.8 — the long-well physics recorded since milestone 9).
+  `test_matrix_report_meets_milestone_10_3_acceptance` encodes the criterion
+  and is deliberately red on the committed matrix. One case crashed under the
+  matrix revision (an escaped "lacks sides" `ConstrainedCutError` from the
+  duplication stage); `_stabilized_side_demotion` now demotes that transition
+  explicitly at the stabilized labels (regression:
+  `test_stabilized_side_check_demotes_instead_of_raising`), leaving completed
+  cases untouched by construction.
+  Things milestone 11 must carry:
+  - Two new certified §5.4 event kinds exist under proposed ADRs 0007/0008:
+    `"fold"` (one marginal point, continuous port limits, uncertainty interval
+    spanning the root-scan blind zone) and `"degenerate_endpoint"` (curve-terminal
+    annihilation; incident arcs stop one authoritative vertex short and the tip
+    vertex is shared by both banks with `NaN` action via
+    `unresolved_event_action_vertex_ids`). Consumers must treat every event node's
+    connectivity as unresolved regardless of kind.
+  - A branch slit whose ends terminate at interior events can leave parent and
+    child ports on the *same* sheet (`CutTransitionPort.sheet_id` equal for all
+    three roles); reachability transfer must support self-transitions rather than
+    assume the ports straddle two sheets.
+  - A case is `resolved` when `cut.unresolved_transition_ids` is empty; curves
+    wholly dissolved into endpoint events remain visible as arc-less `CutEvent`
+    rows and are counted resolved-with-explicit-events. Every other terminal
+    state carries `terminal_reasons` plus `failure_class_counts`; treat all of
+    them as unresolved connectivity, never as no connection.
+  - Local edge-split refinement (`refine_surface_near_curves`) never splits
+    periodic-seam or axis edges; a strip whose longest local edge is seam-locked
+    stays at the recorded refinement bound. Seam-twin splitting is future work.
+
+## Accepted deviations
+
+Design decisions taken during implementation that differ from `docs/DESIGN.md` live in
+`docs/adr/` and are listed here with one line each.
+
+- ADR 0003 — a `GAMMA_MAX` curve whose sampling steps over a nongeneric event is `MULTIWAY` even when every sample is `REGULAR`, and keeps its finite port actions for Milestone 10 to subdivide. (ADRs 0001 and 0002 predate this list and are not repeated here.)
+- ADR 0004 — an open companion-cut endpoint within the local surface-distance allowance (`max_surface_distance_ratio` × local edge scale) is extended to the nearest `EDGE` boundary edge, splitting it, with the extension's `u`/action clamped to the endpoint sample; beyond that allowance the transition stays an explicit geometry-unresolved hyperedge.
+- ADR 0005 — a critical polyline reversal at sub-resolution strand separation is reordered by arc length along the true `B=b, g=0` curve only when a bounded certification walk confirms one simple arc; uncertified reversals stay as extracted and counted, the cut-time double-back guard is permanent, and wide reversals are genuine geometry that is never touched.
+- ADR 0006 — bounded robust event-junction insertion belongs in milestone 10.2 with the six-sheet acceptance unchanged; milestone 10.3 coordinates matrix-level refinement. Failed incident arcs and unknown action measure remain explicit.
+- ADR 0007 (proposed) — a localized count change may certify as a below-`b` fold: one marginal point, an annihilating interior pair strictly below `b`, continuous port limits; its uncertainty interval spans the root-scan blind zone and ambiguity with an equal-height solve stays uncertified.
+- ADR 0008 (proposed) — an open `GAMMA_MAX` polyline ending on a DEGENERATE-classified vertex terminates its companion cut at an explicit degenerate-endpoint event one authoritative vertex short of the annihilation; sub-resolution arms dissolve into their endpoint events.

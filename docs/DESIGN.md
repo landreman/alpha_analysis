@@ -1,116 +1,120 @@
-# Design: Computing the phase-space fraction connected to the plasma edge by constant-\(J\) contours and trapping-class transitions
+# Design: Computing the phase-space fraction connected to the plasma edge
 
-**Repository:** `https://github.com/landreman/alpha_analysis`  
-**Document role:** Technical design and implementation plan for AI-agent-driven development  
-**Primary result:** The topological accessibility fraction \(f\) defined below  
-**Primary implementation language:** Python 3.10+  
+**Repository:** `https://github.com/landreman/alpha_analysis`
+**Active plan:** branch-labelled well atlas and bounded accessibility, adopted 2026-09-11
+**Decision:** [ADR 0010](adr/0010-branch-atlas-and-bounded-f.md)
+**Work queue:** §23 and [STATUS.md](STATUS.md); the next milestone is **R0**
 
----
+This document is normative. It specifies the intended algorithm, not a claim that
+all described modules already exist. Sections 3–5 retain the physical metric and
+transition rules. R0–R8 replace the unfinished development sequence 10.3–18.
+Historical milestones 0–10.2 remain completed under their original criteria;
+10.3 is retired **without being marked complete**. Do not restart it to satisfy
+an obsolete cut-coverage target.
 
-## Document map
-
-- Sections 1–6 define the physical metric, well-state geometry, transitions, and full numerical pipeline.
-- Sections 7–13 specify field evaluation, meshes, well tracing, reachability, and quadrature.
-- Sections 14–19 specify package layout, public APIs, configuration, visualization, persistence, and dependencies.
-- Sections 20–22 specify testing, error control, parallelism, performance, and the test-time budget.
-- Sections 23–28 divide the project into agent-sized milestones and define scientific completion criteria.
-
-The repository description in Section 2 reflects the tree inspected on 2026-08-24. Implementing agents must re-check the current tree and tests before modifying it.
+The [old design](history/DESIGN-pre-redesign.md),
+[old implementation notes](history/STATUS-pre-redesign.md), and
+[reviewed independent proposal](2026-09-03-algorithm-redesign.md) preserve the
+reasoning and experiments. Historical instructions do not override this plan.
+Existing mesh/cut APIs and their physics regressions remain supported. Neither
+this redesign nor a report of explicit failure is evidence that the old 95%
+cut criterion passed.
 
 ## 1. Purpose and scope
 
-This document specifies a practical algorithm and software architecture for computing the fraction of alpha-particle birth phase space that is connected to the plasma boundary by contours of the longitudinal adiabatic invariant
+Compute the existential accessibility fraction \(f\) of §3 for realistic Boozer
+magnetic fields, with a useful lower and upper enclosure. At fixed bounce field
+\(b\), permitted paths follow connected constant-\(J\) contours and all allowed
+trapping-class transitions. This is an upper envelope of possible collisionless
+loss, not a probabilistic capture model or a finite-time guiding-centre loss rate.
 
-\[
-J = \oint v_{\parallel}\,d\ell,
-\]
+The production path is:
 
-when discontinuous changes in \(J\) are permitted at transitions between trapping classes.
+1. independently account for the total trapped birth population;
+2. reuse forward field-line scans and extrema across pitch values;
+3. represent wells by continued entry/exit roots in overlapping local charts;
+4. locate actual barrier crossings from local extremum-height fields;
+5. propagate definite and possible accessibility while preserving action;
+6. integrate weights and all unresolved contributions; refine uncertainty in \(f\).
 
-The intended use is a general three-dimensional stellarator magnetic field represented in straight-field-line Boozer coordinates. The implementation must enumerate **all** trapped wells, including:
+### 1.1 Deliverable and initial acceptance contract
 
-- wells that span several field periods;
-- several independent wells on one field line in one field period;
-- wells whose identities permute as the field-line label or radius changes;
-- generic \(1\leftrightarrow 2\) split/merge transitions;
-- later, nongeneric or symmetry-enforced multiway transitions.
+The primary result is \([f_L,f_U]\), with the full width \(f_U-f_L\le0.01\)
+for each of the five reference equilibria. This is an **absolute full width**;
+a midpoint has uncertainty at most 0.005 if the enclosure is valid. It is not
+±0.01 and not a relative error. A wider interval is a useful diagnostic but does
+not meet accuracy acceptance. Distinguish model-only bounds, field-level bounds,
+and statistical confidence intervals (§13.4).
 
-The implementation must also provide extensive visual diagnostics. Every major geometric or topological object should be inspectable:
+The reference source is \(h(\rho)=1\), the existing API default. Every report must
+record the actual source; also test a nonconstant source. This choice does not
+retroactively establish the source used by unarchived exploratory experiments.
+Accuracy for another source requires reweighting/reintegration and new evidence.
 
-- the background volume mesh;
-- the surfaces \(B=B_b\);
-- their incoming and outgoing halves;
-- entry and exit bounce points;
-- \(J\), bounce time, extrema, winding, and itinerary labels on the surfaces;
-- the marginal curves \(\Gamma_{\min}\) and \(\Gamma_{\max}\);
-- transition curves and their branch correspondences;
-- cut trapping sheets;
-- constant-\(J\) contours;
-- the edge-reachable region \(\Theta=1\);
-- per-triangle quadrature contributions;
-- the outer \(B_b\) integrand and convergence history.
+R8 requires at least **29 of 30 physical file/pitch cases** to achieve the slice
+criterion (§20.3), and all five full-equilibrium results to meet the interval-width
+criterion. These are separate requirements; four backend repetitions do not make
+four independent physical successes. Performance controls are in §22.4.
 
-This document is self-contained. It defines the physical metric, mathematical state space, numerical algorithm, data structures, APIs, tests, diagnostics, dependencies, persistence format, and a sequence of implementation milestones suitable for separate AI-agent pull requests.
+### 1.2 Non-goals and deferred optimizations
 
-### 1.1 What this metric does and does not represent
+Do not add collisions, slowing down, electric fields, finite-orbit-width dynamics,
+probabilistic capture, or passing-to-trapped bridges to this metric. Do not require
+complete classification of every degenerate event when a valid global enclosure
+already meets accuracy. Exact handling of an influential unresolved event may
+still be necessary if its uncertainty will not shrink.
 
-The indicator in this project is an **existential topological accessibility indicator**. It asks whether at least one path exists from a trapped state to \(\rho=1\), using:
+Reeb graphs (one point per connected action contour), orbit-window sampling,
+spline scan surrogates, fast circle-rotation first-hit searches, Numba, and symmetry
+reduction are optional later optimizations. None is a prerequisite to R0–R8.
+Ordinary connectivity of a Reeb graph is **not** the accessibility rule (§11.5).
+No new base dependency or numerical-core boundary crossing is approved by this plan.
 
-1. connected constant-\(J\) contours on a continuously varying trapping sheet; and
-2. all allowed branches at a trapping-class transition.
+## 2. Existing repository and integration baseline
 
-It is not, by itself, a physical loss probability. Near a separatrix, a real orbit can have phase-dependent or probabilistic capture into outgoing branches. Treating every allowed branch as accessible generally gives an upper envelope of physical collisionless loss. The data structures should leave room for a future directed or probabilistic transition model, but that extension is outside version 1.
+Retain the public interfaces in `boozer_field.py`, `bounce_points.py`, and
+`J_invariant.py`. The legacy selected-well action is a regression comparison,
+not a production method for counting all wells. Existing `j_connectivity` field,
+normalization, root/quadrature, synthetic, mesh/cut, and visualization routines
+are assets to reuse or compare, not permission to infer their convergence on all
+real fields. New functionality belongs under `alpha_analysis/j_connectivity/`.
 
-### 1.2 Non-goals for version 1
+Use Python 3.10+ and the clean `.venv` based on conda `20220806-03` as specified
+in [AGENTS.md](../AGENTS.md). Preserve the numerical/test budgets and dependency
+boundaries. Do not use the Python 3.13 environment named there.
 
-Version 1 does not need to include:
+### 2.1 PR #24 and the baseline migration
 
-- finite-orbit-width guiding-center trajectories;
-- collisions, slowing down, or energy evolution;
-- radial electric fields or electrostatic potential variation;
-- probabilistic separatrix capture;
-- transitions through passing trajectories followed by retrapping;
-- automatic differentiation of \(f\);
-- GPU support;
-- multi-node MPI;
-- an explicit Reeb graph or Reeb space;
-- exact treatment of every nongeneric degenerate transition.
+At review on 2026-09-11, [PR #24](https://github.com/landreman/alpha_analysis/pull/24)
+is an open draft at `c11fb305da89d75c552ecf61b03d34895c5834e6`; its Python Tests
+jobs fail. Its failed 120-case experiment is valuable evidence. **Do not merge
+it as-is or declare milestone 10.3 complete.** This planning edit does not modify
+its code, tests, CI, or GitHub state.
 
-Nongeneric cases must be detected and reported rather than silently misclassified.
+Preferred integration: land this planning/evidence change in a **Markdown/data-only
+PR based on current main**, then close #24 as superseded while retaining its branch
+and recorded evidence. Check current main and remote state when executing this
+handoff. Do not accidentally include #24's implementation diff in the planning PR.
+Carry the historical 10.3 report/JSON and ADRs with the planning PR if they are not
+already on main; preserve the raw report and JSON, including the recorded crash.
 
----
+R0 starts from the plan-bearing main baseline. Selectively port a #24 fix only
+when a retained API or a new acceptance criterion needs it, together with its
+regression test and an explicit explanation. Importing its coordinator and event
+machinery wholesale is not required. Run the baseline gate, and investigate any
+failure other than the explicitly superseded policy described next.
 
-## 2. Existing repository and compatibility requirements
-
-The repository currently contains:
-
-- `alpha_analysis/boozer_field.py`: `BoozerField` and `BoozerSurface`, including loading `boozmn` or `wout` data, radial interpolation of \(G\), \(I\), \(\iota\), and Fourier coefficients, and evaluation of \(B\);
-- `alpha_analysis/bounce_points.py`: a one-dimensional field-line scan that finds the contiguous allowed well nearest a selected toroidal center and optionally root-refines its bounce points;
-- `alpha_analysis/J_invariant.py`: computation and plotting of one selected well’s normalized action, commonly using a center near \(\zeta=\pi/N_{\mathrm{fp}}\);
-- tests for these modules and W7-X reference data.
-
-These capabilities are useful and must remain operational. In particular, the current `compute_J_invariant()` result is a valuable regression comparison for a well selected by the existing heuristic. However, that heuristic does not enumerate every well and must not be used as the production well-bookkeeping method for the new metric.
-
-The new implementation should be placed primarily in a subpackage:
-
-```text
-alpha_analysis/j_connectivity/
-```
-
-Existing public functions and command-line entry points should remain backward compatible unless a separate deliberate deprecation is approved.
-
-Repository-specific implementation rules:
-
-- use the existing `20220806-03` conda environment's Python 3.10.5 interpreter rather
-  than creating a new conda environment; create a clean project `.venv` from it without
-  `--system-site-packages`. Do not use `20250627-01-libE`: its Python 3.13 `readline`
-  extension segfaults during pytest capture;
-- keep code straightforward and avoid unnecessary framework abstractions;
-- format new Python code consistently with `black`;
-- every scientific feature must include tests;
-- no failed or unresolved well trace may be silently converted to \(\Theta=0\), zero weight, or `NaN` that is later ignored.
-
----
+If a chosen baseline includes
+`test_matrix_report_meets_milestone_10_3_acceptance`, R0 replaces its obsolete
+success assertion with a **historical evidence regression** under ADR 0010:
+verify 120 cases, the fixed 32/10/77/1 classification census, 42/120 success under
+the old definition, the disclosed exception, and provenance/terminal information
+where the saved schema supplies it. Do not rewrite the JSON, pretend the crash
+was absent, lower the 95% constant, or use `skip`/`xfail`. Scientific tests of
+signs, well identity, cuts, quadrature, and failure accounting remain in force.
+If the old test is absent on main, add the historical evidence check without
+importing the obsolete coordinator just to exercise it. This narrow policy
+migration is already approved; it does not authorize weakening unrelated checks.
 
 ## 3. Physical definition of the metric
 
@@ -281,7 +285,7 @@ Every regular point of \(\Sigma_b^-\) corresponds to exactly one trapped well. T
 - the complicated periodicity of \(\alpha\) is avoided;
 - changes from QI-like to QA- or QH-like winding appear as ordinary topology and homology of curves on \(\Sigma_b^-\).
 
-The production algorithm is organized by independently processed \(B_b\) slices. A shared three-dimensional background mesh is reused, but each \(\Sigma_b^-\) receives its own extracted and adaptively refined triangular mesh.
+The incoming-bounce surface remains the physical state space. The active algorithm represents it by overlapping, root-labelled local charts (§8), sharing field-line scans across fixed-\(b\) slices. A background tetrahedral mesh and a globally cut surface are optional legacy diagnostics, not prerequisites.
 
 ### 4.2 Action and bounce-time quantities
 
@@ -559,7 +563,7 @@ At `GAMMA_MAX`, a well split/merge occurs.
 
 ### 5.3 Generic split/merge relation
 
-Let \(m\in\Gamma_{\max}\). Trace backward along \(-\mathbf B\) to the preceding incoming crossing \(a\). Trace forward from \(m\), ignoring the tangent contact itself, to the next ordinary outgoing crossing \(d\).
+Let \(m\in\Gamma_{\max}\), with preceding ordinary incoming crossing \(a\) and next ordinary outgoing crossing \(d\), ignoring the tangent contact. These define limiting well endpoints. The active implementation obtains them from continued root pairs and forward field-line data; it need not launch a backward scan from \(m\).
 
 At the transition, three limiting wells meet:
 
@@ -573,7 +577,7 @@ Their action lengths satisfy
 A_W=A_{w_1}+A_{w_3}.
 \]
 
-The curve of points \(a\) is the companion transition curve \(T\). Across \(T\), the first-return exit jumps, so \(A\) is multivalued in the geometric projection. The triangular surface mesh must be cut along \(T\), with duplicated vertices carrying the parent and child values separately.
+The curve of points \(a\) is the companion transition curve \(T\). Across \(T\), the first-return exit jumps, so \(A\) is multivalued in the geometric projection. Separate branch records carry the parent and child values. No interpolation may cross that jump; constructing a global mesh cut is not required.
 
 The transition correspondence is pointwise in a common curve parameter \(u\):
 
@@ -595,11 +599,11 @@ If the code detects any of the following, it must refine or report an unresolved
 
 - \(|D_\parallel^{(\zeta)2}B|\) below tolerance;
 - two or more marginal maxima at the same event parameter;
-- a jump in itinerary larger than the generic one-maximum change;
+- a return-root change larger than a generic split/merge, or an unexplained extrema-count change that might conceal a barrier reaching \(b\);
 - several \(\Gamma_{\max}\) components mapping to the same part of \(T\);
 - failure of \(A_W\approx A_{w_1}+A_{w_3}\) under refinement.
 
-Do not arbitrarily decompose a nongeneric event into binary transitions without recording that modeling choice.
+Do not arbitrarily decompose a nongeneric event into binary transitions. An extrema pair born or lost strictly below \(b\), with ordinary endpoints and a certified interior gap, is not a trapping transition. Preserve its diagnostic data without changing well connectivity. Uncertain events may be enclosed instead of completely classified, but their possible connectivity propagates globally (§11); small local measure alone never justifies dropping them.
 
 ---
 
@@ -607,2054 +611,1069 @@ Do not arbitrarily decompose a nongeneric event into binary transitions without 
 
 ```mermaid
 flowchart TD
-    A[Load Boozer equilibrium] --> B[Build shared periodic background tetrahedral mesh]
-    B --> C[Compute denominator V_h]
-    B --> D[Choose adaptive B_b midpoint nodes]
-    D --> E[Extract B = B_b surface]
-    E --> F[Split by g = b dot grad B and retain incoming half]
-    F --> F2[Downsample the incoming surface]
-    F2 --> G[Trace every regular well; compute A, K, exit, extrema, itinerary]
-    G --> H[Extract Gamma_min and Gamma_max]
-    H --> I[Construct companion transition curves T]
-    I --> J[Cut mesh into continuous-return sheets]
-    J --> K[Direct contour tracer for validation]
-    J --> L[Bounded action-atom flood fill from rho = 1]
-    L --> M[Clip reachable parts of triangles]
-    M --> N[Weighted surface quadrature Q(B_b)]
-    N --> O[Adaptive midpoint integration in B_b]
-    C --> P[Form f = integral Q/b^2 divided by 2 V_h]
-    O --> P
-    P --> Q[Convergence report, HDF5 checkpoint, plots and VTK files]
+    A[Load field and source] --> B[Independent trapped-population ledger]
+    A --> C[Shared forward scans and local extrema]
+    C --> D[Root-labelled well atlas at fixed b]
+    D --> E[Barrier-height transition relations]
+    E --> F[Lower and upper action-preserving accessibility]
+    F --> G[Weighted pitch-slice bounds]
+    B --> G
+    G --> H[Adaptive integration in b and final f bounds]
+    H --> I[Refine the uncertainty with largest global influence]
+    I --> D
+    D --> J[Independent direct contour checks]
+    J --> F
 ```
 
-For each \(b\), the algorithm is:
+A valid partial atlas is useful only if its uncovered states and possible links
+are enclosed. A `REGULAR` geometry status or a small local residual is not a
+reachability certificate. Stop at the work budget and return the remaining gap;
+do not turn budget exhaustion into a successful accuracy result.
 
-1. Extract the level surface \(B=b\) from the shared tetrahedral mesh.
-2. Split it along \(g=\mathbf b\cdot\nabla B=0\), retain \(g<0\), and preserve the \(g=0\) curves.
-3. Typically downsample the incoming surface while preserving its topology and tagged boundaries.
-4. At every regular surface vertex, trace the unique well and compute \(A\), \(K\), exit data, extrema, and a lifted return itinerary.
-5. Adaptively refine where field interpolation, \(A\), \(K\), return itinerary, or critical curves are under-resolved.
-6. Construct \(\Gamma_{\max}\) and the companion transition curve \(T\), cut the mesh, and add pointwise transition hyperedges.
-7. Treat \(A\) as a continuous piecewise-linear scalar on each cut sheet.
-8. Seed all \(A\)-contours that intersect `EDGE` as reachable.
-9. Propagate reachable action intervals through ordinary triangles and transition hyperedges to a fixed point.
-10. Integrate \(hK|\omega|\) only over the reachable sub-polygons of each triangle.
-11. Return \(Q(b)\), diagnostics, unresolved-weight bounds, and visualization objects.
+## 7. Magnetic-field evaluation
 
----
+### 7.1 Fourier representation and derivatives
 
-## 7. Magnetic-field evaluation requirements
-
-### 7.1 General Fourier representation
-
-The code must support stellarator-asymmetric fields, not only cosine modes. Represent
+Support cosine and sine coefficients, including asymmetric fields:
 
 \[
-B(s,\theta,\zeta)
-=
-\sum_k
-\left[
-B_k^c(s)\cos\chi_k
-+B_k^s(s)\sin\chi_k
-\right],
+B=\sum_k[B_k^c(s)\cos(m_k\theta-n_k\zeta)
++B_k^s(s)\sin(m_k\theta-n_k\zeta)].
 \]
 
-with
+With \(k=m\iota-n\), evaluate analytic Fourier derivatives:
 
 \[
-\chi_k=m_k\theta-n_k\zeta.
+D_\parallel B=\sum[-kB^c\sin\chi+kB^s\cos\chi],\qquad
+D_\parallel^2B=-\sum k^2[B^c\cos\chi+B^s\sin\chi].
 \]
 
-The existing code reads and evaluates cosine coefficients. Before claiming general-stellarator support, add loading and evaluation of sine coefficients when present in `boozmn` or `booz_xform` output.
+Cache radial coefficients and jointly evaluate field/derivatives at fixed radius.
+Retain all modes unless a separate accepted decision supplies a controlled
+approximation; amplitude alone does not bound topology error.
 
-The field API must provide vectorized evaluation of:
+### 7.2 Field interface and surrogates
 
-- \(B\);
-- \(\partial_s B\), when available;
-- \(\partial_\theta B\);
-- \(\partial_\zeta B\);
-- \(D_\parallel^{(\zeta)}B\);
-- \(D_\parallel^{(\zeta)2}B\);
-- \(G(s)\), \(I(s)\), and \(\iota(s)\).
+Retain `BoozerFieldLike`: `nfp`, `B`, `dB_ds`, `dB_dtheta`, `dB_dzeta`, `D_B`,
+`D2_B`, `iota`, `G`, `I`, with pointwise NumPy broadcasting. Obtain `iota'` and
+other radial derivatives from consistent interpolation where needed. The physical
+sign of tracing uses `sign(G+iota*I)`.
 
-Analytic Fourier derivatives are required. Finite differences may be used only as tests or temporary fallbacks.
+Initially use the original field to accept roots, extrema, and topology decisions.
+A spline can propose scan brackets later, but must carry value/derivative error
+bounds and a check for missed roots before it certifies anything. Agreement at
+sampled points and a tiny value error alone do not establish topology preservation.
 
-For each mode, with \(k=m\iota-n\),
+### 7.3 Axis and radial interpolation
+
+Retain the tested axis continuation: poloidal harmonic \(m\) scales as
+\(\rho^{|m|}\). A chart using \(\alpha\) is singular at \(s=0\); use a regular
+local disk chart, or enclose an omitted core. If a core is omitted, include both
+its own birth weight and every possible accessibility connection through it.
+A small core volume alone does not bound its global connectivity influence.
+
+## 8. Branch-labelled well atlas
+
+### 8.1 Local state representation
+
+In a lifted local chart with \(q=(s,\alpha)\), define
 
 \[
-D_\parallel^{(\zeta)}B
-=
-\sum
-\left[-kB^c\sin\chi+kB^s\cos\chi\right],
+F(q,z;b)=B(s,\alpha+\iota(s)z,z)-b.
 \]
+
+A branch owns an incoming root and its **first** outgoing root in the physical
+field direction, with \(F<0\) between ordinary endpoints. Store the root lifts,
+physical orientation, chart ID, branch ID, coverage interval, endpoint status,
+and error data. Do not impose `z_out > z_in` for negative `G+iota*I`.
+
+The incoming-bounce projection is a local diffeomorphism for \(s>0,g<0\), not
+necessarily a global graph. Several roots and even several points of one connected
+sheet may share \((s,\alpha)\). Each branch has its own action values and integration
+ownership. Continue actual endpoint roots; neither Euclidean proximity, integer
+well count, nor a quantized extrema hash determines identity.
+
+### 8.2 Coverage, periodicity, and overlap
+
+Use a uniform or adaptively controlled transverse mesh first. Overlapping charts
+must identify equivalent states explicitly while assigning each physical incoming
+bounce exactly one integration owner. Retain physical coordinates for cross-checks.
+The seam identification is
 
 \[
-D_\parallel^{(\zeta)2}B
-=
--\sum k^2
-\left[B^c\cos\chi+B^s\sin\chi\right].
+(\alpha,z=L_\zeta)\sim(\alpha+\iota(s)L_\zeta,z=0).
 \]
 
-### 7.2 Field protocol
+This is radius dependent, and any additional integer winding remains authoritative.
+Match neighboring radii as well as neighboring angular samples. An artificial scan
+window boundary is not a well birth, death, transition, or passing boundary.
 
-Define a small protocol so synthetic test fields and future equilibrium backends can be used:
+Continuation from a few seeds does not prove complete coverage. Account for
+unseen disconnected wells, closed barrier loops inside cells, multiple crossings
+on one cell edge, censored scan windows, and uncertain well multiplicity. Uncovered
+regions remain possible states/links in the upper calculation. The independent
+ledger checks weight conservation but cannot locate a missing connection for you.
 
-```python
-class BoozerFieldLike(Protocol):
-    nfp: int
+### 8.3 Measure and local mesh
 
-    def B(self, s, theta, zeta) -> NDArray[np.float64]: ...
-    def dB_ds(self, s, theta, zeta) -> NDArray[np.float64]: ...
-    def dB_dtheta(self, s, theta, zeta) -> NDArray[np.float64]: ...
-    def dB_dzeta(self, s, theta, zeta) -> NDArray[np.float64]: ...
-    def D_B(self, s, theta, zeta) -> NDArray[np.float64]: ...
-    def D2_B(self, s, theta, zeta) -> NDArray[np.float64]: ...
-    def iota(self, s): ...
-    def G(self, s): ...
-    def I(self, s): ...
-```
+On each owned regular branch, the measure is exactly \(|ds\,d\alpha|\).
+With \(x_\alpha=\sqrt{s}\cos\alpha,y_\alpha=\sqrt{s}\sin\alpha\), it is
+\(2|dx_\alpha\,dy_\alpha|\). A cell's area times its well count is valid only
+when that multiplicity and ownership are established throughout the cell.
 
-The existing `BoozerField` should implement this interface directly or through an adapter.
+Triangulate local branch cells when useful for piecewise-linear (PL) actions and
+quadrature. PL means linear inside each triangle. Never interpolate across a
+return discontinuity. Local boundary-bank IDs are distinct from global connected
+sheet IDs: two banks of a slit may belong to the same connected sheet. A global
+cut of an extracted 3-D surface is not required.
 
-### 7.3 Axis behavior
+### 8.4 Refinement and certificates
 
-The logical mesh should be axis regular, but the Fourier interpolation must also have a controlled axis limit. For a smooth scalar, the poloidal harmonic \(m\) should scale as \(\rho^{|m|}\).
+Refine on root-conditioning/coverage failure, action interpolation error, barrier
+uncertainty, ambiguous chart matching, quadrature error, or global accessibility
+influence. Local bounds must include field evaluation/interpolation error.
+For a local extremum height \(H(q)\), a Taylor exclusion test using
+\(|H(q_0)-b|>\|\nabla H(q_0)\|r+Mr^2/2\) requires a validated Hessian bound
+\(M\) on the entire cell and proof that the same branch exists there.
+A few midpoint probes do not supply that bound or certify a unique crossing.
 
-The implementation must do one of the following before including axis-intersecting topology in a production result:
+Near an extremum fold, the Hessian can grow without bound as curvature vanishes.
+Use a separate enclosure/local solve or leave uncertainty; never present the
+Taylor test as a universal certificate. Unknown cells do not have known exact
+multiplicity or exact local weight merely because their geometric area is known.
 
-1. implement and test an axis-regular radial interpolation that enforces the expected harmonic scaling; or
-2. exclude \(s<s_{\min}\), compute an explicit upper bound from the omitted source-weighted volume, and demonstrate convergence as \(s_{\min}\to0\).
+## 9. Shared forward scans and bounce integrals
 
-The preferred final implementation is option 1. Option 2 is acceptable as an intermediate milestone, but the result object must report the omitted-core bound.
+### 9.1 Catalogue and cache
 
----
+Scan \(B\) along each lifted field line independently of \(b\). Store ordered
+extrema, bracket information, scan coverage and root-completeness limitations.
+For different pitches, query the same catalogue for maximal \(B<b\) intervals.
+A per-line merge hierarchy (which allowed intervals join as \(b\) crosses a peak)
+is a query accelerator, not a globally stable well label.
 
-## 8. Mesh strategy
+Share work among neighboring queries and resume scans rather than restarting at
+a larger cap. Cache keys include field identity, radius, orientation, lift/window,
+resolution/error controls, and coverage. An end of available data is censored,
+not a physical outgoing bounce. Global extrema-count completeness is unnecessary
+where a certified bound already excludes any hidden barrier at the relevant \(b\).
 
-### 8.1 Authoritative numerical representation
+### 9.2 Root completeness and failure
 
-All authoritative geometry and topology must be stored as NumPy arrays and integer IDs. PyVista, VTK, Gmsh, Matplotlib, and NetworkX objects are views or helpers, not the source of truth.
+Bracket and refine the first ordinary crossing with analytic derivatives and
+safeguarded root solvers. Validate the physical incoming/outgoing signs and the
+allowed interior. A Fourier-aware scan is a starting resolution, not proof that
+an unobserved shallow extremum pair cannot exist. Use validated derivative/value
+bounds or explicitly retain the potentially missed barrier region.
 
-```python
-@dataclass
-class BackgroundMesh:
-    points: FloatArray          # shape (n_points, 3), columns x, y, zeta
-    tetrahedra: IntArray        # shape (n_tets, 4)
-    periodic_node_pairs: IntArray
-    boundary_tags: IntArray
-    B: FloatArray
-    D_B: FloatArray
-    D2_B: FloatArray
-```
+`MAX_PERIODS`, `ROOT_FAILURE`, `QUADRATURE_FAILURE`, tangent limits and uncertain
+coverage remain distinct. A cap does not prove passing or zero accessibility.
+The old incoming-root polishing controls remain valid for legacy callers.
 
-### 8.2 Background mesh
+### 9.3 Batched action and time quadrature
 
-The shared background mesh covers
+Compute \(A,K\) from §4.2 with the physical \(|C|/B\) line element. For ordinary
+endpoints use an endpoint-regularizing transform, for example
 
 \[
-\{(x,y,\zeta):x^2+y^2\le1,\ 0\le\zeta\le L_\zeta\}
+z(t)=\frac{z_-+z_+}{2}+\frac{z_+-z_-}{2}\sin t,
+\quad -\pi/2\le t\le\pi/2,
 \]
 
-with periodic identification of the end disks.
+and integrate with the absolute transformed line element. Batch composite
+Gauss–Legendre evaluations, using relevant extrema as breakpoints. Preserve stable
+endpoint differences and a summed global integration error budget. Comparing
+orders \(n\) and \(2n\) is an error estimate, not automatically a rigorous bound;
+retain an independent adaptive reference and fallback or unresolved status.
 
-Provide two backends:
+Fix near-tangent cancellation/termination defects by diagnosis and independent
+reference values, never by loosening the production tolerance to make a failure
+disappear. At an exact separatrix, limiting \(A\) can be finite while \(K\)
+diverges. Do not fabricate finite critical-vertex time values.
 
-1. `StructuredPrismMeshBackend` for deterministic unit tests and early development;
-2. `GmshBackgroundMeshBackend` for production-quality tetrahedra and spatially varying resolution.
+### 9.4 Optional orbit-window reuse and long-return solvers
 
-The structured backend may triangulate a disk, extrude the triangles through uniformly spaced \(\zeta\) planes, and split each triangular prism into consistently oriented tetrahedra. The periodic seam must have matching nodes and connectivity.
+After the ordinary chart baseline is correct, consecutive windows of one long
+scan may provide multiple field-line labels. This can replace repeated lookahead
+by shared coverage. Near rational rotational transform, one orbit may cluster or
+fail to cover the angular domain: use multiple orbits or a controlled fallback.
+Finite last-to-first closure and radial shear must be verified, not assumed.
 
-The Gmsh backend should:
+A circle-rotation first-hit solver remains a later option if measured costs still
+warrant it. It must certify crossing intervals, first-hit order, rational cases,
+and accumulated integrals. None of the exploratory appendix timings or rare-tail
+fractions is an accepted production bound or speed guarantee.
 
-- mesh a logical cylinder, not the physical torus;
-- declare the end disks periodic;
-- export the periodic node map explicitly;
-- support size fields near the axis, small \(|\nabla B|\), and known critical regions;
-- close Gmsh after extracting plain arrays.
+### 9.5 Identity versus diagnostic itinerary
 
-### 8.3 Surface extraction
+Store extrema and winding for diagnostics and quadrature. Define physical branch
+continuity by continued entry/first-exit roots and absence of a new \(B=b\) barrier.
+An interior min/max pair can appear below \(b\) without changing this branch.
+Replace any obsolete extrema-count veto with a barrier/root certificate; do not
+merely disable the warning. Do not demand a complete global catalogue of irrelevant
+below-\(b\) folds before computing a useful enclosure.
 
-Define a `SurfaceExtractor` interface. Implement in stages:
+## 10. Barrier-height transitions
 
-- a PyVista/VTK contour backend for rapid development and visualization;
-- a custom marching-tetrahedra backend with parent-edge provenance for production.
+### 10.1 Local height fields
 
-The production extractor should:
-
-1. find every tetrahedron intersected by \(B=b\);
-2. locate each edge root, initially by linear interpolation and then by a bracketed scalar root solve along the background edge;
-3. triangulate the intersection polygon consistently;
-4. preserve the parent tetrahedron and parent edge IDs;
-5. identify and merge periodic seam copies;
-6. carry domain-boundary provenance so `EDGE` and `AXIS` can be tagged robustly.
-
-The output is the full \(B=b\) surface. A second marching-triangles operation on the scalar \(g=\mathbf b\cdot\nabla B\) splits each triangle along \(g=0\), retains \(g<0\), and records the boundary polylines.
-
-### 8.4 Surface refinement
-
-A pitch slice must be independently refinable without modifying unrelated \(b\) slices.
-
-During a calculation of \(f\), the incoming pitch surface should typically be
-downsampled after extraction and the \(g=0\) split, but before bounce integrals
-are evaluated at its vertices. The background volume mesh may need to be fine
-enough to recover the correct level-set topology without the later surface
-calculation needing to inherit its full triangle count. Prefer
-topology-preserving shortest-edge collapse or an equivalent method that also
-reduces the population of very small triangles and makes triangle sizes more
-uniform. Downsampling must preserve every connected component and all `EDGE`,
-`AXIS`, periodic-seam, `G_ZERO`, and unresolved-boundary provenance; moved
-vertices must be projected back to \(B=b\), and no accepted collapse may change
-the physical sign of \(g\) or invert a triangle. Bound drift in the scalar
-axis-regular \(|ds\wedge d\alpha|\) measure both globally and separately on
-every connected component during coarsening; triangle count alone is not an
-accuracy criterion. A downsampling result must report the achieved triangle
-count and rejection counts for its safety checks so a binding constraint is
-visible. These scalar measure budgets prevent cancellation between components,
-but they do not prevent local or within-component cancellation and do not
-directly bound weighted bounce integrals. The requested reduction remains
-subordinate to these invariants, later adaptive refinement, and convergence of
-the final \(f\).
-
-Downsampling occurs before \(A\), \(K\), and return-map data are attached to
-vertices. Later adaptive refinement may add vertices back where those
-quantities or the critical curves require more resolution. Never downsample
-across a transition cut.
-
-Refinement indicators include:
-
-- geometric error of \(B=b\);
-- nonlinear variation of \(A\) or \(K\);
-- changes in lifted exit point or field-period count;
-- changes in extrema sequence;
-- proximity to \(\Gamma_{\min}\), \(\Gamma_{\max}\), or \(T\);
-- mixed or unresolved reachability;
-- large variation in the final weight \(hK|\omega|\).
-
-New surface vertices must be projected back to \(B=b\). Use a safeguarded Newton or secant correction, with periodic coordinates unwrapped locally. Never project across a transition cut.
-
----
-
-## 9. Well tracing and bounce quadrature
-
-### 9.1 Trace input and output
-
-A regular incoming surface point \(q_-=(s,\theta_-,\zeta_-)\) satisfies
+For a nondegenerate along-line extremum at \(z_j(q)\), define
+\(H_j(q)=B(s,\alpha+\iota(s)z_j,z_j)\). It is independent of pitch and smooth
+locally while \(D_\parallel^2B\ne0\). Its gradients are
 
 \[
-B(q_-)=b,
-\qquad g(q_-)<0.
+\partial_\alpha H_j=\partial_\theta B|_j,\qquad
+\partial_s H_j=\partial_s B|_j+\iota'(s)z_j\partial_\theta B|_j.
 \]
 
-The trace follows \(+\mathbf B\). Let
+Track extrema branches locally with safeguarded continuation. Their heights and
+local domains can be reused across pitches. The level curves \(H_j=b\) locate
+candidate marginal barriers; determine which entry/exit branches own each barrier
+before creating a transition. Not every extremum on a line belongs to every well.
+
+### 10.2 Generic ports and common parameter
+
+For a certified generic split, store the three limiting branches of §5.3 with
+separate actions, orientation/lift data, and a common physical event parameter
+\(u\). A transition port is the boundary curve on one incident branch.
+Transfer at the **same event position**, adopting the destination action;
+never match ports just by overlapping action ranges or nearest coordinates.
+The child-3 incoming point can lie several windows away. Preserve the exact
+radius-dependent seam map and integer lift in its correspondence.
+
+Check action additivity by independent parent/child integrals and one-sided limits.
+Minima create/destroy zero-action wells without positive-action transfer. A branch
+becoming passing terminates that route; it is not a bridge to another trapped state.
+
+### 10.3 Events and partial geometry
+
+Equal-height contacts, degenerate endpoints, coincident symmetry curves, and
+uncertified crossings may remain enclosed with all possible incident branches.
+Resolve locally only when their global influence prevents the error target.
+The new path does not require choosing among the old event-kind certifications
+before any neighboring regular state can contribute.
+
+Nevertheless, small or zero event measure does not prove small accessibility
+influence, and shrinking local cells does not by itself prove gap convergence.
+Track possible links through event cells in §11. A logarithmic separatrix model
+requires nonzero curvature and a remainder bound; it is not a universal bound
+at a degenerate endpoint where that curvature vanishes.
+
+### 10.4 Transition interpolation
+
+Subdivide port curves into monotone/constant action segments with bounded
+interpolation error. Store common-parameter domains and full preimages for
+constant maps. Preserve arbitrary port counts and self-transitions (ports on the
+same connected sheet). A numerical root solution is accepted to its error budget,
+not described as an exact continuous-field transition.
+
+### 10.5 Legacy geometry
+
+Keep existing background/extraction/cutting APIs and their independent invariants.
+Use resolved reference cuts as comparisons and 3-D diagnostics. When changing that
+legacy path, still test both mesh backends and both extractors, bounded mapping
+budgets, periodic provenance, and no interpolation across duplicated banks.
+Historical notes and ADRs describe that path; they are not prerequisites for the
+atlas pipeline. A coarse sheet-incidence graph never determines accessibility.
+
+## 11. Action-preserving accessibility
+
+### 11.1 Direct contour oracle
+
+Implement a field-based, branch-aware predictor-corrector contour follower, rather
+than requiring the production atlas triangulation. It follows \(A=\text{constant}\)
+with continued bounce roots, explicit seams, event branching, closure and saddle
+handling. Any action gradient includes radial changes in \(C\), the magnetic field,
+and \(\iota\); do not drop terms because endpoint contributions vanish.
+
+An unsuccessful finite trace is unresolved, not unreachable. Verify all branches
+closed/terminated before certifying a negative answer. Memoization cannot merge
+disconnected contours with equal action. Return witness paths for positive answers
+and reasons for completed negative or unresolved answers.
+
+This oracle shares field/quadrature components but uses independent contour geometry.
+Compare certified classifications away from uncertainty boundaries; continuous-field
+and PL results need not agree exactly near a finite-resolution boundary.
+
+### 11.2 Finite action and event-parameter bins
+
+The initial production algorithm uses finite bins (the old design's action atoms)
+per branch/cell and bins in \(u\) per monotone transition segment. Keep explicit
+spatial adjacency. On a triangle with linear \(A\), a regular local level contour
+is a single segment. Ordinary propagation preserves the action exactly before
+conservative discretization. Equal numerical action in disconnected cells creates
+no link.
+
+For each exact local transfer, the lower calculation takes bins wholly contained
+in its proven image; the upper takes every bin intersecting its possible image.
+Include all interpolation/geometry error bands appropriate to each result's scope.
+Both worklists terminate because only finitely many bits can change. Constant
+maps use their full preimage, not division by a zero slope.
+
+### 11.3 Edge seeds, transitions and global uncertainty
+
+Seed action values actually attained on the physical `EDGE`, with lower/upper
+handling of uncertainty. Ordinary cell links preserve action. Transition links
+map reachable action values back to the common \(u\), then forward through **all**
+allowed ports at that \(u\), adopting each port's action.
+
+The lower calculation uses only certified paths. The upper must cover every
+physically possible connection through unknown geometry, omitted branches/cores,
+capped wells and events. An unresolved region may be represented as a wildcard
+joining its possible boundary states, but its incidence must itself conservatively
+cover missing states. A wildcard touching the plasma edge must allow edge arrival.
+One convenient but loose wildcard is acceptable as an upper enclosure, never as
+an exact description or a lower connection.
+
+Propagate unknown influence through the whole graph. A resolved cell can remain
+uncertain if its only possible edge route uses an unresolved event elsewhere.
+Refinement priority uses the resulting global weighted gap, not the local size
+of the problematic cell. Contributions from multiple wildcards can overlap;
+do not add overlapping influence masses or claim unique attribution without a
+counterfactual calculation.
+
+### 11.4 Cycles, termination and critical values
+
+Transition cycles may generate indefinitely many distinct actions. There is no
+general contraction theorem or geometric tail bound for them, especially with
+undirected inverse maps. Finite bins remain the correctness path. Continuous
+interval propagation may accelerate it only with a work cap and a checked result.
+
+Refining action/parameter bins on a fixed certified geometry should grow the
+inner set and shrink the outer set. For geometry changes, certify how previous
+bounds are transported before asserting nesting. Handle constant-action cells,
+equal vertex values, saddles, and constant port maps explicitly; symbolic
+perturbation must not manufacture finite-weight links or erase flat regions.
+
+### 11.5 Reeb graphs are optional compression
+
+A Reeb point represents one connected constant-\(A\) contour. Moving along a Reeb
+edge changes \(A\), so ordinary connected components of a Reeb graph are **not**
+edge accessibility. On a no-transition annular sheet with \(A=s\) and `EDGE` at
+\(s=1\), all interior contours are inaccessible although the Reeb graph is one
+connected interval. Keep this as a regression for every reachability backend.
+
+A future Reeb representation must carry reachable subsets of its edges and the
+same pointwise transition maps/bounds as above. Neither two union-finds, a few
+samples between initial critical values, nor a presumed geometric cycle remainder
+replaces the finite action-preserving calculation.
+
+## 12. Weighted integration and the population ledger
+
+### 12.1 Independent total trapped population
+
+Let \(\chi_{\rm tr}(s,\theta,\zeta;b)\) indicate that the allowed field-line
+interval containing the point is genuinely bounded by bounces. Then
 
 \[
-\sigma_\zeta=\operatorname{sign}(G+\iota I).
+Q_{\rm total}(b)=\int ds\,d\theta\,d\zeta\,
+\frac{h(\sqrt{s})|C(s)|}{B\sqrt{1-B/b}}
+\,[B<b]\,\chi_{\rm tr}.
 \]
 
-Then unwrapped \(\zeta\) advances with sign \(\sigma_\zeta\), and
+This is the total well weight before accessibility is imposed. If field lines
+are dense on their flux surfaces for almost every radius, one may replace
+\(\chi_{\rm tr}\) on \(B<b\) by \([B_{\max}(s)>b]\), with equality/tangent
+limits handled separately. Do not use this shortcut on a rational-transform
+plateau without analysis. For example, \(\iota=0,B=2+\cos\theta\) independent
+of \(\zeta\) has no trapped wells, even though some points have
+\(B<b<B_{\max}(s)=3\). A surface-maximum formula is then an upper count,
+not an equality. Use linewise trapping, a justified dense-line assumption, or a
+conservative enclosure and record which was used.
+
+Under the dense-line assumption the total trapped fraction can also be computed
+without singular pitch-slice quadrature:
 
 \[
-\theta(\zeta)=\theta_-+\iota(s)(\zeta-\zeta_-).
+T=\frac1{V_h}\int ds\,d\theta\,d\zeta\,
+\frac{h(\sqrt{s})|C|}{B^2}\sqrt{1-\frac{B}{B_{\max}(s)}}.
 \]
 
-Return a `WellTrace` record:
+Use validated bounds on the surface maxima and quadrature when claiming an
+upper/lower enclosure. An optimization result or a coarse sampled maximum is not
+a proven upper bound. R0 establishes exact synthetic controls and explicit error
+scope before relying on real-field ledger bounds.
 
-```python
-@dataclass
-class WellTrace:
-    status: TraceStatus
-    b: float
-    q_in: FloatArray                 # reduced logical coordinates
-    q_out_reduced: FloatArray
-    zeta_out_unwrapped: float
-    field_period_count: int
-    action_length: float             # A
-    bounce_time_length: float        # K
-    extrema_zeta_unwrapped: FloatArray
-    extrema_B: FloatArray
-    extrema_kind: IntArray           # -1 maximum, +1 minimum
-    n_internal_maxima: int
-    itinerary_hash: np.uint64
-    B_residual_in: float
-    B_residual_out: float
-    quadrature_error_A: float
-    quadrature_error_K: float
-```
+### 12.2 Accounting rules
 
-### 9.2 Root search
-
-Use a two-stage procedure:
-
-1. **Scan:** sample \(F(\zeta)=B(s,\theta(\zeta),\zeta)-b\) along unwrapped \(\zeta\), beginning just inside the well. Detect the first regular negative-to-positive crossing in the \(+\mathbf B\) direction.
-2. **Refine:** use `scipy.optimize.brentq` or a safeguarded in-house solver on the bracket.
-
-The scan must also locate extrema by roots of
+Maintain disjoint ownership of definitely accessible, definitely inaccessible,
+and unresolved birth weight. For a slice, let \(M_R^L\) and \(M_N^L\) be lower
+weight bounds for definitely reachable and definitely nonreachable states, where
+nonreachability comes from the **upper** connectivity calculation. Then
 
 \[
-D_\parallel^{(\zeta)}B=0.
+Q_L=M_R^L,\qquad Q_U=Q_{\rm total}^{U}-M_N^L.
 \]
 
-A nearly tangent contact with \(F=0\) and \(D_\parallel^{(\zeta)}B\approx0\) is a transition candidate, not an ordinary outgoing crossing.
-
-The scan step must adapt to the highest retained Fourier mode or to local variation of \(B\). A fixed number of samples per field period is acceptable only with a demonstrated convergence study.
-
-### 9.3 Long wells
-
-Near the trapped-passing boundary, the exit may be many field periods away. The trace must retain unwrapped \(\zeta\) and may continue across arbitrary periodic seams.
-
-A configurable maximum period count is allowed, but reaching it yields `TraceStatus.MAX_PERIODS`, not \(\Theta=0\). The result must include an upper bound or unresolved-weight estimate, and convergence must be checked by increasing the cap.
-
-### 9.4 Endpoint-regularized quadrature
-
-For ordinary roots, map the interval to \(t\in[-\pi/2,\pi/2]\), for example
-
-\[
-\zeta(t)=\frac{\zeta_-+\zeta_+}{2}
-+\frac{\zeta_+-\zeta_-}{2}\sin t.
-\]
-
-The Jacobian vanishes at the endpoints and removes the inverse-square-root singularity from \(K\). Use adaptive Gauss-Kronrod quadrature or a fixed high-order rule with an error estimate.
-
-The implementation should provide one shared evaluator that returns both \(A\) and \(K\) from the same field samples when practical.
-
-### 9.5 Itinerary signature
-
-`n_internal_maxima` is a useful transition diagnostic but is not a sufficient unique sheet label. The itinerary should include:
-
-- lifted exit \(\zeta_+\);
-- field-period count;
-- reduced exit coordinates;
-- ordered extrema kinds;
-- ordered extrema positions modulo and beyond the field period;
-- extrema heights relative to \(b\).
-
-A stable hash may be formed from a quantized version for quick comparisons, while the unquantized arrays remain authoritative.
-
-Adjacent vertices are on the same continuous-return sheet only when the lifted exit and extrema sequence vary continuously.
-
----
-
-## 10. Transition construction and mesh cutting
-
-### 10.1 Extract \(\Gamma_{\max}\)
-
-After splitting \(\Sigma_b\) by \(g=0\), classify every `GAMMA` segment using \(D_\parallel^{(\zeta)2}B\). Refine any segment whose classification changes or is near zero.
-
-Parameterize each connected \(\Gamma_{\max}\) polyline by cumulative arc length in the logical surface mesh. Preserve periodic seam continuity.
-
-### 10.2 Construct the companion curve \(T\)
-
-For sampled points \(m(u)\in\Gamma_{\max}\):
-
-1. trace backward along \(-\mathbf B\);
-2. find the preceding regular incoming crossing \(a(u)\);
-3. trace forward from \(m(u)\), past the tangent contact, to the next regular outgoing crossing \(d(u)\);
-4. compute the three limiting actions
-   \[
-   A_1(u)=A[a,m],\quad
-   A_3(u)=A[m,d],\quad
-   A_W(u)=A[a,d];
-   \]
-5. verify
-   \[
-   A_W-A_1-A_3
-   \]
-   is within the transition tolerance.
-
-The points \(a(u)\) form \(T\).
-
-`TransitionMappingConfig.max_curve_samples` is a work budget, not a uniform
-coarsening request. For a bounded run, start from a deterministic coarse subset
-of the authoritative critical-curve vertices and recursively map the existing
-vertex nearest the arc-length midpoint of each uncertified interval. Retain
-every mapped vertex. Compare its companion/marginal geometry and all three
-actions with interpolation from the interval endpoints; refine on geometric or
-action disagreement, a detected interior-maximum itinerary/count change, `EDGE`
-proximity, or near self-contact. Near `EDGE`, resolve the local interval down to
-adjacent authoritative vertices. The near-self-contact trigger is span-relative:
-split the interval, then reevaluate the threshold on its shorter children; it may
-cease to trigger before adjacency. `None` maps every authoritative vertex.
-
-The geometric test is
-`error <= curve_geometry_atol + curve_geometry_rtol * interval_u_length`, and
-each port's action test is
-`error <= curve_action_atol + curve_action_rtol * max(abs(endpoint/midpoint A))`.
-The absolute tolerances have logical-distance and action-length units
-respectively. `curve_edge_proximity` is a normalized-flux distance `1-s` from
-the plasma edge, and `curve_self_contact_ratio` scales a logical distance by the
-current interval's arc length. These are reported controls, not universal
-accuracy guarantees: certification is relative to the existing authoritative
-critical-curve resolution and detected root-scan itinerary. Features below
-either resolution remain §21.3 convergence work.
-
-Every mapped midpoint is retained, replacing a rejected parent chord. Adjacent
-authoritative vertices provide no further midpoint to test: reaching that terminal
-PL resolution does not establish a continuous sub-vertex error bound.
-
-If this certification cannot finish within the budget, return
-`TransitionStatus.BUDGET_INSUFFICIENT`, retain finite mapped samples and explicit
-uncertified source-index intervals, and do not cut. `sampling_samples_used`,
-`authoritative_sample_count`, `sampling_certified`, `sampling_reason`, and the
-largest midpoint discrepancies encountered make the budget outcome
-machine-readable. Existing physical/numerical sample failures keep their own
-statuses. `map_transitions_budget_sweep` reuses unique vertex traces with all
-non-budget controls fixed, without changing any budget's retained sample set or
-decision.
-
-Early numerical/nongeneric stops retain the stopping interval and all other
-uncertified source-index intervals. An explicit stop flag controls certification;
-human-readable diagnostic wording does not control it. The physical/event reason
-takes precedence over budget exhaustion when both occur on the last allowed sample.
-
-`localize_transition_contacts` refines each count-change bracket on the true
-`B=b, g=0` curve. Its default budget is 20 new midpoint traces per original
-bracket, shared if an intermediate count splits that bracket; the final `u`
-interval target is `1e-5`. Failed traces and exhausted intervals remain explicit.
-Two endpoint rescans at twice the root-scan density, and a corrected midpoint,
-may dissolve an alias only when the refined counts agree, the ordinary crossings
-and actions remain within their existing solve/quadrature tolerances, and the
-midpoint passes the geometry/action interpolation checks above. All probes are
-retained. A below-`b` fold is not dismissed merely because the highest barrier
-stays below `b`.
-
-An equal-height event requires both maxima to satisfy `B=b`, `D_parallel B=0`,
-and negative curvature on one lifted field line. Events shared by source curves
-must match all marginal points and their lifted separations. Exactly sampled
-nongeneric contacts also become explicit events; uncertain event geometry is
-retained without inventing a location or a binary decomposition (§5.4).
-
-`build_transition_arcs` subdivides at these events and computes one-sided limiting
-actions by independent parent and child integrals. It preserves the source `u`
-parameter and continuously aligns all field-line lifts. Each arc independently
-certifies its remaining source intervals using the unused original source-vertex
-budget. Localization traces have their separate budget. A failed endpoint build
-retains the source mapping as diagnostic data and explicitly records the requested
-unresolved `source_interval`; it does not claim finite limiting endpoint data or
-permit a cut. `None` still means every authoritative source vertex is mapped,
-not that continuous sub-vertex errors have been bounded.
-
-### 10.3 Align \(T\) with the triangular mesh
-
-Only a regular, sampling-certified transition may enter this operation. A
-budget-insufficient transition remains an explicit unresolved hyperedge with
-all ports and the budget reason; it is never ordinary missing connectivity.
-This gate applies separately to each arc after milestone 10.2 localization.
-
-The production implementation should insert \(T\) as a constrained polyline:
-
-1. locate each sample in a surface triangle;
-2. trace the polyline through crossed triangles;
-3. split crossed edges and triangles;
-4. snap or project new vertices to \(B=b\);
-5. duplicate the final polyline vertices and edges;
-6. assign parent action values to one copy and child-1 values to the other;
-7. use the matched \(\Gamma_{\max}\) copy for child 3.
-
-Insertion helpers may interpolate from a `T` vertex before that vertex has
-received its limiting branch action. Preserve their interpolation dependency
-chain and refresh off-cut descendants after port assignment, using each
-stencil vertex's copy on the descendant's own sheet. Never retain a stale
-parent/child blend. A stencil that genuinely crosses the final cut is
-unresolved (`NaN` action), not an interpolation across the discontinuity;
-later stages must account for that unresolved action under §21.2.
-
-At event junctions, insert shared endpoint anchors before constraints. When a
-folded field-line chart prevents the ordinary local insertion, a bounded path
-through actual adjacent triangle faces may split crossed edges while retaining
-component and cell provenance (ADR 0006). Existing constraints and physical
-boundaries are barriers; each crossing must satisfy the existing local distance
-allowance, and the path is limited to `max_corridor_faces=64`. This is local
-constrained insertion, not global chart retriangulation. Degree checks prohibit
-branches or dangling companion cuts away from `EDGE` or an explicit event.
-
-The separate snap to an existing vertex on the projected segment uses a
-chord-scaled physical offset allowance in normal-plane insertion:
-`max_surface_distance_ratio * physical_chord_length`. It does not move that
-vertex. This allowance can exceed the crossed-edge allowance when the anchor
-budget leaves a long chord; preserve component provenance and require the same
-connected-chain and decisive side-assignment checks. Report it as a remaining
-surface-resolution control, not a local-edge error bound or convergence result.
-
-Side assignment uses the existing decisive action comparison. Unrepresentable
-arcs retain all ports and their reasons. If an uncut incident arc leaves different
-one-sided event limits on one mesh vertex, retain those values on their distinct
-ports and set that vertex's action to `NaN`, with its ID recorded in
-`unresolved_event_action_vertex_ids`. Never overwrite one limit with another.
-`CutSurface.unresolved_action_flux` measures every triangle containing unknown
-action using §4.4's dimensionless `|ds wedge d alpha|`; this is not a bound on
-`K`-weighted volume or on reachability. Event/transition connectivity uncertainty
-remains separate. The NPZ format preserves arbitrary event-port endpoint
-incidence, unknown-action vertex IDs, unresolved arc reasons, and insertion counts.
-Matrix-level background/local refinement remains milestone 10.3 work.
-
-For an earlier prototype, a mesh-aligned approximation based on itinerary changes across edges is acceptable, provided the direct backward map from \(\Gamma_{\max}\) is used to validate the location and branch correspondence.
-
-### 10.4 Transition representation
-
-```python
-@dataclass
-class TransitionPort:
-    sheet_id: int
-    polyline_vertex_ids: IntArray
-    action_values: FloatArray
-    role: Literal["parent", "child", "generic"]
-
-@dataclass
-class TransitionCurve:
-    transition_id: int
-    u: FloatArray
-    ports: tuple[TransitionPort, ...]
-    marginal_points: FloatArray
-    additivity_residual: FloatArray
-    status: TransitionStatus
-```
-
-Subdivide a transition curve at extrema of any port function \(A_p(u)\). On each resulting segment, every \(A_p(u)\) is piecewise linear and monotone or constant, which makes interval transfer unambiguous.
-
-### 10.5 Sheet graph
-
-After cutting, use union-find or mesh connectivity to assign `sheet_id` to each connected triangular component. Build a coarse NetworkX diagnostic graph:
-
-- sheet nodes;
-- transition nodes;
-- incidence edges;
-- attributes such as `touches_edge`, action range, area, and unresolved flags.
-
-This coarse graph is useful for inspection but is **not sufficient to compute \(\Theta\)** because only some action contours on a sheet may reach the edge or a transition.
-
----
-
-## 11. Reachability algorithms
-
-Two reachability implementations are required:
-
-1. a direct contour tracer used as a transparent correctness oracle;
-2. a bounded interval/finite-atom flood fill used for production quadrature.
-
-A continuous interval worklist is an optional accelerator, not the sole production correctness path.
-
-### 11.1 Direct piecewise-linear contour tracer
-
-On each cut sheet, \(A\) is continuous and piecewise linear. For a query point \(q\), let \(a=A(q)\). Within a triangle, the level set \(A=a\) is a line segment, a point, or a degenerate edge.
-
-The tracer should:
-
-1. locate the starting triangle;
-2. determine the two edge intersections of \(A=a\);
-3. walk across adjacent triangles;
-4. use explicit periodic adjacency;
-5. detect closure and already visited directed triangle-edge states;
-6. report success on reaching `EDGE`;
-7. at a transition port, map the event parameter \(u\) to every other port and recursively continue at each new action value;
-8. terminate only when all branches have closed or ended without reaching the edge.
-
-Memoize completed contour components when useful.
-
-This method is too expensive for every quadrature point but is essential for tests and interactive debugging.
-
-### 11.2 Interval set primitive
-
-Implement a tested `IntervalSet` using sorted, disjoint closed intervals:
-
-```python
-class IntervalSet:
-    def add(self, lo: float, hi: float) -> bool: ...
-    def union(self, other: "IntervalSet") -> bool: ...
-    def intersection(self, lo: float, hi: float) -> "IntervalSet": ...
-    def affine_preimage(self, y0, y1, x0, x1) -> "IntervalSet": ...
-    def affine_image(self, x0, x1, y0, y1) -> "IntervalSet": ...
-```
-
-Requirements:
-
-- deterministic tolerance handling;
-- no order dependence;
-- correct constant-map behavior;
-- compact serialization through `offsets` and `bounds` arrays;
-- property-based tests for union, idempotence, monotonicity, and affine maps.
-
-### 11.3 Interval flood fill on triangles
-
-For each cut triangle \(c\), store
-
-\[
-L(c)\subseteq[A_{\min}(c),A_{\max}(c)],
-\]
-
-a union of action intervals whose local contours are edge connected.
-
-#### Seed
-
-For every triangle adjacent to an `EDGE` boundary edge \(e\), add the action range on that edge:
-
-\[
-I_e=[\min(A_i,A_j),\max(A_i,A_j)].
-\]
-
-#### Ordinary propagation
-
-For an ordinary edge \(e\) shared by triangles \(c\) and \(c'\), propagate
-
-\[
-L(c')\leftarrow
-L(c')\cup\left(L(c)\cap I_e\right),
-\]
-
-and conversely. For a linear scalar on a triangle, every regular contour is a single segment, so this propagation is exact for the piecewise-linear interpolant.
-
-Use a work queue containing triangles whose interval set has changed.
-
-#### Transition propagation
-
-Represent each monotone transition segment by a shared parameter interval \([u_0,u_1]\) and one affine action function per port.
-
-Maintain a reachable `IntervalSet` in \(u\) for the transition segment. When a port-adjacent triangle gains reachable action values:
-
-1. intersect with the port edge’s action range;
-2. take the full affine preimage in \(u\);
-3. add it to the transition segment’s reachable \(u\)-set.
-
-When the transition’s \(u\)-set changes:
-
-1. map it forward through every incident port’s action function;
-2. add the resulting action intervals to the adjacent triangles.
-
-The existential rule is therefore logical OR over all ports.
-
-#### Termination and production discretization
-
-A continuous `IntervalSet` worklist is a useful fast algorithm, but it is not by itself a finite-termination guarantee. A cycle containing affine transition maps can generate an arbitrarily long sequence of new interval endpoints, even though the underlying triangular mesh is finite. Therefore version 1 must not base correctness only on the statement that all endpoints come from a finite set.
-
-The production implementation must provide a **bounded finite-atom mode**:
-
-1. Choose an action grid for each pitch slice or sheet and a parameter grid on every monotone transition segment.
-2. Represent reachable sets by sparse bitmasks or runs of action/parameter atoms.
-3. Whenever an exact interval is propagated, form two snapped images:
-   - an **inner** image containing only atoms wholly contained in the exact interval;
-   - an **outer** image containing every atom that intersects the exact interval.
-4. Run the same worklist separately for the inner and outer masks. Both terminate because only finitely many bits can change.
-5. Interpret the inner result as definitely reachable, the complement of the outer result as definitely unreachable, and the difference as unresolved.
-6. Refine action and transition-parameter atoms wherever the unresolved phase-space weight is significant.
-
-The continuous interval mode may be retained as an accelerator and exploratory diagnostic. It must have an iteration cap, report whether it stabilized, and be checked against the bounded finite-atom result and direct contour traces. The quoted value of \(f\) must come with lower and upper bounds obtained from the inner and outer reachable sets.
-
-### 11.4 Bounded finite-atom flood fill
-
-The finite-atom implementation should use the same physical propagation rules as the continuous interval method:
-
-- ordinary triangle-to-triangle links preserve action;
-- transition links preserve the common event parameter \(u\), not action;
-- periodic identifications are explicit mesh adjacencies;
-- no atom is connected merely because its numerical action range overlaps another disconnected component.
-
-Use a global action grid per pitch slice for the first implementation because it simplifies bitmask operations and reproducibility. Later, allow per-sheet adaptive grids with explicit overlap maps. Initial grids may combine uniform bins with mandatory breakpoints at surface-vertex action values, transition extrema, and edge action extrema.
-
-For every refinement level, save:
-
-- lower and upper reachable masks;
-- unresolved action intervals per triangle;
-- unresolved transition-parameter intervals;
-- the lower/upper contribution to \(Q(b)\);
-- the change relative to the previous atom grid.
-
-### 11.5 Critical PL cases
-
-Adopt one consistent symbolic-perturbation convention for:
-
-- contour values equal to a vertex value;
-- equal action values on an edge;
-- constant-action triangles;
-- contours through a PL saddle vertex.
-
-These values have measure zero, but inconsistent handling can create artificial finite-width connections. Unit tests must exercise them.
-
----
-
-## 12. Surface quadrature
-
-### 12.1 Reachable polygons
-
-For triangle \(c\) and interval \([a_0,a_1]\subset L(c)\), clip the triangle by
-
-\[
-a_0\le A(q)\le a_1.
-\]
-
-Because \(A\) is linear in barycentric coordinates, clipping yields a convex polygon. A union of intervals yields a union of nonoverlapping polygons except at boundaries.
-
-Do not approximate the contribution only as “reachable area fraction times one average weight” in the production calculation.
-
-### 12.2 Weight
-
-The slice weight is
-
-\[
-w(q)=h(\sqrt{s})K(q)|\omega|.
-\]
-
-For a triangle parameterized by edge vectors \(e_1,e_2\), evaluate \(|\omega(e_1,e_2)|\) using the axis-regular formula in Section 4.4.
-
-### 12.3 Regular triangles
-
-Away from marginal curves, interpolate \(K\) and other smooth factors from vertices or evaluate them at polygon quadrature points. Integrate over each clipped polygon using a standard triangle quadrature after fan triangulation.
-
-### 12.4 Triangles adjacent to \(\Gamma_{\max}\)
-
-At \(\Gamma_{\max}\), \(K\) diverges logarithmically. Do not store a finite fabricated vertex value.
-
-For a boundary triangle:
-
-1. set critical boundary-vertex `K` to `inf` or a dedicated status;
-2. use interior quadrature nodes only;
-3. evaluate or interpolate \(K\) using interior well traces;
-4. recursively subdivide until the weighted integral converges;
-5. optionally fit a local \(a+b\log d\) model in distance \(d\) from the marginal curve.
-
-The product \(K|\omega|\) is integrable, but this must be demonstrated by refinement.
-
-### 12.5 Per-slice result and uncertainty
-
-Return:
-
-- \(Q(b)\);
-- a quadrature error estimate;
-- lower and upper bounds from unresolved cells;
-- contribution by sheet;
-- contribution by radial bins;
-- contribution by transition neighborhood versus regular region.
-
-Unresolved cells are assigned \(\Theta=0\) for the lower bound and \(\Theta=1\) for the upper bound, with their weight integrated or conservatively bounded.
-
----
-
-## 13. Denominator and outer \(B_b\) quadrature
+A tighter independently bounded possible-reachable integral may reduce \(Q_U\).
+A missing-weight upper bound is
+\(Q_{\rm total}^{U}-M_{\rm covered}^{L}\), never simply subtraction of two
+uncontrolled estimates. Include both integration errors and check disjoint
+coverage. Aggregate missing mass does not specify exact masses or connections of
+individual unknown cells. Contradictory or materially negative residuals are errors;
+do not clamp them away. Preserve incoming/outgoing flux checks where applicable.
+
+### 12.3 Regular and marginal cell quadrature
+
+On a regular owned branch integrate \(hK|ds\,d\alpha|\) over reachable subregions.
+For PL actions, clip triangles to action intervals and integrate each polygon;
+area fraction times an arbitrary mean weight is insufficient. Evaluate or bound
+\(K\) consistently at interior nodes.
+
+At a nondegenerate marginal maximum, use interior quadrature and controlled
+singularity subtraction or adaptive subdivision. \(K\)'s logarithmic asymptotic
+is a useful accelerator only with curvature and remainder control; child and
+parent coefficients differ. Use a separate enclosure near zero-curvature events.
+Unknown \(A\) or \(K\) is retained in the ledger and connectivity bounds.
+
+### 12.4 Whole pitch bands versus subsets of wells
+
+Because \(b\) is conserved, an entirely omitted pitch band contributes at most
+its independently bounded total trapped birth weight. This can be an economical
+way to handle extreme pitches, but each required R8 slice is still tested and
+scored against its own accuracy requirement.
+
+A short scan cap, omitted core, or omitted long-well family **within** a pitch
+slice can change accessibility of other states. Bound its global influence,
+not only its direct weight. Never treat the exploratory ≤0.3% tail as permission
+to discard it. Source-dependent tail fractions must be remeasured with uncertainty.
+
+## 13. Normalization, outer integration and reported bounds
 
 ### 13.1 Denominator
 
-Compute
+Retain
 
 \[
-V_h
-=
-\int_0^1 ds\,h(\sqrt{s})|C(s)|
-\int_0^{2\pi}d\theta
-\int_0^{2\pi/N_{\mathrm{fp}}}d\zeta\,B^{-2}.
+V_h=\int_0^1ds\,h(\sqrt{s})|C(s)|
+\int_0^{2\pi}d\theta\int_0^{L_\zeta}d\zeta\,B^{-2}.
 \]
 
-Recommended quadrature:
+Use independently converged radial/periodic quadrature and include denominator
+uncertainty in ratio bounds. `source_profile` takes \(\rho\), not \(s\).
 
-- Gauss-Legendre or adaptive quadrature in \(s\);
-- periodic trapezoidal rules in \(\theta\) and \(\zeta\), exploiting spectral convergence for smooth Fourier data;
-- independent resolution controls and convergence report.
+### 13.2 Pitch support
 
-This calculation should be implemented early and tested independently.
+Use radially global magnetic bounds for the conserved pitch variable. Resolve
+support boundaries in \(s\) when integrating the ledger; a quadrature grid cutting
+across an unresolved support boundary is not a certified residual weight.
+Safe global field brackets require validated extrema/error margins or explicit
+supplied bounds. Per-surface maxima do not replace global pitch conservation.
 
-### 13.2 Global \(B\) bounds
+### 13.3 Outer quadrature
 
-The current coarse sampled minimum/maximum is not sufficient as the only production bound. Determine a safe bracket by:
+Compute \(f=(2V_h)^{-1}\int Q(b)b^{-2}\,db\) with adaptive, cached interior
+pitch evaluations, initially a nested midpoint rule. Peak-height information can
+suggest refinement/breakpoints but does not enumerate every change in
+constant-action accessibility. Do not replace adaptivity with a supposedly complete
+list of magnetic critical values without a new proof and tests.
 
-1. taking extrema over a resolved background grid;
-2. refining candidate extrema with local optimization in periodic coordinates;
-3. adding a configurable safety margin tied to the interpolation error;
-4. allowing explicit user-supplied bounds.
+Integrate lower and upper slice functions with explicit outer error handling.
+A midpoint-doubling difference is an estimate, not automatically an enclosure of
+unsampled pitch structure. Return an estimated result with unverified error scope
+if necessary, but do not count it as a field-level bounded success. Whole-band
+ledger bounds can enclose unresolved outer intervals. Ratio lower bounds use the
+upper denominator, and upper bounds use the positive lower denominator.
 
-The outer rule evaluates only interior midpoint values, so degenerate endpoint surfaces need not be constructed.
+### 13.4 Result contract and error scope
 
-### 13.3 Adaptive midpoint rule
+`FractionResult` should provide `f_lower`, `f_upper`, optional midpoint `f`,
+`status`, `bound_scope`, source/field identity, `V_h` with error information,
+pitch nodes/results, wall times, convergence controls, and an error ledger.
+Distinguish:
 
-The function
+- **model enclosure:** proven for the stated discrete/interpolated model;
+- **field enclosure:** also covers field approximation, missing geometry,
+  integration, support, and outer errors;
+- **estimate:** one or more of these errors remain convergence estimates;
+- **statistical interval:** sampling confidence at a stated level, separate
+  from numerical uncertainty and completion rate.
 
-\[
-F(b)=\frac{Q(b)}{b^2}
-\]
+The field-level target is the declared finite Fourier field together with its
+specified radial and axis interpolation, identified by data and implementation
+hashes. Enclose additional numerical/surrogate errors relative to that field.
+This does not prove errors relative to an unknown continuum equilibrium or
+unprovided Fourier modes; sensitivity to supplied equilibrium resolution is
+reported separately.
 
-may be continuous but nonsmooth at topology changes, and nongeneric cases may produce sharper behavior. Use a nested adaptive midpoint rule rather than relying on one high-order global Gaussian rule.
+Only a field enclosure meeting the width/time criteria is an R8 bounded success.
+A small model-only gap is not enough. A reported upper/lower interval must satisfy
+\(0\le f_L\le f_U\le1\) with a consistent positive denominator. A valid
+conservative raw enclosure may be intersected with the known probability range
+[0,1] or an independently proved trapped-fraction bound; retain the raw endpoints
+and justification. Reject an empty intersection or inconsistent weight accounting.
+Do not clamp an invalid numerical point estimate to hide a failure. A midpoint is
+optional and is not a measured loss probability.
 
-For interval \([b_0,b_1]\):
+### 13.5 Birth-space validation and optional gap estimates
 
-1. evaluate the midpoint \(m\);
-2. compare the coarse midpoint estimate with the sum of two child midpoint estimates;
-3. subdivide where the difference exceeds absolute and relative tolerances;
-4. batch independent child evaluations for parallel execution;
-5. reuse cached pitch slices.
+Independently sample birth positions with density proportional to
+\(h(\sqrt{s})|C|/B^2\) and \(\xi=v_\parallel/v_0\) uniformly in [-1,1]; set
+\(b=B/(1-\xi^2)\). With correctly classified \(\Theta\), \(f=E[\Theta]\).
+Closed/rational lines need the same trapping qualification as §12.1.
 
-Return the quadrature tree, estimated error, and the sampled \(F(b)\) curve.
+Use direct contours for sampled accessibility, retaining failed queries as
+interval-valued unknown outcomes. Report sample count, seeds, confidence method,
+source, unresolved fraction, and numerical bias controls. Shared field code does
+not make all failure modes independent of the atlas.
 
-### 13.4 Final result
+An optional estimator may sample the **whole globally ambiguous population**,
+not only event cells. Its normalized well-space measure is
+\(hK\,ds\,d\alpha\,db/(2V_hb^2)\). The variance bound \(G^2/(4n)\) for gap
+mass \(G\) requires correct independent sampling, known mass, and valid binary
+classifications. An upper missing-mass budget alone does not supply this sampler.
+Sampling does not shrink the deterministic enclosure; report the estimate separately.
 
-```python
-@dataclass
-class FractionResult:
-    f: float
-    f_lower: float
-    f_upper: float
-    V_h: float
-    numerator_integral: float
-    b_nodes: FloatArray
-    pitch_integrand: FloatArray
-    pitch_error_estimates: FloatArray
-    outer_error_estimate: float
-    unresolved_weight: float
-    metadata: RunMetadata
-```
+## 14. Package layout and implementation status
 
-The code must verify
+Use plain arrays/integer IDs in the core. Module names below are proposed, not
+existing import guarantees; settle small API choices in the implementing PR.
 
-\[
-0\le f_{\mathrm{lower}}\le f\le f_{\mathrm{upper}}\le1
-\]
+| Area | Reuse or proposed module | Role |
+| --- | --- | --- |
+| Field/normalization | `field.py`, `denominator.py` | Existing kernels and denominator |
+| Population ledger | `population.py` | Independent trapped weight and enclosures |
+| Forward scans | `well_trace.py`, `well_catalogue.py` | Existing reference plus shared scans |
+| Local branches | `well_atlas.py` | Coverage, ownership, root and seam identities |
+| Barrier maps | `barrier_fields.py` | Local height fields and transition ports |
+| Direct oracle | `contour_trace.py` | Continuous-field contour queries |
+| Accessibility | `intervals.py`, `reachability.py` | Finite bins and global uncertainty |
+| Integration | `atlas_quadrature.py`, `pitch_quadrature.py` | Slice and outer integration |
+| Results | `pipeline.py`, `io.py`, `diagnostics.py` | Provenance, restart and reports |
+| Views | `visualization.py` | Chart, path, population and optional 3-D views |
 
-within numerical tolerance. Do not clamp a materially invalid value into this range; raise a diagnostic error instead.
-
----
-
-## 14. Proposed package layout
-
-```text
-alpha_analysis/
-    boozer_field.py                  # existing; extend Fourier and derivative support
-    bounce_points.py                 # existing heuristic tools; preserve
-    J_invariant.py                   # existing heuristic J plots; preserve
-    j_connectivity/
-        __init__.py
-        config.py                    # dataclass configuration and validation
-        types.py                     # array dataclasses, enums, protocols
-        field.py                     # BoozerField adapter and derivative kernels
-        synthetic_fields.py          # analytic fields for tests and demos
-        background_mesh.py           # structured and Gmsh backends
-        surface_extract.py           # B=b and g=0 extraction
-        surface_refine.py            # projection and adaptive refinement
-        well_trace.py                # roots, extrema, A, K, itinerary
-        critical_curves.py           # EDGE, GAMMA_MIN/MAX, AXIS
-        transitions.py               # T construction, cuts, hyperedges
-        contour_trace.py             # direct PL validation tracer
-        intervals.py                 # IntervalSet
-        flood_fill.py                # production reachability
-        polygon_clip.py              # A-interval clipping in triangles
-        surface_quadrature.py         # Q(b)
-        denominator.py               # V_h
-        pitch_quadrature.py           # adaptive midpoint in b
-        pipeline.py                   # public orchestration API
-        io.py                         # HDF5 schema and restart
-        visualization.py             # PyVista and Matplotlib diagnostics
-        diagnostics.py               # consistency and convergence reports
-
-test/
-    test_field_derivatives.py
-    test_background_mesh.py
-    test_surface_extract.py
-    test_well_trace.py
-    test_critical_curves.py
-    test_transitions.py
-    test_intervals.py
-    test_contour_trace.py
-    test_flood_fill.py
-    test_polygon_clip.py
-    test_surface_quadrature.py
-    test_denominator.py
-    test_pitch_quadrature.py
-    test_pipeline_synthetic.py
-    test_pipeline_w7x.py
-
-examples/
-    plot_pitch_slice.py
-    compute_j_connected_fraction.py
-    inspect_transition.py
-```
-
-The exact number of files may be reduced if some remain short. Keep the conceptual boundaries even if small related modules are combined.
-
----
+Existing `background_mesh`, `surface_extract`, `surface_data`, `surface_refine`,
+`critical_curves`, `transitions`, `transition_events`, `mesh_cut`, and any adopted
+`refinement` code remain legacy/reference modules. Do not remove public functions
+or add mandatory geometry dependencies merely to match this table.
 
 ## 15. Public API
 
 ### 15.1 Main calculation
 
-```python
-def compute_j_connected_fraction(
-    field: BoozerFieldLike,
-    source_profile: Callable[[FloatArray], FloatArray] | None = None,
-    config: JConnectivityConfig | None = None,
-) -> FractionResult:
-    """Compute the topological J-plus-transition edge-accessible fraction."""
-```
-
-`source_profile` takes \(\rho\), not \(s\). The default is a uniform profile.
+Proposed endpoint: `compute_j_connected_fraction(field, source_profile=None,
+config=None) -> FractionResult`, with a uniform source by default. Keep existing
+public APIs backward compatible. This endpoint is not claimed to exist before R7.
 
 ### 15.2 Pitch slice
 
-```python
-def compute_pitch_slice(
-    field: BoozerFieldLike,
-    background: BackgroundMesh,
-    b: float,
-    source_profile: Callable[[FloatArray], FloatArray],
-    config: PitchSliceConfig,
-) -> PitchSliceResult:
-    ...
-```
+The new pitch-slice API consumes a reusable catalogue/atlas context, `b`, source,
+and controls; it does not require a `BackgroundMesh`. Return bounded weights,
+coverage/transition uncertainty, classification scope, provenance and timings.
+Legacy callers continue to use their existing interfaces.
 
-### 15.3 Diagnostics and plotting
+### 15.3 Diagnostics
 
-```python
-def plot_background_mesh(...): ...
-def plot_surface_quantity(slice_result, quantity: str, ...): ...
-def plot_well_trace(trace: WellTrace, ...): ...
-def plot_critical_curves(slice_result, ...): ...
-def plot_transition(slice_result, transition_id: int, ...): ...
-def plot_action_contours(slice_result, levels=None, ...): ...
-def plot_reachability(slice_result, ...): ...
-def plot_triangle_intervals(slice_result, triangle_ids, ...): ...
-def plot_pitch_integrand(result: FractionResult, ...): ...
-def write_vtk_bundle(slice_result, directory: Path): ...
-```
+Expose plots of well-count/branch maps, barrier heights, matched seam states,
+constant-action contours, witness paths, globally uncertain populations, ledger
+closure, and error-versus-runtime. Preserve optional 3-D inspection of reference
+surfaces. Do not label unknown states as inaccessible in a visualization.
 
-### 15.4 Example use
+### 15.4 Reuse
 
-```python
-from alpha_analysis.boozer_field import BoozerField
-from alpha_analysis.j_connectivity import (
-    JConnectivityConfig,
-    compute_j_connected_fraction,
-)
+A context can reuse field-only scans over multiple pitches and source profiles.
+Weighted integrals depend on the source; cached results must not silently reuse
+weights from a different source. All reused geometry must match its field/controls.
 
-field = BoozerField.from_boozmn("data/boozmn_example.nc")
+## 16. Configuration and defaults
 
-config = JConnectivityConfig(
-    output_directory="output/j_connectivity",
-    save_pitch_slices=True,
-    make_diagnostic_plots=True,
-)
+Use validated dataclasses for field/scan, atlas, transitions, action bins,
+quadrature, runtime, and output controls. Preserve existing config compatibility.
+Authoritative controls include:
 
-result = compute_j_connected_fraction(
-    field,
-    source_profile=lambda rho: 1.0 - rho**2,
-    config=config,
-)
+- field identifier, retained modes, radial scheme, source identity;
+- scan resolution/completeness, root tolerances, period/window cap;
+- chart coverage/refinement, branch matching and error predicates;
+- action/time integration errors and interpolation controls;
+- action and common-parameter bin resolutions and work caps;
+- independent population/support/denominator/outer error controls;
+- full `f` width target 0.01, slice relative width target 0.01;
+- whole-equilibrium and slice hard guards, worker count, cold-start accounting;
+- optional statistical confidence, sample counts and seeds.
 
-print(result.f, result.f_lower, result.f_upper)
-```
+Defaults are starting work controls, not proof of accuracy. One declared adaptive
+policy applies to all benchmark fields; no per-case tuning to obtain success.
+Changing a scientific tolerance or acceptance budget requires a recorded decision.
 
-The Python API is primary. Add a simple command-line wrapper only after the API is stable.
+## 17. Visualization and diagnostics
 
----
+### 17.1 Required interpretation
 
-## 16. Configuration
+Every new geometric object gets a diagnostic plot and a named numerical invariant.
+Label physical versus chart coordinates, units, field/source, pitch, controls,
+error scope, and unknown data. A visually small defect is not a bound.
 
-Use nested frozen dataclasses with explicit units and validation:
+### 17.2 Atlas and wells
 
-```python
-@dataclass(frozen=True)
-class WellTraceConfig:
-    samples_per_field_period: int
-    max_field_periods: int
-    root_rtol: float
-    root_atol_B: float
-    incoming_root_max_offset: float  # radians
-    extrema_tolerance: float
-    quadrature_rtol: float
-    quadrature_atol: float
+Show well multiplicity, separate overlapping branches, entry/exit lifts, chart
+seams/ownership, unresolved coverage, and representative line profiles with extrema,
+\(b\), bounce roots, \(A\) and \(K\). Include narrow/disconnected examples.
 
-@dataclass(frozen=True)
-class SurfaceConfig:
-    extractor: Literal["pyvista", "marching_tetrahedra"]
-    max_refinement_levels: int
-    B_surface_tolerance: float
-    action_interpolation_tolerance: float
-    itinerary_tolerance: float
+### 17.3 Transitions and accessibility
 
-@dataclass(frozen=True)
-class ReachabilityConfig:
-    mode: Literal["bounded_atoms", "continuous_intervals"]
-    initial_action_atoms: int
-    max_action_atoms: int
-    initial_transition_atoms: int
-    max_transition_atoms: int
-    unresolved_weight_rtol: float
-    unresolved_weight_atol: float
-    interval_merge_rtol: float
-    interval_merge_atol: float
-    continuous_iteration_limit: int
+Show local \(H_j=b\) curves, matched parent/child ports, action additivity, event
+enclosures, and lower/upper action-contour accessibility. Include a positive witness
+path and a closed negative contour. Display globally affected states separately
+from the local region that caused uncertainty.
 
-@dataclass(frozen=True)
-class PitchQuadratureConfig:
-    b_min: float | None
-    b_max: float | None
-    initial_intervals: int
-    max_intervals: int
-    rtol: float
-    atol: float
-    n_jobs: int
+### 17.4 Population and convergence
 
-@dataclass(frozen=True)
-class VisualizationConfig:
-    enabled: bool
-    off_screen: bool
-    save_png: bool
-    save_pdf: bool
-    save_vtk: bool
-    selected_b_values: tuple[float, ...]
+Show total/covered/unknown ledger weights, pitch integrand with uncertainty,
+source-weighted radial contributions, and full `f` interval versus wall time.
+Distinguish deterministic envelopes from statistical error bars. Existing mesh,
+cut and VTK plots remain useful diagnostics when that path is exercised.
 
-@dataclass(frozen=True)
-class JConnectivityConfig:
-    background: BackgroundMeshConfig
-    surface: SurfaceConfig
-    trace: WellTraceConfig
-    reachability: ReachabilityConfig
-    pitch: PitchQuadratureConfig
-    visualization: VisualizationConfig
-    output_directory: Path
-    checkpoint_path: Path | None
-```
+## 18. Persistence and provenance
 
-Provide `development()`, `standard()`, and `high_accuracy()` constructors, but document that defaults are starting points, not certified accuracy settings.
+Use versioned plain-array NPZ or optional HDF5, never pickle for topology/state.
+Save stable chart/branch IDs, roots/lifts, owned coverage, extrema data, possible
+ports, bin grids/masks, errors and scope, source/field/config hashes, code revision,
+random seeds, scan coverage, runtime/attempt logs, and slice/outer state.
 
----
-
-## 17. Visualization and diagnostic requirements
-
-Visualization is a first-class requirement, not an optional afterthought.
-
-### 17.1 General rules
-
-- Every mesh-like result must have a `to_pyvista()` conversion.
-- Every scalar array must carry a human-readable name, units, and location (`point`, `cell`, `edge`, or `transition port`).
-- Save VTK XML files (`.vtu` for volume meshes and `.vtp` for surfaces/curves) for ParaView.
-- Provide static PNG output in headless CI mode.
-- Keep plotting code separate from numerical kernels.
-- Plot unresolved or failed data in a conspicuous separate category rather than hiding it.
-- Include \(b\), equilibrium path/hash, mesh resolution, tolerances, and code commit in plot metadata or titles.
-
-### 17.2 Required background-mesh views
-
-1. Wireframe of the periodic solid cylinder.
-2. Cutaway showing tetrahedra near the axis.
-3. Periodic seam node pairs.
-4. Point or cell colors for:
-   - \(B\);
-   - \(D_\parallel B\);
-   - \(D_\parallel^2B\);
-   - estimated interpolation error;
-   - refinement level.
-5. Histograms of tetrahedron quality and size.
-
-### 17.3 Required pitch-surface views
-
-For selected \(b\):
-
-1. Full \(B=b\) surface.
-2. Incoming \(g<0\) and outgoing \(g>0\) halves in different colors.
-3. Disconnected component IDs.
-4. Boundary curves:
-   - `EDGE`;
-   - `GAMMA_MIN`;
-   - `GAMMA_MAX`;
-   - `AXIS`;
-   - `DEGENERATE`.
-5. Surface colored by:
-   - \(s\) or \(\rho\);
-   - \(\theta\) and \(\zeta\);
-   - \(A\) and legacy-normalized \(J\);
-   - \(K\) or \(\log K\);
-   - unwrapped exit \(\zeta_+\);
-   - field-period count;
-   - number of internal maxima;
-   - itinerary ID;
-   - sheet ID;
-   - trace status;
-   - action interpolation error;
-   - additivity residual near transitions;
-   - \(\Theta\);
-   - per-cell contribution to \(Q(b)\).
-
-### 17.4 Required well-trace diagnostics
-
-For any selected surface vertex or clicked point:
-
-1. \(B(\zeta)\) over the unwrapped trace, with \(b\) horizontal.
-2. Entry, exit, maxima, minima, and tangent candidates marked.
-3. The integrands for \(A\) and \(K\).
-4. Cumulative \(A(\zeta)\) and \(K(\zeta)\).
-5. The field-line path in \((\theta\bmod2\pi,\zeta\bmod L_\zeta)\).
-6. The same path in unwrapped coordinates.
-7. Text showing residuals, period count, and status.
-
-### 17.5 Required transition diagnostics
-
-For each transition:
-
-1. \(\Gamma_{\max}(u)\) and \(T(u)\) on the surface.
-2. Lines connecting matched parameter samples.
-3. Parent, child-1, and child-3 action curves versus \(u\).
-4. \(A_W-A_1-A_3\) versus \(u\).
-5. The three corresponding \(B(\zeta)\) well profiles at selected \(u\).
-6. A view of the mesh before and after cutting/vertex duplication.
-7. Monotone subdivisions used by interval transfer.
-
-### 17.6 Required reachability diagnostics
-
-1. Directly traced constant-action contours for selected levels.
-2. Inner, outer, and unresolved reachable action intervals per triangle.
-3. Inner, outer, and unresolved transition \(u\)-intervals reached during flood fill.
-4. Lower-bound, upper-bound, and resolved \(\Theta\) surfaces.
-5. A comparison map of direct contour tracing versus flood fill at random query points.
-6. Reachability work-queue iteration count and interval-count histogram.
-7. Clipped reachable polygons in selected triangles.
-
-### 17.7 Required global plots
-
-1. \(Q(b)\) and \(Q(b)/b^2\) versus \(b\).
-2. Adaptive midpoint nodes and interval error estimates.
-3. Cumulative contribution to \(f\) versus \(b\).
-4. Contribution versus \(\rho\).
-5. Lower and upper bounds versus refinement level.
-6. Convergence versus:
-   - background resolution;
-   - surface refinement;
-   - field-line scan resolution;
-   - maximum trace periods;
-   - interval tolerance;
-   - outer pitch tolerance.
-7. Timing breakdown by pipeline stage.
-
----
-
-## 18. Persistence and restart
-
-Use HDF5 through `h5py`. One parent process should own the final file. Parallel workers should return compact results or write separate temporary files that the parent merges.
-
-Suggested schema:
-
-```text
-/metadata
-    schema_version
-    equilibrium_path
-    equilibrium_hash
-    code_commit
-    package_versions
-    coordinate_convention
-    config_json
-
-/background_mesh
-    points
-    tetrahedra
-    periodic_node_pairs
-    boundary_tags
-    B
-    D_B
-    D2_B
-
-/denominator
-    V_h
-    quadrature_nodes_s
-    convergence_history
-
-/pitch_slices/<slice_key>
-    b
-    status
-    /surface
-        points
-        triangles
-        parent_tetrahedra
-        boundary_edges
-        boundary_tags
-        sheet_id
-    /vertex_data
-        s
-        theta
-        zeta
-        A
-        K
-        q_out_reduced
-        zeta_out_unwrapped
-        period_count
-        n_internal_maxima
-        itinerary_hash
-        trace_status
-    /extrema
-        offsets
-        zeta_unwrapped
-        B
-        kind
-    /transitions
-        transition_offsets
-        u
-        port_offsets
-        port_vertex_ids
-        port_action_values
-        role
-        additivity_residual
-    /reachability
-        action_atom_edges
-        transition_atom_offsets
-        transition_atom_edges
-        triangle_inner_mask
-        triangle_outer_mask
-        transition_inner_mask
-        transition_outer_mask
-        unresolved_weight
-        continuous_triangle_interval_offsets       # optional
-        continuous_triangle_interval_bounds        # optional
-        continuous_transition_u_interval_offsets   # optional
-        continuous_transition_u_interval_bounds    # optional
-        continuous_stabilized                       # optional
-    /quadrature
-        Q
-        error_estimate
-        lower_bound
-        upper_bound
-        triangle_contribution
-
-/outer_quadrature
-    b_nodes
-    Q
-    Q_over_b2
-    interval_tree
-    error_estimates
-
-/result
-    f
-    f_lower
-    f_upper
-    numerator_integral
-    V_h
-```
-
-Do not pickle PyVista or NetworkX objects. Reconstruct them from arrays.
-
-Cache keys must include:
-
-- equilibrium content hash;
-- \(b\);
-- all tolerances affecting the slice;
-- mesh hash;
-- code schema version.
-
----
+A restart must not turn unknown into known or reuse incompatible cached traces.
+One writer owns a checkpoint file; workers return arrays/results. HDF5 is optional
+until pipeline work justifies it. Legacy NPZ data remain readable by their existing
+APIs; adding a new atlas format does not reinterpret legacy sheet IDs.
 
 ## 19. Dependencies
 
-### 19.1 Recommended first serious implementation
+### 19.1 Existing stack
 
-```text
-numpy          authoritative arrays and vectorized operations
-scipy          splines, root finding, quadrature, optimization
-matplotlib     1D and 2D plots
-pyvista / VTK  isosurfaces, inspection, VTK output, interactive 3D views
-gmsh           production background tetrahedral mesh
-networkx       coarse sheet/transition graph and diagnostics
-numba          later acceleration of field-line scans and quadrature kernels
-h5py           checkpointing and reproducible result files
-joblib         parallel processing of B_b slices on one node
-pytest         unit and integration tests
-hypothesis     property-based tests for topology and interval operations
-meshio         optional mesh-format interoperability
-```
+Keep NumPy, SciPy and Matplotlib as the base numerical/plotting stack. Gmsh,
+PyVista/VTK and NetworkX remain optional geometry/diagnostic tools. Numba, h5py,
+joblib and meshio remain optional where already declared. Tests use the existing
+pytest/Hypothesis stack and `.venv`.
 
 ### 19.2 Dependency boundaries
 
-```text
-Gmsh / PyVista / NetworkX
-        |
-        v
-plain NumPy arrays and integer IDs
-        |
-        v
-NumPy / SciPy / Numba numerical kernels
-```
+Authoritative numerical state is NumPy arrays and integer IDs. Gmsh, PyVista and
+NetworkX objects stay outside it. No per-cell Python graph framework in the
+production numerical core. Optional imports must preserve base-only package import.
 
-PyVista objects must not enter Numba kernels. NetworkX must not duplicate every triangle as a Python graph node in the production flood fill.
+### 19.3 Deferred additions
 
-### 19.3 Deferred dependencies
+No TTK/Reeb library, new base dependency, PDE framework, JAX graph/root rewrite,
+GPU runtime or multi-node stack is required. Profile a proven algorithm before
+adding acceleration machinery. A new boundary/dependency needs an accepted ADR.
 
-- Use Topology ToolKit only after the custom cut-sheet and contour algorithms are correct; it can then validate Reeb graphs on selected cases.
-- Use `rustworkx` only if profiling shows NetworkX overhead matters.
-- Use `mpi4py` only after one-node parallelism is insufficient.
-- Do not introduce DOLFINx/FEniCSx unless a genuine finite-element problem emerges.
-- Do not use JAX to manage adaptive roots, mesh connectivity, or graph traversal.
+### 19.4 Packaging
 
-### 19.4 `pyproject.toml`
+Preserve current extras and CLI behavior. Run the existing clean-environment smoke
+check when touching packaging or dependency boundaries. Do not add dependencies
+merely because a historical design listed a possible future package.
 
-Keep the current minimal base dependencies if desired, and add optional groups such as:
+## 20. Testing and real-equilibrium evidence
 
-```toml
-[project.optional-dependencies]
-connectivity = [
-    "pyvista",
-    "gmsh",
-    "networkx",
-    "numba",
-    "h5py",
-    "joblib",
-]
-mesh-io = ["meshio"]
-test = ["pytest", "hypothesis"]
-```
+### 20.1 Small discriminating synthetic cases
 
-Exact minimum versions should be set only after the implementation is tested in the project environment.
+Each milestone selects a small suite that would catch plausible wrong physics:
 
----
+- analytic bounce integrals with both signs of \(C\), asymmetric Fourier modes;
+- multiple wells and periodic/multi-window ownership with no double counting;
+- a hidden shallow barrier, a closed transition loop inside a cell, and two
+  crossings on one edge;
+- a below-\(b\) extremum fold with continuous roots/actions, contrasted with an
+  actual barrier crossing and the existing six-well equal-height junction;
+- a multiply covered chart and a nonseparating slit with distinct local banks;
+- a rational/near-rational line and a rational plateau with genuinely passing
+  lines below the surface maximum;
+- closed constant-action contours, edge-reaching contours, flat actions/ports,
+  disconnected equal-action components, and affine transition cycles;
+- a tiny unknown connector affecting a large regular population;
+- analytic population/weighted quadrature and a whole omitted pitch band.
 
-## 20. Testing strategy
+Use analytic references or independently derived cases, not outputs of the tested
+implementation. Preserve the existing reference cuts and numerical regressions.
 
-The hardest failures are topological. Tests must go beyond numerical spot checks.
-The lists below are the menu of what is worth testing, not a coverage quota; §22.5 sets
-the wall-clock budget that any selection from them has to fit inside.
+### 20.2 Bounds and mutations
 
-### 20.1 Synthetic fields
+Check coverage/ownership, error scope and uncertainty conservation before quoting
+a narrow bound. Mutation-test the critical sign, dropped term, missing barrier,
+wrong seam/branch match, wrong pitch weight or omitted unknown connection for the
+milestone. Named tests below are proposed acceptance-test names, not claims that
+those functions already exist. Equivalent names are acceptable if mapped in the PR.
+Do not add redundant tests only to fill the list.
 
-Implement analytic `BoozerFieldLike` test fields with controllable:
+### 20.3 Reference matrix and final success
 
-- one simple trapped well;
-- several independent wells;
-- a well spanning multiple field periods;
-- a generic split/merge controlled by \(s\) or \(\theta\);
-- a closed constant-action island disconnected from the edge;
-- an edge-connected band;
-- a near-tangent separatrix;
-- a periodic-seam crossing;
-- a field with sine modes to test asymmetry;
-- a deliberately degenerate equal-height event.
+Use all five exact files listed in [AGENTS.md](../AGENTS.md), at radially global
+\(\lambda_n=0.05,0.1,0.5,0.8,0.9,0.95\), with
+\(b=B_{\min}^{global}+\lambda_n(B_{\max}^{global}-B_{\min}^{global})\).
+Hold each \(b\) fixed during its accessibility calculation. The primary matrix
+has **30 physical cases**, with at least two controlled atlas/bin refinement levels
+as convergence comparisons, not extra successes. Refinement bounds remain limited
+by the runtime policy. Include both source declarations and exact code/field hashes.
 
-Synthetic fields should provide exact analytic derivatives.
-
-### 20.2 Unit tests
-
-#### Field evaluation
-
-- Fourier derivatives agree with high-accuracy finite differences.
-- Periodicity in \(\theta\) and one field period in \(\zeta\).
-- Cosine-only behavior matches the current code.
-- Sine modes are loaded and evaluated correctly.
-- \(D_\parallel B\) agrees with differentiation along a field line.
-
-#### Coordinates and measure
-
-- \(ds\wedge d\theta=2dx\wedge dy\).
-- The \((x,y,\zeta)\) formula for \(\omega\) agrees with a locally unwrapped \((s,\alpha)\) determinant away from the axis.
-- The measure remains finite at the axis.
-
-#### Background mesh
-
-- Positive tetrahedron orientation.
-- Periodic seam maps are one-to-one.
-- No cracks after seam identification.
-- Deterministic structured mesh.
-
-#### Surface extraction
-
-- Exact plane cuts through a tetrahedron.
-- Closed analytic isosurfaces have expected component counts.
-- Extracted vertices satisfy \(|B-b|\) tolerance.
-- Incoming and outgoing halves reconstruct the full surface except for \(g=0\).
-
-#### Well trace
-
-For every regular trace:
+A nonempty slice passes when it has a field-level enclosure and
 
 \[
-|B(q_-)-b|<\epsilon,
-\qquad
-|B(q_+)-b|<\epsilon,
+0\le Q_U-Q_L\le0.01\,Q_{\rm total}^{U},
 \]
 
-with correct signs of \(g\), and
+with independent ledger accuracy
+\(Q_{\rm total}^{U}-Q_{\rm total}^{L}\le0.001\,Q_{\rm total}^{U}\).
+This prevents an arbitrarily loose upper population count from making the
+normalized gap look small. A proven empty slice passes with zero contribution.
+If nonemptiness cannot be resolved, it remains uncertain rather than an empty
+success. R8 requires at least 29/30 passing cases plus all five full `f` widths
+≤0.01, within §22.4's guards. Count each file/pitch once; preserve failures.
 
-\[
-B<b
-\]
+The old 100/120-case mesh/extractor reports remain historical evidence and
+comparators. Re-run both backends and both extractors when modifying those legacy
+algorithms; do not force a mesh-free atlas to invent those axes. Compare to resolved
+reference geometry where authoritative and treat prior unresolved outputs as
+uncertainty, not ground truth. Adaptive outer integration requires pitches beyond
+the six matrix levels; the matrix alone does not establish final `f`.
 
-between endpoints except within tolerance.
+### 20.4 Exploratory evidence
 
-Also test:
-
-- invariance under shifting by one field period;
-- long-well period count;
-- endpoint quadrature convergence;
-- comparison with the existing `compute_J_invariant()` for the same selected well;
-- failure statuses rather than silent truncation.
-
-#### Transitions
-
-- recovered \(T\) matches the analytic synthetic transition;
-- port correspondence preserves the common parameter;
-- \(A_W\approx A_1+A_3\) converges under refinement;
-- duplicated cut vertices carry distinct action values;
-- nongeneric events are flagged.
-
-#### Interval operations
-
-Use Hypothesis to test:
-
-- commutativity and idempotence of union;
-- monotonicity;
-- no overlapping stored intervals;
-- affine image/preimage consistency;
-- tolerance stability;
-- serialization round trips.
-
-#### Flood fill
-
-Test small hand-constructed meshes with known answers:
-
-- strip connected to edge;
-- closed contour island;
-- two disconnected components with overlapping action ranges;
-- periodic cylinder seam;
-- one generic three-port transition;
-- a transition cycle;
-- contour through a vertex or constant edge.
-
-For bounded finite-atom mode, also test:
-
-- the inner mask is always a subset of the outer mask;
-- every sampled point classified reachable by the inner mask is reachable by direct tracing;
-- every sampled point classified unreachable by the outer mask is unreachable by direct tracing;
-- nested atom refinement grows the inner reachable set, shrinks the outer reachable set, and reduces unresolved weighted area;
-- the worklist terminates deterministically for affine transition cycles.
-
-The optional continuous interval mode must agree with direct contour tracing whenever it reports stabilization.
-
-#### Quadrature
-
-- clipped polygon areas against analytic formulas;
-- exact integration of constant and linear weights;
-- convergence for a logarithmic boundary weight;
-- unresolved lower/upper bounds contain a high-resolution reference.
-
-#### Outer integration
-
-- adaptive midpoint on smooth, kinked, and step-like synthetic functions;
-- cache reuse;
-- deterministic results independent of task ordering.
-
-### 20.3 Integration tests
-
-1. **Legacy agreement:** for wells near \(\zeta=\pi/N_{\mathrm{fp}}\), new `action_length/L_ref` agrees with existing normalized \(J\).
-2. **\(\Theta\equiv1\) benchmark:** the surface/pitch quadrature agrees with an independent direct phase-space trapped-fraction integral.
-3. **Flux balance:** incoming and outgoing \(B=b\) surfaces carry equal absolute magnetic flux:
-   \[
-   \int_{\Sigma_b^-}|d\psi\wedge d\alpha|
-   =
-   \int_{\Sigma_b^+}|d\psi\wedge d\alpha|.
-   \]
-4. **One period versus full torus:** replicated calculations give the same \(f\).
-5. **QI-like synthetic field:** \(f\) is zero or converges to the expected small value.
-6. **Known edge-connected synthetic field:** compare with an analytic or independently discretized result.
-7. **W7-X reference data:** run a coarse deterministic smoke test, save diagnostics, and verify finite bounds with \(0\le f\le1\).
-
-### 20.4 Property tests particularly worth adding
-
-- renumbering mesh nodes does not change \(Q(b)\);
-- rotating \(\theta\) or shifting \(\zeta\) by a period does not change \(f\);
-- refining without changing topology does not destroy an already resolved edge connection;
-- every regular incoming point maps to exactly one regular outgoing point;
-- every transition port has the same number and ordering of common-parameter samples;
-- no well is counted twice in the incoming-surface measure.
-
----
+The September 3 appendix reports useful experiments, but its scripts/raw outputs,
+source choice and some statistical conventions were not recoverable during review.
+Reproduce important findings with commands, source, seeds, raw results, field hashes
+and error estimates before using them as acceptance evidence. Do not inherit its
+success probabilities, unsupported ≤0.3% tail bound, or projected runtime as results.
 
 ## 21. Error handling and convergence
 
-### 21.1 Status enums
+### 21.1 Status and scope
 
-Define explicit enums such as:
-
-```python
-class TraceStatus(Enum):
-    REGULAR = auto()
-    NO_WELL = auto()
-    MAX_PERIODS = auto()
-    ROOT_FAILURE = auto()
-    QUADRATURE_FAILURE = auto()
-    TANGENT_OR_TRANSITION = auto()
-    AXIS_UNRESOLVED = auto()
-    DEGENERATE = auto()
-```
-
-Equivalent statuses are needed for surface extraction, transitions, flood fill, and quadrature.
+Retain existing failure enums for legacy callers. New records distinguish covered
+regular branches, passing/empty proofs, incomplete scans, ambiguous root identity,
+unknown barriers/ports, unresolved accessibility, quadrature error, and budget
+exhaustion. `bound_scope` is separate from geometric status and from success.
+A diagnostic exception is a failure, not a physically resolved terminal.
 
 ### 21.2 No silent data loss
 
-The following are forbidden:
+Never:
 
-- replacing a failed trace with zero action or zero weight;
-- interpreting a clipped well as passing;
-- dropping triangles containing `NaN` without accounting for their measure;
-- treating a missing transition as no connection;
-- capping a long trace and assigning \(\Theta=0\);
-- merging disconnected surface components because they are close in Euclidean coordinates.
+- replace a failed trace with zero action or zero weight;
+- interpret a clipped well as passing;
+- drop `NaN` cells/triangles without accounting for their measure and influence;
+- treat a missing transition as no connection;
+- cap a long trace and assign \(\Theta=0\);
+- merge disconnected components/branches because they are close in coordinates;
+- propagate along a graph edge that changes action without a permitted transition;
+- bound a small region's global influence solely by its own local mass;
+- call a model-only gap or a statistical interval a field-level deterministic bound.
 
 ### 21.3 Convergence dimensions
 
-A production result must report convergence or an uncertainty bound with respect to:
+Report error/uncertainty or explicitly uncontrolled scope for field/radial
+interpolation; independent population and support; root scans/completeness and
+tolerances; period/window coverage; root/branch/chart/seam matching; barrier and
+transition parameter resolution; action/time quadrature; action interpolation;
+action/parameter bins and cycles; weighted cell quadrature; outer pitch integration;
+any omitted core/band; denominator; and optional sampling error.
+Legacy background/extraction/cut resolution remains relevant only when that path
+supplies data. Reusing a legacy result does not erase its uncertainties.
 
-1. Fourier/radial field interpolation;
-2. background mesh resolution;
-3. surface extraction and projection;
-4. surface refinement;
-5. root scan resolution;
-6. root tolerance;
-7. \(A\) and \(K\) quadrature tolerances;
-8. maximum field-period count;
-9. transition-curve sampling;
-10. interval merge tolerance or bitmask resolution;
-11. surface quadrature;
-12. outer \(b\) quadrature;
-13. any excluded core.
+## 22. Runtime and test budgets
 
-The result should include a machine-readable `ConvergenceReport` and a human-readable summary.
+### 22.1 Optimize measured costs
 
----
+Measure whole-equilibrium wall time and stage counts, including failed work.
+Prioritize shared scans, cached coefficients and batched quadrature. Validate an
+ordinary chart before orbit sampling. Reeb compression and fast first-hit solvers
+follow only if correctness and a measured bottleneck justify them.
 
-## 22. Parallelism and performance
+### 22.2 Parallelism
 
-### 22.1 Expected dominant cost
+Share read-only field/catalogue data. Parallelize independent scans or slices with
+bounded worker counts, without oversubscribing numerical libraries. Cache across
+pitches. One writer owns persistent output. Count actual elapsed time, not the sum
+of per-worker CPU time, for performance acceptance; record CPU time separately.
 
-The likely dominant work is repeated evaluation of \(B\) during:
+### 22.3 Acceleration acceptance
 
-- outgoing-bounce searches;
-- extrema searches;
-- \(A\) and \(K\) quadrature;
-- transition traces;
-- adaptive interior quadrature near marginal curves.
+An optimization must preserve branch ownership, root completeness/error scope,
+physical signs, actions/time within their existing error budgets, and lower/upper
+accessibility. Benchmark easy and difficult cases, including timeouts. Do not tune
+an approximation on the same few reference cases and call it generally safe.
 
-Graph traversal and interval union are expected to be secondary until meshes become very large.
+### 22.4 Initial benchmark guards
 
-### 22.2 Parallel strategy
+Use an initial **600-second whole-equilibrium wall guard**, including cold field
+loading, scan preparation, adaptive slices, outer integration and required result
+serialization. Retain a **600-second hard per-slice guard**; it does not grant an
+extra 600 seconds beyond the enclosing run. Record gap snapshots at 60, 300 and
+600 seconds when the run lasts that long. Optional interactive/plot rendering is
+reported separately and excluded from numerical timing; it must not hide numerical
+work. Record hardware, workers and warm/cold cache state.
 
-Use coarse-grained parallelism over \(b\) slices with `joblib`:
-
-```python
-results = Parallel(n_jobs=config.pitch.n_jobs)(
-    delayed(compute_pitch_slice)(field_data, background, b, source, config.slice)
-    for b in requested_b_values
-)
-```
-
-Adaptive outer quadrature should submit newly required midpoint slices in batches. Background arrays should be read-only and memory-mapped when process-based workers are used.
-
-Do not allow workers to write concurrently to one HDF5 file.
-
-### 22.3 Numba strategy
-
-Begin with transparent NumPy/SciPy code. After correctness:
-
-- compile field-line scan loops;
-- compile Fourier evaluation for fixed radial coefficients;
-- compile fixed-node quadrature and extrema bookkeeping;
-- compile polygon clipping and cellwise weights if profiling justifies it.
-
-Keep SciPy `brentq` in Python initially. Replace it only if root solving is a measured bottleneck.
-
-### 22.4 Performance instrumentation
-
-Record timings for:
-
-- field loading;
-- background mesh;
-- surface extraction;
-- well traces;
-- transition construction;
-- mesh cutting;
-- flood fill;
-- surface quadrature;
-- HDF5 I/O;
-- outer adaptivity.
-
-Save counts such as field evaluations, roots, trace periods, triangles, transitions, and interval operations.
-
----
+The standalone 30-case slice matrix uses 600 seconds per physical case, charging
+that case its full cold setup. Warm or amortized matrix runs are useful additional
+measurements but do not satisfy this standalone guard. The full-equilibrium
+benchmark includes all shared preparation exactly once.
+This initial full-run target is not a demonstrated runtime claim. If it fails,
+report failure and the interval-versus-time curve; an agent may not silently raise
+the guard, lower resolution or widen the accuracy target to claim success.
 
 ### 22.5 Test-time budget
 
-Test speed is a design constraint, not an afterthought: an agent that cannot run the
-suite in a coffee break stops running it. Two tiers, both measured on the researcher's
-laptop:
+| Tier | Command | Budget |
+| --- | --- | --- |
+| fast | `make test` | under 2 minutes; no single fast test over about 20 s |
+| full | `make test-full` | under 5 minutes; no single slow test over about 90 s |
 
-| Tier | Command | Selection | Budget |
+`make check` remains lint plus full tests. Activate the clean `.venv` first.
+Real-matrix experiments are separate from the fast/full suite; CI retains small
+production-path physics tests and checks the saved acceptance evidence where useful.
+Do not run the entire real matrix inside a five-minute unit-test budget.
+
+Before marking a test slow, shrink the experiment or share fixtures without losing
+the invariant. Every scientific claim retains a fast production-path test that
+fails under a meaningful mutation. No `skip`, `xfail`, relaxed tolerance, narrowed
+inputs, or slow marker solely to hide failure. The explicitly authorized R0 policy
+migration (§2.1) changes an obsolete milestone assertion into historical evidence;
+it does not waive scientific checks or the Tests workflow.
+
+## 23. Active development milestones
+
+Only **R0–R8** form the active queue. Select the first unchecked active milestone
+whose listed dependencies are complete with green Tests on the chosen code baseline.
+Do not select an unchecked row from historical status. A request for a retired
+number should be mapped through this table and explained, not silently implemented.
+
+| ID | Work | Depends on | Replaces or reuses |
 | --- | --- | --- | --- |
-| fast | `make test` | `-m "not slow"` | under 2 minutes total; no single test over about 20 s |
-| full | `make test-full` | everything | under 5 minutes total; no single `slow` test over about 90 s |
-
-The fast tier is what CI runs on every pull request and what an agent runs in its
-inner loop. The full tier is the gate before a milestone pull request is marked ready.
-
-Rules:
-
-- The default is fast. A test earns `@pytest.mark.slow` only when the physics it
-  covers genuinely cannot be exercised more cheaply, and the milestone pull request
-  must say why.
-- Before marking a test `slow`, make it cheaper: lower the mesh or Fourier resolution,
-  shrink the pitch grid, share expensive fixtures across tests at module scope, cache
-  a loaded `boozmn` field.
-- Marking a *failing* test `slow`, `xfail`, or `skip` to reach green is never
-  acceptable. See §21.2.
-- A `slow` test must not be the only live evidence for an acceptance criterion. Every
-  scientific claim keeps at least one fast test that goes through the production code
-  path and fails under a mutation of the physics it checks. A fast test that only
-  checks a schema, an array shape, or that nothing raised does not satisfy this.
-- `make test` prints a durations report. It is the early-warning system; when the
-  slowest fast test starts approaching 20 s, fix it in that pull request rather than
-  leaving it for the next one.
-
-This repository does not aim for exhaustive coverage of every parameter combination.
-It aims for a small suite of tests that would actually catch a wrong sign, a dropped
-term, or a misclassified topology, and that runs fast enough to be run every time.
-
----
-
-## 23. AI-agent milestones
-
-Each milestone should normally be one focused pull request. An agent must read this document and `AGENTS.md`, run the full existing test suite before and after its changes, and add both tests and at least one diagnostic example for any geometric feature.
-
-Completion state lives in `docs/STATUS.md`, not here. This section defines what each milestone *is*; `docs/STATUS.md` records which ones are done. A milestone's implementing pull request marks its own row there. Milestones are ordered: unless the researcher says otherwise, take the lowest-numbered unchecked row.
-
-### Milestone 0: Baseline and design scaffolding
-
-**Goal:** Establish package skeleton without changing numerical behavior.
-
-**Changes:**
-
-- add `alpha_analysis/j_connectivity/` with `__init__.py`, `config.py`, and `types.py`;
-- add optional dependency groups to `pyproject.toml`;
-- add a trivial import test;
-- add run metadata and status enums;
-- preserve all current CLIs and tests.
-
-**Acceptance:** Existing tests pass; new package imports with base dependencies;
-optional imports fail with informative messages.
-
-### Milestone 1: General Boozer field derivatives and asymmetric modes
-
-**Goal:** Provide the field interface needed by all later work.
-
-**Changes:**
-
-- extend `BoozerField` or add an adapter for sine coefficients;
-- implement analytic \(s\), \(\theta\), \(\zeta\), \(D_\parallel\), and \(D_\parallel^2\) derivatives;
-- expose \(C=G+\iota I\);
-- add synthetic Fourier fields;
-- add finite-difference and periodicity tests.
-
-**Acceptance:** Derivative tests pass for cosine and sine modes; current `compute_B` behavior is unchanged for existing data.
-
-### Milestone 2: Denominator \(V_h\) and global \(B\) bounds
-
-**Goal:** Implement the independent normalization calculation.
-
-**Changes:**
-
-- tensor-product quadrature for \(V_h\);
-- source-profile API;
-- refined global \(B\) extrema search;
-- convergence diagnostics and plots of \(B_{\min}(s)\), \(B_{\max}(s)\), and denominator convergence.
-
-**Acceptance:** Manufactured-field integrals agree with analytic/reference
-results; periodic resolution convergence is demonstrated.
-
-### Milestone 3: Deterministic periodic background mesh
-
-**Goal:** Build the axis-regular logical mesh without Gmsh.
-
-**Changes:**
-
-- disk triangulation, extrusion, prism-to-tet split;
-- periodic seam map;
-- boundary tags;
-- PyVista conversion and mesh plots;
-- mesh quality tests.
-
-**Acceptance:** No inverted tetrahedra; exact seam pairing; deterministic output; visual example generated.
-
-### Milestone 4: Gmsh background backend
-
-**Goal:** Add the production mesher behind the same interface.
-
-**Changes:**
-
-- logical-cylinder geometry;
-- periodic end-surface relation;
-- extraction of node, tetrahedron, and periodic-pair arrays;
-- optional size fields;
-- comparison with structured backend.
-
-**Acceptance:** Mesh passes the same invariants; Gmsh is isolated from core numerical data structures.
-
-### Milestone 5: \(B=b\) surface extraction
-
-**Goal:** Extract all level-surface components and incoming/outgoing halves.
-
-**Changes:**
-
-- PyVista prototype;
-- custom marching-tetrahedra reference or production path;
-- edge-root polishing;
-- periodic merge;
-- split by \(g=0\);
-- boundary tags and 3D visualizations.
-
-**Acceptance:** Synthetic isosurfaces have correct topology; vertex residuals meet tolerance; incoming/outgoing flux balance begins to converge.
-
-### Milestone 6: Regular well tracer
-
-**Goal:** Trace every regular surface vertex, not only the well near \(\pi/N_{\mathrm{fp}}\).
-
-**Changes:**
-
-- unwrapped field-line scan;
-- outgoing root and extrema detection;
-- endpoint-regularized \(A\) and \(K\);
-- itinerary records and statuses;
-- well-profile plots;
-- comparison against existing `compute_J_invariant()`.
-
-**Acceptance:** All regular synthetic tests pass; legacy selected-well agreement is within tolerance; long wells preserve period count.
-
-### Milestone 7: Surface data, refinement, and sheet candidates
-
-**Goal:** Evaluate action data over a whole pitch surface and refine discontinuity candidates.
-
-**Changes:**
-
-- batch traces at vertices;
-- interpolation-error estimators;
-- itinerary comparison;
-- local surface refinement and projection;
-- visual maps of \(A\), \(K\), exit, maxima count, and statuses.
-
-**Acceptance:** Smooth manufactured action fields converge; candidate return-map discontinuities sharpen with refinement.
-
-### Milestone 8: Critical curves
-
-**Goal:** Robustly extract and classify \(\Gamma_{\min}\), \(\Gamma_{\max}\), and degenerate portions.
-
-**Changes:**
-
-- polyline connectivity and periodic stitching;
-- second-derivative classification;
-- refinement around ambiguous segments;
-- curve plots.
-
-**Acceptance:** Synthetic critical curves match analytic locations and classifications.
-
-### Milestone 9: Transition mapping and action additivity
-
-**Goal:** Construct \(T\) and matched parent/child ports without yet cutting the full mesh.
-
-**Changes:**
-
-- backward and forward tangent-event traces;
-- common parameter samples;
-- \(A_W,A_1,A_3\);
-- additivity diagnostics;
-- multiway-event detection;
-- transition plots.
-
-**Acceptance:** Generic synthetic split satisfies additivity under refinement; mismatched nearest-neighbor associations are impossible because lifted field-line identity is retained.
-
-### Milestone 10: Constrained cuts and sheet IDs
-
-**Goal:** Insert \(T\), duplicate vertices, and make \(A\) continuous on each sheet.
-
-**Changes:**
-
-- polyline insertion into triangular mesh;
-- vertex/edge duplication;
-- branch-specific action values;
-- union-find sheet IDs;
-- coarse NetworkX transition graph;
-- before/after cut plots.
-
-**Acceptance:** No triangle spans an action jump; each port has a valid sheet; topology survives serialization.
-
-### Milestone 10.1: Sampling-robust cut geometry
-
-Inserted 2026-08-30 after the milestone-10 real-equilibrium matrix resolved no cut:
-the transition-mapping sample subset (`max_curve_samples`) directly becomes the
-inserted cut polyline, so the sample budget silently changes cut geometry and, on
-under-sampled curves, whether the cut resolves at all — the §21.3 dimension-9
-fragility ADR 0005 documented.
-
-**Goal:** Make the sheet graph invariant to the transition-mapping sample budget, or explicitly budget-limited — never silently budget-dependent.
-
-**Changes:**
-
-- `max_curve_samples` becomes a work budget: the sample subset densifies adaptively from the authoritative critical-curve vertices where a mapped midpoint disagrees with interpolation from its neighbors (geometric deviation, action deviation, itinerary change, EDGE proximity, near self-contact);
-- an explicit budget-insufficient transition status/reason when certification is not reached within budget, instead of cutting a different, coarser curve;
-- budget-invariance acceptance checks: identical sheet graphs across budgets (8, 10, 16, full) or an explicit budget report;
-- documentation no longer describes the subset as "bounding cost without coarsening geometry".
-
-**Acceptance:** A named test demonstrates sheet-graph invariance across sample budgets on the production synthetic field and on the DMercFail reference equilibrium, and a named test demonstrates the explicit budget-insufficient path; no cut resolves or changes topology as a silent function of the budget.
-
-### Milestone 10.2: Contact localization and segment-level cutting
-
-Inserted 2026-08-30: after ADR 0003, 57 of the 164 real-matrix transition curves are
-`MULTIWAY` because coarse sampling steps over an interior-maximum count change
-somewhere along the curve — only 6 of 164 are free of one — and the all-or-nothing
-resolvability gate then vetoes the entire curve, so real equilibria essentially never
-cut at any affordable sampling.
-
-**Goal:** Cut the resolved arcs of a transition curve whose nongeneric events are localized, keeping every event an explicit §5.4 hyperedge.
-
-**Changes:**
-
-- bisection in \(u\) of ADR 0003 contact brackets (each bracketed event is localized to a tight interval or dissolved as a sampling artifact by a few extra traces);
-- subdivision of transition curves at localized events and at nongeneric samples;
-- explicit event nodes with arbitrary port count (§5.4) at subdivision points, including the sheet-graph treatment of a cut terminating at an interior event junction;
-- per-arc resolvability and cutting, replacing the whole-curve gate, with the nongeneric arcs retained as explicit unresolved or event hyperedges.
-
-**Acceptance:** A curve with one bracketed contact cuts its regular arcs and carries an explicit event hyperedge at the localized contact — never an arbitrary binary decomposition; the W7-X reference curve with four contacts yields cut arcs plus explicit events; no dangling cut terminates in a surface interior without an event node.
-
-### Milestone 10.3: Failure-directed refinement and matrix convergence
-
-Inserted 2026-08-30: the remaining real-matrix failures are resolution effects with
-machine-readable reasons (unresolved surfaces and critical curves, thin
-\(T\)-to-`EDGE` strips, off-component projections, `MAX_PERIODS` caps), each with a
-demonstrated targeted remedy from the milestone-9/10 convergence probes — but today
-each remedy requires manual per-case tuning.
-
-**Goal:** Make the five-equilibrium matrix converge unattended: every failure
-class triggers its targeted remediation, bounded, and what remains unresolved is
-physics or an explicit budget, not a default knob. Unresolved cuts into sheets
-are very rare: 5% or fewer of cases in the 120-case matrix.
-
-**Changes:**
-
-- a coordinator that dispatches on the recorded unresolved reason: background refinement for unresolved extractions/critical curves, \(u\)-refinement for contact brackets, per-sample period-cap escalation for `MAX_PERIODS`, component-provenance enforcement for off-surface projections, and local surface refinement near thin transition strips;
-- local (not global) surface refinement around companion curves whose strip width fails the resolution requirement;
-- bounded escalation with every retry recorded (§21.3);
-- regeneration of the real-equilibrium validation matrix with budget-invariance
-  checks.
-- To achieve resolved outcomes for least 95% of the cases n the 120-case matrix,
-  diagnose the reasons for unresolved cases, devise new ideas if needed to
-  remedy the unresolved cases, and budgets can be increased.
-
-**Acceptance:** The 120-case matrix report shows every case either resolves or terminates with a physically meaningful reason (a genuinely unrepresentable strip at the refinement bound, a genuine cap ceiling) with counts per failure class; no case needs manual per-case tuning to resolve.
-At least 95% of the cases in the matrix have resolved cuts into sheets or have
-no transitions; only 5% or fewer of the cases are unresolved.
-
-### Milestone 11: Direct contour tracer
-
-**Goal:** Build the correctness oracle.
-
-**Changes:**
-
-- PL contour traversal;
-- periodic adjacency;
-- transition branching;
-- loop detection and memoization;
-- interactive contour plots.
-
-**Acceptance:** Hand-built and synthetic reachability cases are correct; no infinite loops; critical conventions are tested.
-
-### Milestone 12: Interval primitives and bounded ordinary flood fill
-
-**Goal:** Classify edge-connected action ranges without transitions using a finite algorithm with lower and upper bounds.
-
-**Changes:**
-
-- `IntervalSet` and serialization for exact local operations;
-- finite action-atom grids and sparse bitmasks;
-- inner/outward snapping rules;
-- triangle work queues, edge seeds, and ordinary propagation;
-- property-based tests;
-- visualization of lower, upper, and unresolved per-triangle intervals.
-
-**Acceptance:** The worklist terminates deterministically; lower and upper results bracket direct tracing on random regular query points; the unresolved weighted area converges to zero under atom refinement for surfaces without transitions.
-
-### Milestone 13: Transition-aware bounded flood fill
-
-**Goal:** Add common-parameter transfer through hyperedges while preserving finite termination and bounds.
-
-**Changes:**
-
-- finite transition-parameter atom grids;
-- affine preimage/image mappings with inner and outer snapping;
-- monotone segment subdivision;
-- optional continuous-interval accelerator with iteration cap;
-- comparison with direct tracer.
-
-**Acceptance:** Generic splits, affine transition cycles, and periodic cases terminate; lower/upper classifications bracket direct tracing and converge under joint action/parameter refinement.
-
-### Milestone 14: Reachable-polygon and surface quadrature
-
-**Goal:** Compute \(Q(b)\).
-
-**Changes:**
-
-- triangle clipping by action intervals;
-- regular weighted quadrature;
-- singular boundary-triangle treatment;
-- per-sheet/radial contributions;
-- lower/upper unresolved bounds;
-- polygon and contribution plots.
-
-**Acceptance:** Analytic polygon tests and logarithmic convergence tests pass; \(Q(b)\) is invariant to triangle ordering.
-
-### Milestone 15: Pitch-slice pipeline and HDF5
-
-**Goal:** Produce a restartable `PitchSliceResult` end to end.
-
-**Changes:**
-
-- orchestration;
-- HDF5 schema;
-- cache keys;
-- VTK bundle output;
-- human-readable pitch-slice report.
-
-**Acceptance:** Interrupted runs restart without recomputing completed stages; round-trip data preserve topology and intervals.
-
-### Milestone 16: Adaptive outer quadrature and parallel execution
-
-**Goal:** Compute final \(f\).
-
-**Changes:**
-
-- adaptive midpoint tree;
-- joblib batching;
-- parent-only HDF5 merge;
-- `FractionResult` and convergence plots.
-
-**Acceptance:** Manufactured integrands pass; deterministic result independent of worker count and task completion order.
-
-### Milestone 17: Full validation suite
-
-**Goal:** Establish scientific credibility on synthetic and repository data.
-
-**Changes:**
-
-- \(\Theta\equiv1\) benchmark;
-- flux-balance check;
-- one-period/full-torus check;
-- W7-X coarse integration test;
-- convergence dashboard;
-- documented known limitations.
-
-**Acceptance:** All required validations pass or produce explicit quantified unresolved bounds.
-
-### Milestone 18: Profiling and Numba acceleration
-
-**Goal:** Optimize only measured bottlenecks.
-
-**Changes:**
-
-- benchmark suite;
-- Numba field-line scan and quadrature kernels;
-- memory profiling;
-- performance report.
-
-**Acceptance:** Numerical results remain unchanged within tolerance; meaningful speedup is demonstrated on a representative pitch slice.
-
----
+| R0 | Baseline migration and independent population ledger | plan-bearing main | old 2; historical 10.3 policy |
+| R1 | Efficient shared forward scans and bounce integrals | R0 | old 6, measured part of 18 |
+| R2 | Root-labelled atlas and barrier-height transitions | R1 | old 3–5, 7–10.x as production path |
+| R3 | Independent continuous contour oracle | R2 | old 11 |
+| R4 | Bounded ordinary action-bin accessibility | R3 | old 12 |
+| R5 | Transitions, cycles and global uncertainty | R4 | old 13 |
+| R6 | Weighted pitch-slice bounds and persistence | R5 | old 14–15 |
+| R7 | Outer fraction and birth-space validation | R6 | old 16 plus independent validation |
+| R8 | Five-equilibrium accuracy and runtime acceptance | R7 | old 17 and final measured optimization |
+
+### R0 — Baseline migration and independent population ledger
+
+**Goal:** start from a green baseline and count trapped birth weight independently
+of well tracing/accessibility. Apply the exact integration policy in §2.1.
+
+**Deliver:** historical matrix regression, source-aware population/denominator
+ledger with explicit assumption/error scope, whole-pitch-band bounds, and diagnostic
+weight-versus-pitch/radius plots. Do not classify accessibility yet.
+
+**Acceptance:**
+
+- `test_historical_cut_matrix_is_preserved` verifies the saved failure census,
+  exception and provenance without asserting the retired target passed.
+- `test_population_ledger_matches_analytic_trapped_fraction` checks normalization,
+  pitch Jacobian and nonconstant source against an independent analytic integral.
+- `test_surface_maximum_is_not_linewise_trapping_on_rational_plateau` exercises
+  the counterexample in §12.1, prohibiting a false equality claim.
+- `test_missing_weight_uses_total_upper_minus_covered_lower` catches both error
+  directions and overlapping ownership; `test_whole_pitch_band_upper_weight`
+  checks the omitted-band bound.
+- Run ledger-only evidence on all five fields/six pitches with declared source,
+  support and field/maxima/quad assumptions. Estimates remain labelled estimates.
+
+**Mutations:** drop \(b^{-2}\) or evaluate source at \(s\) instead of \(\sqrt s\);
+substitute an uncontrolled total estimate for its upper bound. No prior 10.3 green
+gate is required. Existing scientific regressions and the selected baseline gate are.
+
+### R1 — Efficient shared forward scans and bounce integrals
+
+**Goal:** query all ordinary wells from shared pitch-independent line data with
+measured cost improvement and explicit incomplete coverage.
+
+**Deliver:** reusable catalogue/cache, coverage and root-completeness records,
+batched \(A,K\) quadrature, independent adaptive reference, and diagnosed
+near-tangent failure behavior. Keep legacy tracer API behavior compatible.
+
+**Acceptance:** `test_shared_catalogue_matches_independent_well_traces` across
+several pitches/wells; `test_window_end_is_not_passing`; `test_scan_detects_or_bounds_hidden_barrier`;
+`test_batched_integrals_preserve_near_tangent_accuracy`; and
+`test_catalogue_resumes_without_losing_first_crossing`. Include both signs of \(C\),
+multiple windows and source-independent reuse. Save representative five-field
+timings including failures; no promised speedup factor substitutes for measurements.
+
+**Mutations:** skip a narrow barrier or reset a lift across a window; remove endpoint
+regularization. A failed integral stays unknown with its reason.
+
+### R2 — Root-labelled atlas and barrier-height transitions
+
+**Goal:** represent ordinary well families, their measure/ownership and genuine
+split/merge ports without global surface cuts.
+
+**Deliver:** controlled chart baseline, root continuation, local extrema heights,
+coverage/cell predicates, seam maps and ordinary transition ports. Keep difficult
+events enclosed. Include chart/count/action/transition diagnostics.
+
+**Acceptance:** `test_atlas_counts_each_incoming_bounce_once`;
+`test_multicover_chart_and_periodic_lifts_preserve_distinct_wells`;
+`test_below_b_fold_preserves_return_branch` contrasted with
+`test_barrier_crossing_creates_matched_additive_ports`;
+`test_cell_detects_or_encloses_closed_barrier_loop_and_two_crossings`;
+`test_unknown_multiplicity_remains_in_coverage_bound`. Reproduce the independently
+known six-well synthetic ports and DMercFail 0.8 reference, and probe TURBO 0.1,
+PCA 0.1, DMercFail 0.05 and high-pitch d23p4 failures. Do not use the old unresolved
+mesh topology as expected truth. Run bounded atlas evidence on all 30 physical cases.
+
+**Mutations:** merge two chart branches, drop the seam shift, or accept a sampled
+Taylor test without its required error/branch coverage.
+
+### R3 — Independent continuous contour oracle
+
+**Goal:** answer selected accessibility queries directly in the field, with positive
+witnesses, justified negative closure, or explicit uncertainty.
+
+**Acceptance:** `test_direct_contour_closes_without_edge`;
+`test_direct_contour_reaches_edge_with_constant_action`;
+`test_direct_contour_branches_at_same_event_parameter`;
+`test_contour_budget_exhaustion_remains_unknown`. Include saddles, periodic lifts,
+multiple branches and a gradient check retaining radial \(C\)/shear terms. Test
+real closed/edge/transition queries on the DMercFail reference and report completion
+fractions and runtimes on the five-field query set. Completion rate is feasibility
+evidence, not an unbiased loss estimate.
+
+**Mutations:** omit a transition branch or a radial gradient term; accept an
+unfinished contour as closed. Do not assume agreement near PL uncertainty boundaries.
+
+### R4 — Bounded ordinary action-bin accessibility
+
+**Goal:** terminate with correct lower/upper action-contour accessibility without
+transitions, including uncertain chart/field data.
+
+**Acceptance:** `test_ordinary_bounds_bracket_direct_contours`;
+`test_disconnected_equal_action_branches_do_not_connect`;
+`test_connected_reeb_interval_is_not_radial_escape` (\(A=s\));
+`test_nested_action_bins_tighten_fixed_geometry_bounds`;
+`test_flat_action_and_saddle_cases_preserve_measure`. Check spatial adjacency,
+actual edge seeds, finite termination and symbolic conventions.
+
+**Mutations:** permit motion along a Reeb edge or connect disconnected cells merely
+by action overlap. Real no-transition slices provide production comparisons.
+
+### R5 — Transitions, cycles and global uncertainty
+
+**Goal:** preserve common-parameter transfers and enclose the nonlocal effect of
+missing geometry, including arbitrary cycles.
+
+**Acceptance:** `test_transition_transfer_preserves_parameter_not_action`;
+`test_affine_cycles_terminate_and_bracket_oracle` including noncontracting maps;
+`test_tiny_unknown_connector_changes_large_population_bound`;
+`test_self_transition_and_constant_port_preimages`;
+`test_unknown_edge_incidence_and_omitted_core_remain_possible`. Verify a missing
+whole branch is accounted for, not only existing cells with unknown actions.
+
+**Mutations:** remove an uncertain link from the upper calculation, omit a permitted
+port, or use local unknown mass as the entire global error. Reeb compression remains
+optional and must pass the same tests before adoption.
+
+### R6 — Weighted pitch-slice bounds and persistence
+
+**Goal:** produce restartable \(Q_L,Q_U\) with explicit numerical error scope.
+
+**Acceptance:** `test_weighted_reachable_polygons_match_independent_integrals`;
+`test_marginal_quadrature_uses_interior_nodes_and_valid_error_scope`;
+`test_slice_population_ledger_closes_without_double_counting`;
+`test_partial_atlas_missing_mass_and_influence_are_both_retained`;
+`test_restart_preserves_branch_ids_masks_and_error_scope`. Test a degenerate
+endpoint where the nondegenerate logarithmic model cannot be blindly used. At least
+one nontrivial real transitioned slice must yield field-level bounded \(Q\),
+independently checked; run and report the remaining 30-case slice matrix honestly.
+
+**Mutations:** omit a weight/Jacobian or unknown-action cell; restart with a different
+source/field while retaining old weights. Preserve supported legacy persistence APIs.
+
+### R7 — Outer fraction and birth-space validation
+
+**Goal:** compute full \(f\), with pitch/denominator errors and an independent
+birth-space check. Optional sampling supplements, never replaces, the enclosure.
+
+**Acceptance:** `test_outer_bounds_cover_unsampled_pitch_structure`;
+`test_fraction_ratio_uses_denominator_bounds_in_correct_direction`;
+`test_theta_one_matches_independent_birth_fraction`;
+`test_fraction_is_periodic_and_worker_order_invariant`;
+`test_failed_birth_queries_remain_unknown_without_selection_bias`.
+If gap sampling is added, `test_gap_sampler_uses_global_ambiguity_and_b_inverse_square`
+is required. Check declared nonconstant sources and per-equilibrium cold-start timing.
+
+**Mutations:** drop \(b^{-2}\), use the wrong denominator endpoint, or discard
+failed contour samples. Produce complete reports for all five fields, even if wide.
+
+### R8 — Five-equilibrium accuracy and runtime acceptance
+
+**Goal:** demonstrate the scientific outcome, not merely completed geometry.
+
+**Acceptance:** a saved reproducible matrix and named validator
+`test_redesign_matrix_meets_accuracy_and_runtime_contract` enforce §20.3 and
+§22.4: 29/30 field-enclosed slices, all five full-equilibrium widths ≤0.01,
+source/controls/field/revision provenance, error-scope checks, honest failures and
+cold-start runtime guards. Include controlled chart/bin/quad refinement comparisons,
+independent contour checks, total-population closure, birth-space validation and
+interval-versus-time plots. The validator does not rerun the expensive matrix in CI.
+
+Optimize only measured bottlenecks while preserving tolerances and tests. If a
+criterion fails, leave R8 unchecked and report the unresolved mechanisms. Do not
+change the denominator of the success rate, reclassify wide bounds as successes,
+or claim a general 95% success probability from five tested equilibria.
 
 ## 24. Agent implementation protocol
 
-For every milestone, the implementing agent should:
+Read §23, the relevant algorithm sections, active STATUS notes and AGENTS before
+coding. Work on one active milestone at a time; use dependencies rather than the
+obsolete numerical sequence. Explain whether a requested retired milestone maps
+to an active replacement. Do not rerun a resolved policy STOP from ADR 0010.
 
-1. read this design and `AGENTS.md`;
-2. identify the exact acceptance tests before coding;
-3. avoid broad refactors unrelated to the package;
-4. preserve existing public behavior;
-5. use plain arrays in the numerical core;
-6. add docstrings defining conventions and units;
-7. add at least one visualization or diagnostic for new geometry;
-8. add unit tests and run all existing tests;
-9. record any deviation from this design in the pull-request description;
-10. never hide an unresolved topology or numerical failure.
+Write meaningful acceptance tests first for code milestones, implement the required
+scope, run the gates, verify the important mutations, and record measured evidence
+and unresolved limitations in the PR. Do not claim future APIs or validation as
+implemented. Document any new physics/bound ambiguity in an ADR rather than guessing.
 
-A reviewer should reject a pull request that produces plausible pictures but lacks machine-checkable invariants.
+Use a separate `codex/` branch/worktree from the appropriate plan-bearing baseline,
+preserving the user's uncommitted work. Open implementation PRs as drafts and require
+green GitHub Tests before completion. Once the applicable milestone gates and Tests
+pass on the final revision, automatically mark the PR ready to trigger Claude Code
+Review; no further user request is needed. Unresolved STOP conditions leave the PR
+draft. Optional Claude review does not block next work when unavailable; its
+applicable findings still deserve review. Do not merge
+without user authorization. Planning-only edits do not require scientific mutations
+or a full matrix run; check document consistency and disclose known baseline failures.
 
----
+## 25. Scientific completion checklist
 
-## 25. Scientific validation checklist
+- [ ] Field conventions, physical orientation, source argument and pitch conservation checked.
+- [ ] Every counted well has authoritative root identity, unique ownership and bounded coverage error.
+- [ ] No hidden barrier is silently excluded by a scan or interpolation assumption.
+- [ ] Below-\(b\) folds preserve ordinary branches; true transitions preserve matched event position.
+- [ ] Accessibility preserves action between transitions and all permitted branches at transitions.
+- [ ] Unknown connections propagate globally, including omitted core/long-well influence.
+- [ ] Action/time, population, denominator and outer errors are included with declared scope.
+- [ ] Total population and independent birth/contour checks agree within their stated uncertainties.
+- [ ] Periodicity, restart and worker-order invariance are demonstrated.
+- [ ] All real cases are reported, with no tuning or failure exclusions.
+- [ ] Accuracy and cold-start runtime gates are met before R8 is complete.
+- [ ] Diagnostic plots distinguish known, possible, and unresolved states.
 
-Before a result is described as converged, verify:
+## 26. Decisions and legacy mapping
 
-- [ ] all surface vertices satisfy the \(B=b\) residual tolerance;
-- [ ] incoming vertices have the correct physical sign of \(\mathbf b\cdot\nabla B\);
-- [ ] every regular trace has one first outgoing root and stays below \(b\) in between;
-- [ ] periodic shifts leave \(A\), \(K\), itinerary, and \(\Theta\) unchanged;
-- [ ] all identified generic transitions satisfy action additivity;
-- [ ] every itinerary discontinuity is explained by a transition or marked unresolved;
-- [ ] no triangle crosses an uncut action discontinuity;
-- [ ] direct contour tracing and flood fill agree away from critical values;
-- [ ] incoming/outgoing surface fluxes agree under refinement;
-- [ ] the \(\Theta\equiv1\) benchmark agrees with an independent integral;
-- [ ] the denominator is independently converged;
-- [ ] the outer \(b\) integral is converged;
-- [ ] maximum trace-period and omitted-core bounds are negligible or reported;
-- [ ] \(0\le f_{\mathrm{lower}}\le f\le f_{\mathrm{upper}}\le1\);
-- [ ] results are reproducible after HDF5 restart;
-- [ ] all diagnostic plots identify unresolved data visibly.
+[ADR 0010](adr/0010-branch-atlas-and-bounded-f.md) records the accepted replacement
+of mandatory surface cutting, active R0–R8 sequence, migration policy and bounds
+contract. The physical state remains the incoming bounce point; only its numerical
+representation changes. Local charts do not assume a global single-valued action.
 
----
+Old ADRs 0001–0006 remain explanations of retained legacy implementations.
+The proposed policies in 0007/0008 are superseded for new development, not a blanket
+acceptance of their legacy event connectivity. ADR 0009's failed measurement remains
+true; its decision menu is superseded, not answered by declaring 35% adequate.
+The independent proposal's incorrect Reeb traversal, unconditional zero-measure
+argument and unverified tail guarantees are not part of this plan.
 
-## 26. Design decisions and rationale
+## 27. Deferred extensions
 
-### Decision 1: Mesh incoming bounce points, not \((\rho,\alpha)\)
+After R8, consider orbit-window reuse, validated spline scans, circle-rotation
+first-hit algorithms, Reeb compression retaining action subsets, Numba, or
+symmetry reduction according to measured bottlenecks. A probabilistic physical
+transition model is a different metric and requires a separate design decision.
 
-The global \((\rho,\alpha)\) projection is multivalued and develops folds when wells split or merge. The physical incoming surface \(\Sigma_b^-\) is the correct two-dimensional state space and counts each well once.
+## 28. Definition of done
 
-### Decision 2: Process fixed \(B_b\) slices
-
-\(B_b=W_0/\mu\) is conserved. Independent surfaces allow pitch-specific adaptivity and parallelism. A shared volume mesh retains reuse without forcing every pitch to share the same refinement.
-
-### Decision 3: Use action contours, not a bounce-averaged drift ODE
-
-Once \(A\) is tabulated, drift trajectories are its level contours. Piecewise-linear contour topology avoids repeated bounce-average evaluation inside an ODE callback.
-
-### Decision 4: Use explicit transition hyperedges
-
-A split/merge changes the action discontinuously. It cannot be represented by ordinary interpolation across a triangle. The mesh must be cut and the permitted branch relation stored explicitly.
-
-### Decision 5: Use bounded interval/atom flood fill for production
-
-The scalar integral requires classifying a continuum of states. Propagating reachable action ranges amortizes the work over all contours and maps directly to PL polygon clipping. The production path uses finite action and transition-parameter atoms with inner and outer snapping, so it terminates and supplies lower/upper bounds. Continuous interval propagation is an optional accelerator, not the sole correctness argument.
-
-### Decision 6: Retain direct contour tracing
-
-The flood fill is efficient but globally sensitive to topology errors. A transparent pointwise tracer is the most valuable correctness oracle.
-
-### Decision 7: Use axis-regular \((x,y,\zeta)\) geometry
-
-Polar logical coordinates collapse at \(\rho=0\). The Cartesianized disk gives a valid tetrahedral mesh and a regular expression for the phase-space two-form.
-
-### Decision 8: Keep external libraries outside the scientific topology core
-
-Gmsh, PyVista, and NetworkX provide mature generic operations, but none knows the first-return well identity or the physical transition rule. Those remain explicit custom code over NumPy arrays.
-
----
-
-## 27. Future extensions
-
-After version 1 is validated, possible extensions include:
-
-1. **Probabilistic transitions:** replace Boolean hyperedges with branch probabilities based on separatrix-crossing theory and solve an absorbing Markov problem.
-2. **Directed dynamics:** retain the orientation of the bounce-averaged drift rather than treating contours as undirected.
-3. **Reeb graph acceleration:** build an explicit Reeb graph on each cut sheet and compare with the bounded flood fill.
-4. **TTK validation:** use Topology ToolKit on continuous sheet fields after cuts.
-5. **MPI:** distribute pitch slices over nodes.
-6. **Continuation in \(b\):** deform one extracted surface into neighboring pitch values and reuse triangulations and root brackets.
-7. **Optimization support:** differentiate a regularized or probabilistic version of the metric.
-8. **Finite-orbit-width comparison:** compare the topological accessibility bound with guiding-center orbit following.
-
----
-
-## 28. Definition of done for version 1
-
-Version 1 is complete when the repository can, from a Boozer equilibrium and a source profile:
-
-1. construct all fixed-\(B_b\) incoming-bounce surfaces needed by an adaptive outer quadrature;
-2. enumerate all regular wells on those surfaces rather than only a preferred well near \(\zeta=\pi/N_{\mathrm{fp}}\);
-3. compute \(A\), \(K\), exit winding, extrema, and itinerary data;
-4. construct and validate generic split/merge transitions;
-5. cut the surface so \(A\) is continuous on each sheet;
-6. compute edge reachability with both direct contour tracing and bounded action/transition-atom flood fill;
-7. integrate the reachable phase-space weight and form \(f\);
-8. report lower/upper bounds for unresolved regions;
-9. checkpoint and restart the calculation;
-10. generate the required mesh, surface, transition, reachability, quadrature, and convergence visualizations;
-11. pass the synthetic, legacy-regression, flux-balance, \(\Theta\equiv1\), periodicity, and W7-X smoke tests;
-12. provide a convergence report sufficient to judge whether a quoted value of \(f\) is trustworthy.
+The redesigned calculation is complete only when R0–R8 meet their named tests,
+required diagnostics, source-aware field-level bounds, five-equilibrium accuracy
+and runtime evidence, compatibility gates and green GitHub Tests. An accepted
+planning document, successful cut, informative failure report or narrow model-only
+interval is not completion of the scientific calculation.
