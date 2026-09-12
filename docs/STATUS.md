@@ -13,13 +13,13 @@ implementation milestone complete.
 
 ## Active plan
 
-**Next milestone: R1. R0 is complete.** Follow the dependencies in `DESIGN.md`
+**Next milestone: R2. R0 and R1 are complete.** Follow the dependencies in `DESIGN.md`
 §23; retired milestones are not prerequisites.
 
 | ID | Milestone | Goal | Done | PR |
 | --- | --- | --- | --- | --- |
 | R0 | Baseline migration and independent population ledger | Establish the accepted code baseline, preserve historical evidence and tests, and independently account for trapped population and unresolved weight | [x] | #26 |
-| R1 | Efficient shared forward scans and bounce integrals | Share field-line scans, enumerate maximal wells, and evaluate batched \(A,K\) with error accounting | [ ] | |
+| R1 | Efficient shared forward scans and bounce integrals | Share field-line scans, enumerate maximal wells, and evaluate batched \(A,K\) with error accounting | [x] | #27 |
 | R2 | Root-labelled atlas and barrier-height transitions | Build local well charts, explicit seam ownership and certified generic transition relations | [ ] | |
 | R3 | Independent continuous contour oracle | Follow constant-action contours and permitted branch transitions without relying on the atlas reachability implementation | [ ] | |
 | R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [ ] | |
@@ -62,9 +62,9 @@ do not relax the fast/full test-suite budgets.
   field enclosures or accessibility classifications. The nonsingular whole-band
   fraction changed by at most 3.351e-4 between the recorded grids, but individual
   fixed-b tensor estimates changed by as much as 46.8% near their integrable
-  singularity; the diagnostics show that coarse/fine spread explicitly. R1 should
-  return `LinewiseTrappingMasks` from its scans: definite and possible masks plus
-  a reason keep incomplete roots in the population interval, while the scalar
+  singularity; the diagnostics show that coarse/fine spread explicitly. R1 now
+  returns `LinewiseTrappingMasks` from centered scans: definite and possible masks
+  with reasons that keep incomplete roots in the population interval. The scalar
   accessor rejects unresolved weight. R6 must separately resolve radial support
   boundaries where `b` crosses `B_max(s)` (§13.2); fixed Gauss nodes can jump across
   them, so the present grid spread is not a bound. Carry source and bound scope for
@@ -78,6 +78,17 @@ do not relax the fast/full test-suite budgets.
 - Existing public functions, CLI entry points and legacy mesh/extractor tests
   remain compatibility obligations. The old numerical path is also a useful
   reference on cases it resolves; it is not the production prerequisite for R2–R8.
+- R1's [forward-scan evidence](validation/r1-forward-scan-matrix.md) covers one
+  lifted line per field at all 30 specified pitches and two scan resolutions.
+  The Fourier-model envelope excluded hidden \(B=b\) barriers on those lines;
+  16/30 pitch probes per resolution still ended at a censored four-period window.
+  A certificate for roots inside a window does not establish complete global
+  line or atlas coverage. Up to ten cells per line retained unverified extrema,
+  so R2 must continue or enclose those local families rather than treating the
+  sampled extrema itinerary as a stable branch label. Batched \(A,K\) values
+  retain summed numerical estimates and an independent adaptive comparison,
+  not rigorous field or quadrature enclosures. The five-field timings are
+  representative local probes, not a final \(f\) runtime or accuracy claim.
 - Keep the physical trace direction `sign(G + iota I)`, authoritative half-bounce
   action `A` and time length `K`, lifted root/port identities, and explicit
   `MAX_PERIODS`, root, quadrature and topology failures. A capped or clipped well
