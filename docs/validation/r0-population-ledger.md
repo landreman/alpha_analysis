@@ -4,8 +4,8 @@ This is a ledger-only run on the five reference equilibria and six required
 radially global pitch levels. It does **not** classify accessibility and every
 number below remains a quadrature **estimate**, not a field-level enclosure.
 
-Source: `h(rho)=1 (UniformSourceProfile)`. Revision: `620a8fbb5d4125610843c7270dc9a0c8e7ba2ece`.
-Total wall time: 7.307 s on macOS-14.7.6-arm64-arm-64bit
+Source: `h(rho)=1 (UniformSourceProfile)`. Revision: `dc95074d6faf600b05a2ceef04230f007b51d5bb`.
+Total wall time: 7.191 s on macOS-14.7.6-arm64-arm-64bit
 with one worker, new field objects, and an uncontrolled warm OS file cache.
 
 ## Assumptions and uncontrolled scope
@@ -14,6 +14,7 @@ with one worker, new field objects, and an uncontrolled warm OS file cache.
 - surface maxima at population nodes are sampled-grid estimates, not upper bounds
 - coarse-fine differences are convergence diagnostics, not error enclosures
 - field interpolation, extrema, population and denominator quadrature errors are uncontrolled
+- radial support boundaries where b crosses B_max(s) are unresolved by fixed Gauss nodes (DESIGN 13.2)
 
 The pitch support uses the locally optimized global extrema estimates. The
 population-node surface maxima are sampled on each listed angular grid. Neither
@@ -23,11 +24,11 @@ optimization nor coarse/fine agreement is promoted into a rigorous bound.
 
 | field | B min | B max | trapped fraction (fine) | |fine-coarse| | wall s |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc | 7.7156843 | 12.03069 | 0.38462758 | 3.351e-04 | 1.708 |
-| boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc | 7.342417 | 12.032438 | 0.36669897 | 2.350e-05 | 1.411 |
-| boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc | 5.0404659 | 12.050344 | 0.62959086 | 4.782e-06 | 1.489 |
-| boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc | 2.293059 | 3.3705889 | 0.39615999 | 5.804e-05 | 1.431 |
-| boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc | 4.9092607 | 7.0698003 | 0.27817912 | 6.299e-05 | 1.202 |
+| boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc | 7.7156843 | 12.03069 | 0.38462758 | 3.351e-04 | 1.695 |
+| boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc | 7.342417 | 12.032438 | 0.36669897 | 2.350e-05 | 1.385 |
+| boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc | 5.0404659 | 12.050344 | 0.62959086 | 4.782e-06 | 1.405 |
+| boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc | 2.293059 | 3.3705889 | 0.39615999 | 5.804e-05 | 1.499 |
+| boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc | 4.9092607 | 7.0698003 | 0.27817912 | 6.299e-05 | 1.148 |
 
 The nonsingular whole-band primitive changes by at most 3.351e-04 between these grids. Individual fixed-b
 tensor estimates change by as much as 46.8%: their integrable B=b singularity is not
