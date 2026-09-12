@@ -51,6 +51,10 @@ def summarize(result):
         "path_steps": [len(path.points) for path in result.paths],
         "numerically_closed": [path.closed for path in result.paths],
         "edge_intersections": [path.edge_reached for path in result.paths],
+        "max_estimated_error_A": max(
+            (point.error_A for path in result.paths for point in path.points),
+            default=None,
+        ),
         "port_outcomes": [
             {"role": role, "status": status.name, "reason": reason}
             for role, status, reason in result.port_outcomes
@@ -98,7 +102,7 @@ def run() -> None:
         "milestone": "R3",
         "source": "h(rho)=1 (declared benchmark; contour geometry is source-independent)",
         "pitch_provenance": "R0 sampled radially global extrema estimates; not field enclosures",
-        "scope": "represented Fourier/interpolated field, numerical A/gradient/path, finite-window root topology; no f enclosure",
+        "scope": "represented Fourier/interpolated field, adaptive numerical A with estimated quadrature error, numerical gradient/path, finite-window root topology; no field or f enclosure",
         "hardware": platform.platform(),
         "workers": 1,
         "cache_state": "new field objects; warm OS cache uncontrolled",
@@ -181,6 +185,7 @@ def run() -> None:
                             "zeta_in": seed.zeta_in,
                             "zeta_out": seed.zeta_out,
                             "A": seed.action_length,
+                            "error_A": seed.error_A,
                         },
                         "wall_seconds": time.perf_counter() - t0,
                     }
@@ -245,6 +250,20 @@ def run() -> None:
         )
         for label in ("coarse", "fine")
     }
+    completions = {}
+    for label in ("coarse", "fine"):
+        total = sum(counts[label].values())
+        seeded = total - counts[label]["NO_SEED"]
+        completed = counts[label]["ACCESSIBLE"] + counts[label]["INACCESSIBLE"]
+        completions[label] = (completed, seeded)
+    no_seed_both = sum(
+        all(p["status"] == "NO_SEED" for p in case["probes"])
+        for case in evidence["cases"]
+    )
+    agreeing = sum(
+        case["probes"][0]["status"] == case["probes"][1]["status"]
+        for case in evidence["cases"]
+    )
     lines = [
         "# R3 direct-contour oracle evidence",
         "",
@@ -252,9 +271,9 @@ def run() -> None:
         "",
         f"Hardware: `{evidence['hardware']}`; one worker; new field objects, warm OS cache uncontrolled. Total elapsed: {evidence['elapsed_seconds']:.2f} s.",
         "",
-        f"Coarse (step .04, 80 steps): {dict(counts['coarse'])}. Fine (step .02, 160 steps): {dict(counts['fine'])}. The fixed interior seed search gave 0/17 completed seeded queries and 13/30 with no seed at either resolution. The unchanged statuses are an uncertainty result, not a convergence claim. Completion is feasibility evidence, not an unbiased loss estimate.",
+        f"Coarse (step .04, 80 steps): {dict(counts['coarse'])}. Fine (step .02, 160 steps): {dict(counts['fine'])}. The fixed interior seed search completed {completions['coarse'][0]}/{completions['coarse'][1]} seeded coarse queries and {completions['fine'][0]}/{completions['fine'][1]} seeded fine queries; {no_seed_both}/{len(evidence['cases'])} cases had no seed at either resolution. Statuses agreed across resolutions in {agreeing}/{len(evidence['cases'])} cases. Agreement on unknown is not convergence; completion is feasibility evidence, not an unbiased loss estimate.",
         "",
-        "| Field | λn | Coarse | Fine | Coarse s | Fine s |",
+        "| Field | λn | Coarse | Fine | Coarse wall (s) | Fine wall (s) |",
         "| --- | ---: | --- | --- | ---: | ---: |",
     ]
     for case in evidence["cases"]:
@@ -270,7 +289,7 @@ def run() -> None:
     lines.extend(
         [
             "",
-            "Synthetic [closed](r3-contour-plots/synthetic-closed.png) and [edge-reaching](r3-contour-plots/synthetic-edge.png) diagnostic plots show the two classified reference contours. The targeted DMercFail edge witness is certified within the finite represented-field root window; the numerically closed real path remains unknown because its root-pattern certificate fails. Pointwise transition ports are expanded at the same parameter; unresolved incident continuation remains unknown. This partial oracle can challenge R4 where it classifies, but its zero completion on the fixed interior matrix is a feasibility risk, not an f result.",
+            "Synthetic [closed](r3-contour-plots/synthetic-closed.png) and [edge-reaching](r3-contour-plots/synthetic-edge.png) diagnostic plots show the two classified reference contours. The targeted DMercFail edge witness is certified within the finite represented-field root window; the numerically closed real path remains unknown because its root-pattern certificate fails. Pointwise transition ports are expanded at the same parameter; unresolved incident continuation remains unknown. This partial oracle can challenge R4 where it classifies. The fixed interior matrix's completion rate is a feasibility risk, not an f result.",
             "",
         ]
     )

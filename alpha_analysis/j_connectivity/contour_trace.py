@@ -12,8 +12,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, auto
+import warnings
 
 import numpy as np
+from scipy.integrate import IntegrationWarning, quad
 from scipy.optimize import newton
 
 from .branch_atlas import AtlasPort, AtlasTransition, _certified_roots
@@ -71,13 +73,14 @@ class ContourConfig:
 
 @dataclass(frozen=True)
 class ContourPoint:
-    """One ordinary root-labelled state; angles are unwrapped radians (§8.1)."""
+    """One ordinary root-labelled state; A and its estimated error have length units (§8.1)."""
 
     s: float
     alpha: float
     zeta_in: float
     zeta_out: float
     action_length: float
+    error_A: float = np.nan
 
 
 @dataclass(frozen=True)
@@ -99,10 +102,14 @@ class ContourResult:
     reason: str
     event_ports: tuple[AtlasPort, ...] = ()
     port_outcomes: tuple[tuple[str, ContourStatus, str], ...] = ()
-    bound_scope: str = "represented-field numerical query"
+    bound_scope: str = (
+        "represented-field numerical query; estimated action quadrature error"
+    )
 
     @property
     def witness(self) -> ContourPath | None:
+        if self.status is not ContourStatus.ACCESSIBLE:
+            return None
         return next((p for p in self.paths if p.edge_reached), None)
 
 
@@ -154,18 +161,50 @@ class DirectContourOracle:
             raise _Unresolved("continued bounce root has a field residual")
         return z
 
-    def _action(self, s: float, alpha: float, zin: float, zout: float) -> float:
-        # A vanishes at ordinary endpoints; the cosine map still resolves the
-        # square-root behavior and is reused for the singular derivative.
-        t = (self._nodes + 1) / 2
+    def _action(
+        self, s: float, alpha: float, zin: float, zout: float
+    ) -> tuple[float, float]:
+        """Evaluate §4.2 A with an adaptive numerical error estimate, not a field bound."""
+        # A vanishes at ordinary endpoints. The cosine map removes their
+        # square-root behavior; adaptive integration resolves interior structure.
         mid, half = (zin + zout) / 2, abs(zout - zin) / 2
-        z = mid + half * np.cos(np.pi * t)
-        jac = half * np.pi * np.sin(np.pi * t)
-        B = np.asarray(self.field.B(s, self._coordinates(s, alpha, z), z), dtype=float)
-        if np.any(~np.isfinite(B)) or np.any(B <= 0) or np.any(B > self.b):
-            raise _Unresolved("invalid B inside continued trapped well")
         C = abs(float(self.field.C(s)))
-        return float(np.dot(self._weights / 2, jac * C / B * np.sqrt(1 - B / self.b)))
+        iota = float(self.field.iota(s))
+
+        def integrand(t: float) -> float:
+            z = mid + half * np.cos(np.pi * t)
+            B = float(self.field.B(s, alpha + iota * z, z))
+            if not np.isfinite(B) or B <= 0 or B > self.b + 1e-10 * max(self.b, 1.0):
+                raise _Unresolved("invalid B inside continued trapped well")
+            return (
+                half
+                * np.pi
+                * np.sin(np.pi * t)
+                * C
+                / B
+                * np.sqrt(max(0.0, 1 - B / self.b))
+            )
+
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", IntegrationWarning)
+                value, error = quad(
+                    integrand,
+                    0.0,
+                    1.0,
+                    epsabs=self.config.action_atol / 4,
+                    epsrel=1e-10,
+                    limit=200,
+                )
+        except (ValueError, IntegrationWarning) as exc:
+            raise _Unresolved(f"action quadrature failed: {exc}") from exc
+        if (
+            not np.isfinite(value)
+            or not np.isfinite(error)
+            or error > self.config.action_atol / 2
+        ):
+            raise _Unresolved("action quadrature error exceeds tolerance")
+        return float(value), float(error)
 
     def seed(
         self, s: float, alpha: float, zeta_in_hint: float | None = None
@@ -219,10 +258,10 @@ class DirectContourOracle:
         )
         if d_in >= -1e-9 or d_out <= 1e-9:
             raise _Unresolved("marginal or incorrectly oriented bounce root")
-        A = self._action(s, alpha, zin, zout)
+        A, error_A = self._action(s, alpha, zin, zout)
         if not np.isfinite(A) or A <= 0:
             raise _Unresolved("ordinary well has nonpositive/unknown action")
-        return ContourPoint(float(s), float(alpha), zin, zout, A)
+        return ContourPoint(float(s), float(alpha), zin, zout, A, error_A)
 
     def action_gradient(self, point: ContourPoint) -> np.ndarray:
         """Return (∂s A, ∂alpha A), including C' and iota' z B_theta (§11.1).
@@ -552,44 +591,66 @@ class DirectContourOracle:
                     return ContourResult(
                         ContourStatus.UNKNOWN, tuple(paths), "unresolved supplied event"
                     )
-                eq = np.array(event.parameter) / np.array([1.0, 2 * np.pi])
                 for path in paths:
                     for p in path.points:
-                        x = np.array([p.s, p.alpha / (2 * np.pi)])
-                        if np.linalg.norm(x - eq) < self.config.event_tol:
-                            matches = sorted(
-                                event.ports,
-                                key=lambda port: max(
-                                    abs(p.zeta_in - port.zeta_in),
-                                    abs(p.zeta_out - port.zeta_out),
-                                ),
+                        near_event = False
+                        matches = []
+                        for port in event.ports:
+                            shift = round((port.zeta_in - p.zeta_in) / self.period)
+                            expected_alpha = (
+                                event.parameter[1]
+                                + shift
+                                * float(self.field.iota(event.parameter[0]))
+                                * self.period
+                            )
+                            angular = np.angle(np.exp(1j * (p.alpha - expected_alpha)))
+                            distance = np.hypot(
+                                p.s - event.parameter[0], angular / (2 * np.pi)
+                            )
+                            if distance >= self.config.event_tol:
+                                continue
+                            near_event = True
+                            root_distance = max(
+                                abs(p.zeta_in + shift * self.period - port.zeta_in),
+                                abs(p.zeta_out + shift * self.period - port.zeta_out),
                             )
                             if (
-                                not matches
-                                or max(
-                                    abs(p.zeta_in - matches[0].zeta_in),
-                                    abs(p.zeta_out - matches[0].zeta_out),
-                                )
-                                > self.config.root_shift_periods * self.period
+                                root_distance
+                                <= self.config.root_shift_periods * self.period
                             ):
+                                matches.append((root_distance, port, shift))
+                        if near_event:
+                            if not matches:
                                 return ContourResult(
                                     ContourStatus.UNKNOWN,
                                     tuple(paths),
                                     "event encountered without a matched root-labelled port",
                                     event.ports,
                                 )
+                            _, matched_port, shift = min(
+                                matches, key=lambda item: item[0]
+                            )
                             try:
                                 exact = self.sample(
-                                    event.parameter[0], event.parameter[1], p
+                                    event.parameter[0],
+                                    event.parameter[1],
+                                    ContourPoint(
+                                        p.s,
+                                        event.parameter[1],
+                                        p.zeta_in + shift * self.period,
+                                        p.zeta_out + shift * self.period,
+                                        p.action_length,
+                                        p.error_A,
+                                    ),
                                 )
                                 action_matches = (
                                     abs(exact.action_length - seed.action_length)
                                     <= self.config.action_atol
                                     and abs(
-                                        exact.action_length - matches[0].action_length
+                                        exact.action_length - matched_port.action_length
                                     )
                                     <= self.config.action_atol
-                                    + matches[0].error_estimate
+                                    + matched_port.error_estimate
                                 )
                             except _Unresolved:
                                 action_matches = False
@@ -602,7 +663,7 @@ class DirectContourOracle:
                                     "event contact lacks an exact-action path certificate",
                                     event.ports,
                                 )
-                            branched = self.query_event(event, matches[0].role)
+                            branched = self.query_event(event, matched_port.role)
                             return ContourResult(
                                 branched.status,
                                 tuple(paths) + branched.paths,
@@ -683,11 +744,28 @@ class DirectContourOracle:
     ) -> ContourPoint | None:
         """Search both event sides, preserving the limiting root-pair identity."""
         s, alpha = event.parameter
+        sigma = np.sign(float(self.field.C(s)))
+        # Child ports end/start at the marginal Γmax root. Newton cannot start
+        # at that zero-derivative point; approach the child from its well side.
+        away = 0.02 * self.period * sigma
         reference = ContourPoint(
-            s, alpha, port.zeta_in, port.zeta_out, port.action_length
+            s,
+            alpha,
+            port.zeta_in + (away if port.role == "child_3" else 0.0),
+            port.zeta_out - (away if port.role == "child_1" else 0.0),
+            port.action_length,
         )
         for radius in (0.002, 0.006, 0.015):
-            for ds, da in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1)):
+            for ds, da in (
+                (1, 0),
+                (-1, 0),
+                (0, 1),
+                (0, -1),
+                (1, 0.4),
+                (-1, -0.4),
+                (1, 1),
+                (-1, -1),
+            ):
                 trial_s = s + radius * ds
                 trial_alpha = alpha + 2 * np.pi * radius * da
                 if not 0 < trial_s < 1:
@@ -701,7 +779,7 @@ class DirectContourOracle:
                         continue
                     tangent = np.array([-scaled[1], scaled[0]]) / norm
                     x = np.array([trial_s, trial_alpha / (2 * np.pi)])
-                    for direction in (1, -1):
+                    for direction in (0, 1, -1):
                         candidate_x = x + direction * radius * tangent
                         if not 0 < candidate_x[0] < 1:
                             continue
@@ -739,8 +817,12 @@ def plot_contour_result(
         s = np.array([p.s for p in path.points])
         label = (
             "edge witness"
-            if path.edge_reached
-            else "closed" if path.closed else "unresolved"
+            if path.edge_reached and result.status is ContourStatus.ACCESSIBLE
+            else (
+                "uncertified edge intersection"
+                if path.edge_reached
+                else "closed" if path.closed else "unresolved"
+            )
         )
         ax.plot(alpha, s, lw=1.5, label=f"path {index + 1}: {label}")
         ax.scatter(alpha[0], s[0], marker="o", s=28)

@@ -2,36 +2,36 @@
   "milestone": "R3",
   "source": "h(rho)=1 (declared benchmark; contour geometry is source-independent)",
   "pitch_provenance": "R0 sampled radially global extrema estimates; not field enclosures",
-  "scope": "represented Fourier/interpolated field, numerical A/gradient/path, finite-window root topology; no f enclosure",
+  "scope": "represented Fourier/interpolated field, adaptive numerical A with estimated quadrature error, numerical gradient/path, finite-window root topology; no field or f enclosure",
   "hardware": "macOS-14.7.6-arm64-arm-64bit",
   "workers": 1,
   "cache_state": "new field objects; warm OS cache uncontrolled",
-  "code_sha256": "9c7dd258429ba5d9e86f1b198d676a2280dc475e27ab3acaf18d2d7135e7c93d",
+  "code_sha256": "fc016c3cf7d0bfee52421782e315b1b27ed6ad4accabc22f1a411cf818bb150a",
   "field_files": [
     {
       "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
       "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
-      "load_seconds": 0.004459999967366457
+      "load_seconds": 0.006589124968741089
     },
     {
       "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
       "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
-      "load_seconds": 0.0072251250385306776
+      "load_seconds": 0.007318957999814302
     },
     {
       "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
       "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
-      "load_seconds": 0.00573466595960781
+      "load_seconds": 0.006738082971423864
     },
     {
       "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
       "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
-      "load_seconds": 0.005602542019914836
+      "load_seconds": 0.0054105829913169146
     },
     {
       "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
       "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
-      "load_seconds": 0.004855250008404255
+      "load_seconds": 0.006343792018014938
     }
   ],
   "seed_choices": [
@@ -103,7 +103,7 @@
             "no complete ordinary well in scan window",
             "no complete ordinary well in scan window"
           ],
-          "wall_seconds": 0.30284625000786036
+          "wall_seconds": 0.30777445796411484
         },
         {
           "resolution": "fine",
@@ -115,7 +115,7 @@
             "no complete ordinary well in scan window",
             "no complete ordinary well in scan window"
           ],
-          "wall_seconds": 0.26383520796662197
+          "wall_seconds": 0.45900462503777817
         }
       ]
     },
@@ -140,17 +140,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.606025780478195e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.8,
             "alpha": 0.0,
             "zeta_in": -0.17037039198003873,
             "zeta_out": 0.17037039198004075,
-            "A": 0.272065717181005
+            "A": 0.27206571718101685,
+            "error_A": 1.1051335140826806e-12
           },
-          "wall_seconds": 1.0099173749913462
+          "wall_seconds": 1.340854583948385
         },
         {
           "status": "UNKNOWN",
@@ -167,17 +169,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.7874202797845404e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.8,
             "alpha": 0.0,
             "zeta_in": -0.17037039198003873,
             "zeta_out": 0.17037039198004075,
-            "A": 0.272065717181005
+            "A": 0.27206571718101685,
+            "error_A": 1.1051335140826806e-12
           },
-          "wall_seconds": 1.1519803749979474
+          "wall_seconds": 1.5647977920016274
         }
       ]
     },
@@ -189,7 +193,7 @@
       "probes": [
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.0580456072859148.; bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.0580452799070208.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.0575922203578005.; bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.0575920153118474.",
           "path_steps": [
             8,
             8
@@ -202,17 +206,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.279908321604896e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": -0.8722279952985963,
             "zeta_out": 0.8722279952985962,
-            "A": 4.604604395381525
+            "A": 4.604604395391103,
+            "error_A": 9.997010715014038e-09
           },
-          "wall_seconds": 0.19518445897847414
+          "wall_seconds": 0.49272354098502547
         },
         {
           "status": "UNKNOWN",
@@ -229,17 +235,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.888816361531516e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": -0.8722279952985963,
             "zeta_out": 0.8722279952985962,
-            "A": 4.604604395381525
+            "A": 4.604604395391103,
+            "error_A": 9.997010715014038e-09
           },
-          "wall_seconds": 0.23693850002018735
+          "wall_seconds": 0.6538353340001777
         }
       ]
     },
@@ -251,7 +259,7 @@
       "probes": [
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.455180528494236.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.106408906358668.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.608898096136581.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.0970208972001574.",
           "path_steps": [
             5,
             9
@@ -264,21 +272,23 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.4218175023722e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.8,
             "alpha": 1.5707963267948966,
             "zeta_in": 1.7081086727649262,
             "zeta_out": 3.500991810779732,
-            "A": 7.813433832095526
+            "A": 7.813434979103985,
+            "error_A": 9.357945491437678e-08
           },
-          "wall_seconds": 0.4259789999923669
+          "wall_seconds": 0.6730132920201868
         },
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.455180528494236.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.1144268751486568.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.608898096136581.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.0360821052345213.",
           "path_steps": [
             5,
             14
@@ -291,17 +301,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.58118952303952e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.8,
             "alpha": 1.5707963267948966,
             "zeta_in": 1.7081086727649262,
             "zeta_out": 3.500991810779732,
-            "A": 7.813433832095526
+            "A": 7.813434979103985,
+            "error_A": 9.357945491437678e-08
           },
-          "wall_seconds": 0.4447622500010766
+          "wall_seconds": 0.8180113750277087
         }
       ]
     },
@@ -321,7 +333,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.2635627079871483
+          "wall_seconds": 0.27623983297962695
         },
         {
           "resolution": "fine",
@@ -333,7 +345,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.26162474998272955
+          "wall_seconds": 0.259050958964508
         }
       ]
     },
@@ -353,7 +365,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.2954621670069173
+          "wall_seconds": 0.2681997919571586
         },
         {
           "resolution": "fine",
@@ -365,7 +377,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.2582157500437461
+          "wall_seconds": 0.2657957919873297
         }
       ]
     },
@@ -385,7 +397,7 @@
             "no complete ordinary well in scan window",
             "no complete ordinary well in scan window"
           ],
-          "wall_seconds": 0.2574237919761799
+          "wall_seconds": 0.2662104589981027
         },
         {
           "resolution": "fine",
@@ -397,7 +409,7 @@
             "no complete ordinary well in scan window",
             "no complete ordinary well in scan window"
           ],
-          "wall_seconds": 0.2550222090212628
+          "wall_seconds": 0.2563820839859545
         }
       ]
     },
@@ -417,7 +429,7 @@
             "no complete ordinary well in scan window",
             "no complete ordinary well in scan window"
           ],
-          "wall_seconds": 0.25826470798347145
+          "wall_seconds": 0.2565484580118209
         },
         {
           "resolution": "fine",
@@ -429,7 +441,7 @@
             "no complete ordinary well in scan window",
             "no complete ordinary well in scan window"
           ],
-          "wall_seconds": 0.2646734170266427
+          "wall_seconds": 0.28652145800879225
         }
       ]
     },
@@ -454,17 +466,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.894267906438432e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": -0.5296902838801429,
             "zeta_out": 0.5296902838801429,
-            "A": 3.1313162303980393
+            "A": 3.1313162303980366,
+            "error_A": 1.350497467247089e-09
           },
-          "wall_seconds": 0.8103896669927053
+          "wall_seconds": 1.256257832981646
         },
         {
           "status": "UNKNOWN",
@@ -481,17 +495,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.599036654900565e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": -0.5296902838801429,
             "zeta_out": 0.5296902838801429,
-            "A": 3.1313162303980393
+            "A": 3.1313162303980366,
+            "error_A": 1.350497467247089e-09
           },
-          "wall_seconds": 1.136937958013732
+          "wall_seconds": 1.8714306670008227
         }
       ]
     },
@@ -503,7 +519,7 @@
       "probes": [
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is -0.8122385568614031.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.8122386500920474.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is -0.8122395001505947.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.8122394779720117.",
           "path_steps": [
             6,
             6
@@ -516,21 +532,23 @@
             false,
             false
           ],
+          "max_estimated_error_A": 2.1445482780297872e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.8,
             "alpha": 0.0,
             "zeta_in": -0.7874666235629324,
             "zeta_out": 0.7874666235629336,
-            "A": 7.086961197383257
+            "A": 7.086961197383283,
+            "error_A": 8.670245512835224e-09
           },
-          "wall_seconds": 0.2684169170097448
+          "wall_seconds": 0.3881670000264421
         },
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is -0.8102022501082766.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.8102023246541041.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is -0.8102022349443218.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.8102023849526346.",
           "path_steps": [
             7,
             7
@@ -543,17 +561,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 1.6703365263792756e-08,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.8,
             "alpha": 0.0,
             "zeta_in": -0.7874666235629324,
             "zeta_out": 0.7874666235629336,
-            "A": 7.086961197383257
+            "A": 7.086961197383283,
+            "error_A": 8.670245512835224e-09
           },
-          "wall_seconds": 0.25823425000999123
+          "wall_seconds": 0.4100828749942593
         }
       ]
     },
@@ -565,7 +585,7 @@
       "probes": [
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.7368611636513718.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.99350782506157.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.8685864007252913.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.9943190332647692.",
           "path_steps": [
             3,
             8
@@ -578,21 +598,23 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.91370751280065e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.8,
             "alpha": 1.5707963267948966,
             "zeta_in": 1.5641472771949732,
             "zeta_out": 3.6655976784296525,
-            "A": 8.444184974878215
+            "A": 8.444185034693877,
+            "error_A": 4.48782259804115e-08
           },
-          "wall_seconds": 0.36586883303243667
+          "wall_seconds": 0.6046973330085166
         },
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.7368611636513718.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.9936348332247683.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.8685864007252913.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.0268717737721018.",
           "path_steps": [
             3,
             11
@@ -605,17 +627,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 2.9496414716923993e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.8,
             "alpha": 1.5707963267948966,
             "zeta_in": 1.5641472771949732,
             "zeta_out": 3.6655976784296525,
-            "A": 8.444184974878215
+            "A": 8.444185034693877,
+            "error_A": 4.48782259804115e-08
           },
-          "wall_seconds": 0.3638095000060275
+          "wall_seconds": 0.5860937089892104
         }
       ]
     },
@@ -635,7 +659,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.25405437499284744
+          "wall_seconds": 0.267245750001166
         },
         {
           "resolution": "fine",
@@ -647,7 +671,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.24875308299669996
+          "wall_seconds": 0.2504108750144951
         }
       ]
     },
@@ -672,17 +696,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.920868308920774e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 0.6017716164622308,
             "zeta_out": 0.9108220190412999,
-            "A": 0.931223862464879
+            "A": 0.9312238624637778,
+            "error_A": 3.087034891474802e-07
           },
-          "wall_seconds": 1.0200383749906905
+          "wall_seconds": 1.4440511669963598
         },
         {
           "status": "UNKNOWN",
@@ -699,17 +725,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.858484491983844e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 0.6017716164622308,
             "zeta_out": 0.9108220190412999,
-            "A": 0.931223862464879
+            "A": 0.9312238624637778,
+            "error_A": 3.087034891474802e-07
           },
-          "wall_seconds": 1.2058333329623565
+          "wall_seconds": 1.544687207962852
         }
       ]
     },
@@ -734,17 +762,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.320172846203728e-08,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 0.5357182059334724,
             "zeta_out": 0.9894621138179812,
-            "A": 2.194931737110064
+            "A": 2.1949317371100716,
+            "error_A": 1.2706259525172969e-09
           },
-          "wall_seconds": 0.98299854202196
+          "wall_seconds": 1.1554140830412507
         },
         {
           "status": "UNKNOWN",
@@ -761,17 +791,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.333412357947596e-08,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 0.5357182059334724,
             "zeta_out": 0.9894621138179812,
-            "A": 2.194931737110064
+            "A": 2.1949317371100716,
+            "error_A": 1.2706259525172969e-09
           },
-          "wall_seconds": 1.7857631249935366
+          "wall_seconds": 2.240694749983959
         }
       ]
     },
@@ -796,17 +828,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.554488158597059e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 0.28431627205906357,
             "zeta_out": 1.233678760028205,
-            "A": 8.26939644225206
+            "A": 8.269396442252077,
+            "error_A": 1.4812410206988772e-10
           },
-          "wall_seconds": 1.1976159999612719
+          "wall_seconds": 1.9879402920487337
         },
         {
           "status": "UNKNOWN",
@@ -823,17 +857,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.9945655496801964e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 0.28431627205906357,
             "zeta_out": 1.233678760028205,
-            "A": 8.26939644225206
+            "A": 8.269396442252077,
+            "error_A": 1.4812410206988772e-10
           },
-          "wall_seconds": 1.6077704170020297
+          "wall_seconds": 2.786009917035699
         }
       ]
     },
@@ -858,17 +894,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.545229449846905e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 0.0449102869859216,
             "zeta_out": 1.4059430620098394,
-            "A": 11.469132237196435
+            "A": 11.469132237222054,
+            "error_A": 1.1743081084943141e-07
           },
-          "wall_seconds": 0.8708400829927996
+          "wall_seconds": 1.834501665958669
         },
         {
           "status": "UNKNOWN",
@@ -885,17 +923,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.923442950118043e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 0.0449102869859216,
             "zeta_out": 1.4059430620098394,
-            "A": 11.469132237196435
+            "A": 11.469132237222054,
+            "error_A": 1.1743081084943141e-07
           },
-          "wall_seconds": 2.6491611660458148
+          "wall_seconds": 4.310621042037383
         }
       ]
     },
@@ -907,7 +947,7 @@
       "probes": [
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.1105584072005663.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.7512923333970525.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.1067487858160283.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.752647894866672.",
           "path_steps": [
             7,
             6
@@ -920,21 +960,23 @@
             false,
             false
           ],
+          "max_estimated_error_A": 9.595915250826346e-10,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 3.186700814977881,
             "zeta_out": 4.70785494045456,
-            "A": 12.494125647844221
+            "A": 12.49412565804639,
+            "error_A": 9.154191120001919e-10
           },
-          "wall_seconds": 0.17599220800912008
+          "wall_seconds": 0.3785277500282973
         },
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.0996265549397526.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.7512923333970525.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.0969174075524784.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.752647894866672.",
           "path_steps": [
             9,
             6
@@ -947,17 +989,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 9.555851719720426e-10,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 3.186700814977881,
             "zeta_out": 4.70785494045456,
-            "A": 12.494125647844221
+            "A": 12.49412565804639,
+            "error_A": 9.154191120001919e-10
           },
-          "wall_seconds": 0.16578520799521357
+          "wall_seconds": 0.3887607080396265
         }
       ]
     },
@@ -977,7 +1021,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.28497337497537956
+          "wall_seconds": 0.27598191698780283
         },
         {
           "resolution": "fine",
@@ -989,7 +1033,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.2806814170326106
+          "wall_seconds": 0.279792208049912
         }
       ]
     },
@@ -1014,17 +1058,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.532464733722534e-10,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 1.7346776738395624,
             "zeta_out": 1.8656843425001046,
-            "A": 0.052993575274347685
+            "A": 0.05299357527435038,
+            "error_A": 1.706547553493824e-10
           },
-          "wall_seconds": 0.9464232079917565
+          "wall_seconds": 1.026973915984854
         },
         {
           "status": "UNKNOWN",
@@ -1041,17 +1087,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.683777766544749e-10,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 1.7346776738395624,
             "zeta_out": 1.8656843425001046,
-            "A": 0.052993575274347685
+            "A": 0.05299357527435038,
+            "error_A": 1.706547553493824e-10
           },
-          "wall_seconds": 1.4292959159938619
+          "wall_seconds": 1.35811387503054
         }
       ]
     },
@@ -1076,17 +1124,19 @@
             true,
             true
           ],
+          "max_estimated_error_A": 1.4002990431092869e-12,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 0.5100651968249966,
             "zeta_out": 0.5579555674864705,
-            "A": 0.004887170895664969
+            "A": 0.00488717089566487,
+            "error_A": 4.539836491932746e-15
           },
-          "wall_seconds": 1.0822282080189325
+          "wall_seconds": 1.224611499987077
         },
         {
           "status": "UNKNOWN",
@@ -1103,17 +1153,19 @@
             true,
             true
           ],
+          "max_estimated_error_A": 1.4002990431092869e-12,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 0.5100651968249966,
             "zeta_out": 0.5579555674864705,
-            "A": 0.004887170895664969
+            "A": 0.00488717089566487,
+            "error_A": 4.539836491932746e-15
           },
-          "wall_seconds": 1.258479374984745
+          "wall_seconds": 1.3050490420428105
         }
       ]
     },
@@ -1125,7 +1177,7 @@
       "probes": [
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.2144448839648354.; bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.2144449311875998.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.189058821532694.; bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.189058887915949.",
           "path_steps": [
             5,
             5
@@ -1138,21 +1190,23 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.794221173532625e-08,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": -1.0996719754865738,
             "zeta_out": 1.0996719754865738,
-            "A": 3.9028268042473906
+            "A": 3.9028264889077775,
+            "error_A": 1.9452271120915394e-08
           },
-          "wall_seconds": 0.17728520795935765
+          "wall_seconds": 0.33483308303402737
         },
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.2144448839648354.; bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.2144449311875998.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.189058821532694.; bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.189058887915949.",
           "path_steps": [
             5,
             5
@@ -1165,17 +1219,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.794221173532625e-08,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": -1.0996719754865738,
             "zeta_out": 1.0996719754865738,
-            "A": 3.9028268042473906
+            "A": 3.9028264889077775,
+            "error_A": 1.9452271120915394e-08
           },
-          "wall_seconds": 0.1497681249747984
+          "wall_seconds": 0.31823712500045076
         }
       ]
     },
@@ -1187,7 +1243,7 @@
       "probes": [
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 2.461398858132563.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.8213796155916846.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 2.461399385077629.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.821378461746909.",
           "path_steps": [
             7,
             9
@@ -1200,21 +1256,23 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.209168877356096e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.8,
             "alpha": 0.0,
             "zeta_in": 2.574037409648128,
             "zeta_out": 3.6491406684347036,
-            "A": 2.381086078809382
+            "A": 2.381086078809055,
+            "error_A": 1.3886782010982312e-08
           },
-          "wall_seconds": 0.31175558402901515
+          "wall_seconds": 0.48270925000542775
         },
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 2.460767682244799.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.8290286155667044.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 2.4607686468596635.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.8290279559318368.",
           "path_steps": [
             8,
             11
@@ -1227,17 +1285,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.172555964779829e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.8,
             "alpha": 0.0,
             "zeta_in": 2.574037409648128,
             "zeta_out": 3.6491406684347036,
-            "A": 2.381086078809382
+            "A": 2.381086078809055,
+            "error_A": 1.3886782010982312e-08
           },
-          "wall_seconds": 0.309504333010409
+          "wall_seconds": 0.5207553340005688
         }
       ]
     },
@@ -1257,7 +1317,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.28199716698145494
+          "wall_seconds": 0.2579287920380011
         },
         {
           "resolution": "fine",
@@ -1269,7 +1329,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.24929091602098197
+          "wall_seconds": 0.25603520800359547
         }
       ]
     },
@@ -1289,7 +1349,7 @@
             "no complete ordinary well in scan window",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.24949454196030274
+          "wall_seconds": 0.25650704198051244
         },
         {
           "resolution": "fine",
@@ -1301,7 +1361,7 @@
             "no complete ordinary well in scan window",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.24776341702090576
+          "wall_seconds": 0.25668566703097895
         }
       ]
     },
@@ -1321,7 +1381,7 @@
             "no complete ordinary well in scan window",
             "no complete ordinary well in scan window"
           ],
-          "wall_seconds": 0.20282266702270135
+          "wall_seconds": 0.20086891698883846
         },
         {
           "resolution": "fine",
@@ -1333,7 +1393,7 @@
             "no complete ordinary well in scan window",
             "no complete ordinary well in scan window"
           ],
-          "wall_seconds": 0.20060641696909443
+          "wall_seconds": 0.19988870801171288
         }
       ]
     },
@@ -1353,7 +1413,7 @@
             "no complete ordinary well in scan window",
             "no complete ordinary well in scan window"
           ],
-          "wall_seconds": 0.20564545801607892
+          "wall_seconds": 0.20673212502151728
         },
         {
           "resolution": "fine",
@@ -1365,7 +1425,7 @@
             "no complete ordinary well in scan window",
             "no complete ordinary well in scan window"
           ],
-          "wall_seconds": 0.19459629204357043
+          "wall_seconds": 0.22773808403871953
         }
       ]
     },
@@ -1377,7 +1437,7 @@
       "probes": [
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.809934530330295.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 5.661970193197462.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.809939977952406.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 5.661997568439298.",
           "path_steps": [
             8,
             10
@@ -1390,21 +1450,23 @@
             false,
             false
           ],
+          "max_estimated_error_A": 2.2893702315715908e-08,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 5.007816465421532,
             "zeta_out": 5.492378121090076,
-            "A": 0.2714966769491055
+            "A": 0.27149667694910573,
+            "error_A": 1.1531803428968057e-14
           },
-          "wall_seconds": 0.19678779202513397
+          "wall_seconds": 0.2915562500129454
         },
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.773995176570382.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 5.692667397179706.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.773996092568122.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 5.692667312292264.",
           "path_steps": [
             11,
             16
@@ -1417,17 +1479,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 3.7162610518091666e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.3,
             "alpha": 0.0,
             "zeta_in": 5.007816465421532,
             "zeta_out": 5.492378121090076,
-            "A": 0.2714966769491055
+            "A": 0.27149667694910573,
+            "error_A": 1.1531803428968057e-14
           },
-          "wall_seconds": 0.22728704195469618
+          "wall_seconds": 0.332949917006772
         }
       ]
     },
@@ -1439,7 +1503,7 @@
       "probes": [
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.151265908985321.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 6.312577484693736.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.151264261475529.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 6.312452631433767.",
           "path_steps": [
             8,
             3
@@ -1452,21 +1516,23 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.3065556857241357e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "coarse",
           "seed": {
             "s": 0.8,
             "alpha": 0.0,
             "zeta_in": 4.382457691057069,
             "zeta_out": 6.163018170507631,
-            "A": 2.1510032941236394
+            "A": 2.151003294104931,
+            "error_A": 4.697278982173462e-09
           },
-          "wall_seconds": 0.2029671659693122
+          "wall_seconds": 0.35367316601332277
         },
         {
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.139797144159068.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 6.317428972915623.",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.139795933616662.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 6.317432199790739.",
           "path_steps": [
             12,
             7
@@ -1479,17 +1545,19 @@
             false,
             false
           ],
+          "max_estimated_error_A": 4.820626841507437e-07,
           "port_outcomes": [],
-          "scope": "represented-field numerical query",
+          "scope": "represented-field numerical query; estimated action quadrature error",
           "resolution": "fine",
           "seed": {
             "s": 0.8,
             "alpha": 0.0,
             "zeta_in": 4.382457691057069,
             "zeta_out": 6.163018170507631,
-            "A": 2.1510032941236394
+            "A": 2.151003294104931,
+            "error_A": 4.697278982173462e-09
           },
-          "wall_seconds": 0.24710104102268815
+          "wall_seconds": 0.46523466595681384
         }
       ]
     },
@@ -1509,7 +1577,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.18945399997755885
+          "wall_seconds": 0.1966851670295
         },
         {
           "resolution": "fine",
@@ -1521,7 +1589,7 @@
             "well crosses a finite scan-window boundary",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.18828562495764345
+          "wall_seconds": 0.19779395899968222
         }
       ]
     },
@@ -1541,7 +1609,7 @@
             "no complete ordinary well in scan window",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.18685475003439933
+          "wall_seconds": 0.2048117080121301
         },
         {
           "resolution": "fine",
@@ -1553,7 +1621,7 @@
             "no complete ordinary well in scan window",
             "well crosses a finite scan-window boundary"
           ],
-          "wall_seconds": 0.18466199998511001
+          "wall_seconds": 0.18947225000010803
         }
       ]
     }
@@ -1574,19 +1642,20 @@
         false,
         false
       ],
+      "max_estimated_error_A": 4.6791924987930834e-07,
       "port_outcomes": [],
-      "scope": "represented-field numerical query",
+      "scope": "represented-field numerical query; estimated action quadrature error",
       "seed": [
         0.3,
         0.0
       ],
-      "wall_seconds": 0.7600123750162311
+      "wall_seconds": 1.7328994169947691
     },
     "edge_candidate": {
       "status": "ACCESSIBLE",
       "reason": "edge witness",
       "path_steps": [
-        11,
+        7,
         3
       ],
       "numerically_closed": [
@@ -1597,28 +1666,25 @@
         false,
         true
       ],
+      "max_estimated_error_A": 4.972799908941262e-07,
       "port_outcomes": [],
-      "scope": "represented-field numerical query",
+      "scope": "represented-field numerical query; estimated action quadrature error",
       "seed": [
         0.95,
         -0.1577992744671513
       ],
-      "wall_seconds": 2.919807167025283
+      "wall_seconds": 5.866638375038747
     },
     "transition": {
       "status": "UNKNOWN",
       "reason": "all common-parameter ports explored; event-curve or branch uncertainty remains",
       "path_steps": [
-        35,
+        36,
         2,
-        7,
-        7,
         20,
-        3
+        2
       ],
       "numerically_closed": [
-        false,
-        false,
         false,
         false,
         false,
@@ -1628,28 +1694,27 @@
         false,
         false,
         false,
-        true,
-        false,
         false
       ],
+      "max_estimated_error_A": 4.967842213641019e-07,
       "port_outcomes": [
         {
           "role": "child_1",
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.584361842595166.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.009863006656455781."
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.5865361070921202.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.0034692916698636743."
         },
         {
           "role": "parent",
           "status": "UNKNOWN",
-          "reason": "invalid B inside continued trapped well; edge path has uncertified root topology"
+          "reason": "no regular constant-action continuation"
         },
         {
           "role": "child_3",
           "status": "UNKNOWN",
-          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.556914989122999.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.017662323418741775."
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.5487155847593506.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.013884110580450318."
         }
       ],
-      "scope": "represented-field numerical query",
+      "scope": "represented-field numerical query; estimated action quadrature error",
       "event_status": "generic",
       "event_parameter": [
         0.8,
@@ -1660,8 +1725,8 @@
         "parent": 22.327691266337105,
         "child_3": 11.125682766330735
       },
-      "wall_seconds": 2.547349957982078
+      "wall_seconds": 2.423214000009466
     }
   },
-  "elapsed_seconds": 37.77683833404444
+  "elapsed_seconds": 53.78158445801819
 }

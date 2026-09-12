@@ -118,10 +118,13 @@ do not relax the fast/full test-suite budgets.
   prescribed field/pitch cases at two step sizes with fixed interior seed
   choices. It classifies 0/17 seeded cases; 13/30 find no complete seed in the
   bounded search. A targeted DMercFail \(\lambda_n=0.8\) query at \(s=0.95\)
-  yields a positive edge witness, while a numerically closed interior contour
-  lacks a root-pattern certificate and the three-port event remains unknown
-  after every common-parameter branch is attempted. These are represented-field
-  numerical queries, not field or \(f\) enclosures. R4 must compare only
+  yields a positive edge witness with independently checked action and recorded
+  quadrature error; a numerically closed interior contour lacks a root-pattern
+  certificate. A transverse synthetic event continues every port at its adopted
+  action, while the real three-port event remains unknown after incident branches
+  are attempted. Supplied pointwise events match periodic root lifts. These are
+  represented-field numerical queries with estimated action errors, not field
+  or \(f\) enclosures. R4 must compare only
   classified oracle paths away from PL uncertainty and retain every failed
   query as unknown; improving lifted root-window certification and seed search
   is a feasibility priority, not grounds to treat missing paths as inaccessible.
