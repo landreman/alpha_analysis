@@ -105,8 +105,13 @@ do not relax the fast/full test-suite budgets.
   binding must precede their use as certified transitions. §8.2 matching across
   neighboring radii and §10.4 port curves, monotone/constant segments, full
   preimages and self-transitions are deferred to R3–R5. Do not infer those links
-  from coordinate proximity. These are finite represented-field/model results,
-  not field or \(f\) enclosures. R3 should use an independent continuous contour
+  from coordinate proximity. Production `transition_at` checks marginal endpoints
+  and action partition consistency; independent one-sided action limits are
+  test-only and must become a production check before R5 certifies transfers.
+  R4–R5 should exercise the sample-count/cell-certificate mismatch guard before
+  using atlas cells for weighted reachability. These are finite
+  represented-field/model results, not field or \(f\) enclosures. R3 should use
+  an independent continuous contour
   oracle to challenge atlas connectivity, including enclosed crossings and
   unresolved global links.
 - Keep the physical trace direction `sign(G + iota I)`, authoritative half-bounce

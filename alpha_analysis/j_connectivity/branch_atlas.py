@@ -15,6 +15,7 @@ import numpy as np
 from scipy.integrate import IntegrationWarning, quad
 from scipy.optimize import brentq
 
+from ..boozer_field import BoozerField
 from .field import BoozerFieldLike
 from .forward_catalogue import ForwardLineCatalogue, ForwardScanConfig
 from .synthetic_fields import SyntheticFourierField
@@ -90,11 +91,25 @@ class BranchAtlas:
 
     @property
     def owned_wells(self) -> tuple[AtlasWell, ...]:
-        # All alpha labels at s=0 represent the same physical axis line.
+        """Sampled owned wells, collapsing axis labels only for axis-regular fields.
+
+        BoozerField uses the §7.3 core continuation. A synthetic polynomial
+        field has an equivalent axis line only when all m!=0 modes vanish at
+        s=0. Unknown field types retain every axis sample conservatively.
+        """
+        if isinstance(self.field, BoozerField):
+            collapse_axis = True
+        elif isinstance(self.field, SyntheticFourierField):
+            transverse = self.field.m != 0
+            collapse_axis = not np.any(
+                self.field.cosine_coefficients[transverse, 0]
+            ) and not np.any(self.field.sine_coefficients[transverse, 0])
+        else:
+            collapse_axis = False
         return tuple(
             well
             for sample in self.samples
-            if sample.s != 0 or sample.alpha == 0
+            if not collapse_axis or sample.s != 0 or sample.alpha == 0
             for well in sample.wells
         )
 

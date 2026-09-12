@@ -227,7 +227,9 @@ def test_unknown_multiplicity_remains_in_coverage_bound():
         [0, 1, 2, 2, -2],
         m=[0, 0, 0, 2, 2],
     )
-    atlas = build_atlas(f, 1.4, AtlasConfig(2, 2, 2))
+    atlas = build_atlas(f, 1.4, AtlasConfig(2, 4, 2))
+    assert not np.isclose(f.B(0, 0, 0), f.B(0, np.pi / 2, 0))
+    assert len(atlas.owned_wells) == sum(len(sample.wells) for sample in atlas.samples)
     assert atlas.unknown_area > 0
     assert atlas.multiplicity_area_upper is None
     assert np.isclose(sum(cell.area for cell in atlas.cells), 2 * np.pi)
