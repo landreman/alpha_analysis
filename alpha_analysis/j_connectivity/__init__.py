@@ -41,6 +41,17 @@ from .denominator import (
     find_global_B_bounds,
 )
 from .field import BoozerFieldLike
+from .forward_catalogue import (
+    BounceIntegral,
+    CatalogueLinewisePredicate,
+    ForwardLineCatalogue,
+    ForwardScanConfig,
+    OrdinaryWell,
+    PitchQuery,
+    ScanExtremum,
+    adaptive_bounce_integral,
+    batched_bounce_integrals,
+)
 from .population import (
     LinewiseTrappingMasks,
     OwnedWeightBounds,
@@ -131,6 +142,15 @@ from .transition_events import (
 )
 
 __all__ = [
+    "BounceIntegral",
+    "CatalogueLinewisePredicate",
+    "ForwardLineCatalogue",
+    "ForwardScanConfig",
+    "OrdinaryWell",
+    "PitchQuery",
+    "ScanExtremum",
+    "adaptive_bounce_integral",
+    "batched_bounce_integrals",
     "ContactLocalizationConfig",
     "ContactBracket",
     "TransitionEvent",

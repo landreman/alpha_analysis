@@ -7,6 +7,57 @@ import numpy as np
 from .denominator import DenominatorConvergence, GlobalBBounds
 
 
+def plot_forward_catalogue(catalogue, query, *, field_label: str, output_path=None):
+    """Show lifted B, ordinary roots and unresolved cells (DESIGN.md §§17, 23 R1).
+
+    Horizontal coordinates are physical scan distance ``u=|zeta-zeta0|`` in
+    radians. Blue spans are certified maximal B<b wells; hatched spans are
+    cells where a hidden barrier was not excluded. A clipped window is named
+    in the title so no diagnostic suggests a passing classification.
+    """
+    import matplotlib.pyplot as plt
+
+    figure, axis = plt.subplots(figsize=(9, 3.5), constrained_layout=True)
+    axis.plot(catalogue.u, catalogue.B_samples, color="0.2", lw=1)
+    axis.axhline(query.b, color="tab:red", ls="--", lw=1, label="bounce field b")
+    for index, well in enumerate(query.wells):
+        axis.axvspan(
+            well.u_in,
+            well.u_out,
+            color="tab:blue",
+            alpha=0.18,
+            label="certified ordinary well" if index == 0 else None,
+        )
+        axis.plot(
+            [well.u_in, well.u_out],
+            [query.b, query.b],
+            marker="o",
+            ls="none",
+            color="tab:blue",
+            markersize=3,
+        )
+    for index, (left, right) in enumerate(query.unknown_cells):
+        axis.axvspan(
+            left,
+            right,
+            facecolor="none",
+            edgecolor="tab:orange",
+            hatch="///",
+            label="possible hidden barrier" if index == 0 else None,
+        )
+    axis.set_xlabel(r"physical scan distance $u$ [rad]")
+    axis.set_ylabel("B [field units]")
+    axis.set_title(
+        f"{field_label}: b={query.b:.6g}, {len(query.wells)} complete wells, "
+        f"{query.status.name} (window={query.scanned_periods} periods)"
+    )
+    axis.grid(alpha=0.3)
+    axis.legend(fontsize="small")
+    if output_path is not None:
+        figure.savefig(output_path, dpi=160)
+    return figure, axis
+
+
 def plot_population_diagnostics(
     slices,
     *,
