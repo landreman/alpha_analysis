@@ -1,0 +1,1667 @@
+{
+  "milestone": "R3",
+  "source": "h(rho)=1 (declared benchmark; contour geometry is source-independent)",
+  "pitch_provenance": "R0 sampled radially global extrema estimates; not field enclosures",
+  "scope": "represented Fourier/interpolated field, numerical A/gradient/path, finite-window root topology; no f enclosure",
+  "hardware": "macOS-14.7.6-arm64-arm-64bit",
+  "workers": 1,
+  "cache_state": "new field objects; warm OS cache uncontrolled",
+  "code_sha256": "9c7dd258429ba5d9e86f1b198d676a2280dc475e27ab3acaf18d2d7135e7c93d",
+  "field_files": [
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "load_seconds": 0.004459999967366457
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "load_seconds": 0.0072251250385306776
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "load_seconds": 0.00573466595960781
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "load_seconds": 0.005602542019914836
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "load_seconds": 0.004855250008404255
+    }
+  ],
+  "seed_choices": [
+    [
+      0.3,
+      0.0
+    ],
+    [
+      0.5,
+      0.0
+    ],
+    [
+      0.8,
+      0.0
+    ],
+    [
+      0.5,
+      1.5707963267948966
+    ],
+    [
+      0.8,
+      1.5707963267948966
+    ]
+  ],
+  "resolution_controls": {
+    "coarse": {
+      "step": 0.04,
+      "min_step": 0.001,
+      "max_steps": 80,
+      "max_branches": 16,
+      "max_certificate_boxes": 64,
+      "corrector_steps": 6,
+      "action_atol": 2e-06,
+      "closure_tol": 0.015,
+      "root_shift_periods": 0.3,
+      "gradient_floor": 2e-05,
+      "event_tol": 0.015,
+      "scan_periods": 4
+    },
+    "fine": {
+      "step": 0.02,
+      "min_step": 0.001,
+      "max_steps": 160,
+      "max_branches": 16,
+      "max_certificate_boxes": 64,
+      "corrector_steps": 6,
+      "action_atol": 2e-06,
+      "closure_tol": 0.015,
+      "root_shift_periods": 0.3,
+      "gradient_floor": 2e-05,
+      "event_tol": 0.015,
+      "scan_periods": 4
+    }
+  },
+  "cases": [
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "lambda_n": 0.05,
+      "b": 7.9314345648115845,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window"
+          ],
+          "wall_seconds": 0.30284625000786036
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window"
+          ],
+          "wall_seconds": 0.26383520796662197
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "lambda_n": 0.1,
+      "b": 8.147184858800973,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            28,
+            28
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.8,
+            "alpha": 0.0,
+            "zeta_in": -0.17037039198003873,
+            "zeta_out": 0.17037039198004075,
+            "A": 0.272065717181005
+          },
+          "wall_seconds": 1.0099173749913462
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            46,
+            46
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.8,
+            "alpha": 0.0,
+            "zeta_in": -0.17037039198003873,
+            "zeta_out": 0.17037039198004075,
+            "A": 0.272065717181005
+          },
+          "wall_seconds": 1.1519803749979474
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "lambda_n": 0.5,
+      "b": 9.873187210716075,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.0580456072859148.; bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.0580452799070208.",
+          "path_steps": [
+            8,
+            8
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": -0.8722279952985963,
+            "zeta_out": 0.8722279952985962,
+            "A": 4.604604395381525
+          },
+          "wall_seconds": 0.19518445897847414
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce root moved outside the continuation window; bounce root moved outside the continuation window",
+          "path_steps": [
+            12,
+            12
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": -0.8722279952985963,
+            "zeta_out": 0.8722279952985962,
+            "A": 4.604604395381525
+          },
+          "wall_seconds": 0.23693850002018735
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "lambda_n": 0.8,
+      "b": 11.167688974652405,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.455180528494236.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.106408906358668.",
+          "path_steps": [
+            5,
+            9
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.8,
+            "alpha": 1.5707963267948966,
+            "zeta_in": 1.7081086727649262,
+            "zeta_out": 3.500991810779732,
+            "A": 7.813433832095526
+          },
+          "wall_seconds": 0.4259789999923669
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.455180528494236.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.1144268751486568.",
+          "path_steps": [
+            5,
+            14
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.8,
+            "alpha": 1.5707963267948966,
+            "zeta_in": 1.7081086727649262,
+            "zeta_out": 3.500991810779732,
+            "A": 7.813433832095526
+          },
+          "wall_seconds": 0.4447622500010766
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "lambda_n": 0.9,
+      "b": 11.59918956263118,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.2635627079871483
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.26162474998272955
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "lambda_n": 0.95,
+      "b": 11.814939856620569,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.2954621670069173
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.2582157500437461
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "lambda_n": 0.05,
+      "b": 7.576918032939711,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window"
+          ],
+          "wall_seconds": 0.2574237919761799
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window"
+          ],
+          "wall_seconds": 0.2550222090212628
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "lambda_n": 0.1,
+      "b": 7.811419099418058,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window"
+          ],
+          "wall_seconds": 0.25826470798347145
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window"
+          ],
+          "wall_seconds": 0.2646734170266427
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "lambda_n": 0.5,
+      "b": 9.68742763124483,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            33,
+            33
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": -0.5296902838801429,
+            "zeta_out": 0.5296902838801429,
+            "A": 3.1313162303980393
+          },
+          "wall_seconds": 0.8103896669927053
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            64,
+            64
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": -0.5296902838801429,
+            "zeta_out": 0.5296902838801429,
+            "A": 3.1313162303980393
+          },
+          "wall_seconds": 1.136937958013732
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "lambda_n": 0.8,
+      "b": 11.094434030114908,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is -0.8122385568614031.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.8122386500920474.",
+          "path_steps": [
+            6,
+            6
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.8,
+            "alpha": 0.0,
+            "zeta_in": -0.7874666235629324,
+            "zeta_out": 0.7874666235629336,
+            "A": 7.086961197383257
+          },
+          "wall_seconds": 0.2684169170097448
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is -0.8102022501082766.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.8102023246541041.",
+          "path_steps": [
+            7,
+            7
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.8,
+            "alpha": 0.0,
+            "zeta_in": -0.7874666235629324,
+            "zeta_out": 0.7874666235629336,
+            "A": 7.086961197383257
+          },
+          "wall_seconds": 0.25823425000999123
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "lambda_n": 0.9,
+      "b": 11.563436163071602,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.7368611636513718.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.99350782506157.",
+          "path_steps": [
+            3,
+            8
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.8,
+            "alpha": 1.5707963267948966,
+            "zeta_in": 1.5641472771949732,
+            "zeta_out": 3.6655976784296525,
+            "A": 8.444184974878215
+          },
+          "wall_seconds": 0.36586883303243667
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.7368611636513718.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.9936348332247683.",
+          "path_steps": [
+            3,
+            11
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.8,
+            "alpha": 1.5707963267948966,
+            "zeta_in": 1.5641472771949732,
+            "zeta_out": 3.6655976784296525,
+            "A": 8.444184974878215
+          },
+          "wall_seconds": 0.3638095000060275
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "lambda_n": 0.95,
+      "b": 11.797937229549948,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.25405437499284744
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.24875308299669996
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "lambda_n": 0.05,
+      "b": 5.390959775428983,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            54,
+            54
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 0.6017716164622308,
+            "zeta_out": 0.9108220190412999,
+            "A": 0.931223862464879
+          },
+          "wall_seconds": 1.0200383749906905
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            53,
+            53
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 0.6017716164622308,
+            "zeta_out": 0.9108220190412999,
+            "A": 0.931223862464879
+          },
+          "wall_seconds": 1.2058333329623565
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "lambda_n": 0.1,
+      "b": 5.741453657785587,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            27,
+            27
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 0.5357182059334724,
+            "zeta_out": 0.9894621138179812,
+            "A": 2.194931737110064
+          },
+          "wall_seconds": 0.98299854202196
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            52,
+            52
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 0.5357182059334724,
+            "zeta_out": 0.9894621138179812,
+            "A": 2.194931737110064
+          },
+          "wall_seconds": 1.7857631249935366
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "lambda_n": 0.5,
+      "b": 8.545404716638414,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            27,
+            27
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 0.28431627205906357,
+            "zeta_out": 1.233678760028205,
+            "A": 8.26939644225206
+          },
+          "wall_seconds": 1.1976159999612719
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            53,
+            53
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 0.28431627205906357,
+            "zeta_out": 1.233678760028205,
+            "A": 8.26939644225206
+          },
+          "wall_seconds": 1.6077704170020297
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "lambda_n": 0.8,
+      "b": 10.648368010778036,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            28,
+            28
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 0.0449102869859216,
+            "zeta_out": 1.4059430620098394,
+            "A": 11.469132237196435
+          },
+          "wall_seconds": 0.8708400829927996
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            54,
+            54
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 0.0449102869859216,
+            "zeta_out": 1.4059430620098394,
+            "A": 11.469132237196435
+          },
+          "wall_seconds": 2.6491611660458148
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "lambda_n": 0.9,
+      "b": 11.34935577549124,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.1105584072005663.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.7512923333970525.",
+          "path_steps": [
+            7,
+            6
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 3.186700814977881,
+            "zeta_out": 4.70785494045456,
+            "A": 12.494125647844221
+          },
+          "wall_seconds": 0.17599220800912008
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.0996265549397526.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.7512923333970525.",
+          "path_steps": [
+            9,
+            6
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 3.186700814977881,
+            "zeta_out": 4.70785494045456,
+            "A": 12.494125647844221
+          },
+          "wall_seconds": 0.16578520799521357
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "lambda_n": 0.95,
+      "b": 11.699849657847844,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.28497337497537956
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.2806814170326106
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "lambda_n": 0.05,
+      "b": 2.34693551572541,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            44,
+            44
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 1.7346776738395624,
+            "zeta_out": 1.8656843425001046,
+            "A": 0.052993575274347685
+          },
+          "wall_seconds": 0.9464232079917565
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "closed trace lacks a root-pattern certificate",
+          "path_steps": [
+            85,
+            85
+          ],
+          "numerically_closed": [
+            true,
+            true
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 1.7346776738395624,
+            "zeta_out": 1.8656843425001046,
+            "A": 0.052993575274347685
+          },
+          "wall_seconds": 1.4292959159938619
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "lambda_n": 0.1,
+      "b": 2.4008120098047856,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "edge path has uncertified root topology; edge path has uncertified root topology",
+          "path_steps": [
+            33,
+            20
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            true,
+            true
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 0.5100651968249966,
+            "zeta_out": 0.5579555674864705,
+            "A": 0.004887170895664969
+          },
+          "wall_seconds": 1.0822282080189325
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "edge path has uncertified root topology; edge path has uncertified root topology",
+          "path_steps": [
+            51,
+            37
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            true,
+            true
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 0.5100651968249966,
+            "zeta_out": 0.5579555674864705,
+            "A": 0.004887170895664969
+          },
+          "wall_seconds": 1.258479374984745
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "lambda_n": 0.5,
+      "b": 2.831823962439789,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.2144448839648354.; bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.2144449311875998.",
+          "path_steps": [
+            5,
+            5
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": -1.0996719754865738,
+            "zeta_out": 1.0996719754865738,
+            "A": 3.9028268042473906
+          },
+          "wall_seconds": 0.17728520795935765
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.2144448839648354.; bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.2144449311875998.",
+          "path_steps": [
+            5,
+            5
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": -1.0996719754865738,
+            "zeta_out": 1.0996719754865738,
+            "A": 3.9028268042473906
+          },
+          "wall_seconds": 0.1497681249747984
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "lambda_n": 0.8,
+      "b": 3.155082926916042,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 2.461398858132563.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.8213796155916846.",
+          "path_steps": [
+            7,
+            9
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.8,
+            "alpha": 0.0,
+            "zeta_in": 2.574037409648128,
+            "zeta_out": 3.6491406684347036,
+            "A": 2.381086078809382
+          },
+          "wall_seconds": 0.31175558402901515
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 2.460767682244799.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 3.8290286155667044.",
+          "path_steps": [
+            8,
+            11
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.8,
+            "alpha": 0.0,
+            "zeta_in": 2.574037409648128,
+            "zeta_out": 3.6491406684347036,
+            "A": 2.381086078809382
+          },
+          "wall_seconds": 0.309504333010409
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "lambda_n": 0.9,
+      "b": 3.2628359150747928,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.28199716698145494
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.24929091602098197
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "lambda_n": 0.95,
+      "b": 3.316712409154168,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.24949454196030274
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.24776341702090576
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "lambda_n": 0.05,
+      "b": 5.017287700966896,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window"
+          ],
+          "wall_seconds": 0.20282266702270135
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window"
+          ],
+          "wall_seconds": 0.20060641696909443
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "lambda_n": 0.1,
+      "b": 5.125314678758602,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window"
+          ],
+          "wall_seconds": 0.20564545801607892
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window"
+          ],
+          "wall_seconds": 0.19459629204357043
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "lambda_n": 0.5,
+      "b": 5.989530501092255,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.809934530330295.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 5.661970193197462.",
+          "path_steps": [
+            8,
+            10
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 5.007816465421532,
+            "zeta_out": 5.492378121090076,
+            "A": 0.2714966769491055
+          },
+          "wall_seconds": 0.19678779202513397
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.773995176570382.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 5.692667397179706.",
+          "path_steps": [
+            11,
+            16
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.3,
+            "alpha": 0.0,
+            "zeta_in": 5.007816465421532,
+            "zeta_out": 5.492378121090076,
+            "A": 0.2714966769491055
+          },
+          "wall_seconds": 0.22728704195469618
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "lambda_n": 0.8,
+      "b": 6.637692367842495,
+      "probes": [
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.151265908985321.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 6.312577484693736.",
+          "path_steps": [
+            8,
+            3
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "coarse",
+          "seed": {
+            "s": 0.8,
+            "alpha": 0.0,
+            "zeta_in": 4.382457691057069,
+            "zeta_out": 6.163018170507631,
+            "A": 2.1510032941236394
+          },
+          "wall_seconds": 0.2029671659693122
+        },
+        {
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 4.139797144159068.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 6.317428972915623.",
+          "path_steps": [
+            12,
+            7
+          ],
+          "numerically_closed": [
+            false,
+            false
+          ],
+          "edge_intersections": [
+            false,
+            false
+          ],
+          "port_outcomes": [],
+          "scope": "represented-field numerical query",
+          "resolution": "fine",
+          "seed": {
+            "s": 0.8,
+            "alpha": 0.0,
+            "zeta_in": 4.382457691057069,
+            "zeta_out": 6.163018170507631,
+            "A": 2.1510032941236394
+          },
+          "wall_seconds": 0.24710104102268815
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "lambda_n": 0.9,
+      "b": 6.853746323425908,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.18945399997755885
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.18828562495764345
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "lambda_n": 0.95,
+      "b": 6.961773301217614,
+      "probes": [
+        {
+          "resolution": "coarse",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.18685475003439933
+        },
+        {
+          "resolution": "fine",
+          "status": "NO_SEED",
+          "reasons": [
+            "no complete ordinary well in scan window",
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary",
+            "no complete ordinary well in scan window",
+            "well crosses a finite scan-window boundary"
+          ],
+          "wall_seconds": 0.18466199998511001
+        }
+      ]
+    }
+  ],
+  "dmerc_queries": {
+    "closed_candidate": {
+      "status": "UNKNOWN",
+      "reason": "closed trace lacks a root-pattern certificate",
+      "path_steps": [
+        32,
+        32
+      ],
+      "numerically_closed": [
+        true,
+        true
+      ],
+      "edge_intersections": [
+        false,
+        false
+      ],
+      "port_outcomes": [],
+      "scope": "represented-field numerical query",
+      "seed": [
+        0.3,
+        0.0
+      ],
+      "wall_seconds": 0.7600123750162311
+    },
+    "edge_candidate": {
+      "status": "ACCESSIBLE",
+      "reason": "edge witness",
+      "path_steps": [
+        11,
+        3
+      ],
+      "numerically_closed": [
+        false,
+        false
+      ],
+      "edge_intersections": [
+        false,
+        true
+      ],
+      "port_outcomes": [],
+      "scope": "represented-field numerical query",
+      "seed": [
+        0.95,
+        -0.1577992744671513
+      ],
+      "wall_seconds": 2.919807167025283
+    },
+    "transition": {
+      "status": "UNKNOWN",
+      "reason": "all common-parameter ports explored; event-curve or branch uncertainty remains",
+      "path_steps": [
+        35,
+        2,
+        7,
+        7,
+        20,
+        3
+      ],
+      "numerically_closed": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "edge_intersections": [
+        false,
+        false,
+        false,
+        true,
+        false,
+        false
+      ],
+      "port_outcomes": [
+        {
+          "role": "child_1",
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is -1.584361842595166.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.009863006656455781."
+        },
+        {
+          "role": "parent",
+          "status": "UNKNOWN",
+          "reason": "invalid B inside continued trapped well; edge path has uncertified root topology"
+        },
+        {
+          "role": "child_3",
+          "status": "UNKNOWN",
+          "reason": "bounce-root continuation failed: Failed to converge after 15 iterations, value is 1.556914989122999.; bounce-root continuation failed: Failed to converge after 15 iterations, value is 0.017662323418741775."
+        }
+      ],
+      "scope": "represented-field numerical query",
+      "event_status": "generic",
+      "event_parameter": [
+        0.8,
+        -0.1577992744671513
+      ],
+      "event_actions": {
+        "child_1": 11.202008500006372,
+        "parent": 22.327691266337105,
+        "child_3": 11.125682766330735
+      },
+      "wall_seconds": 2.547349957982078
+    }
+  },
+  "elapsed_seconds": 37.77683833404444
+}
