@@ -81,9 +81,11 @@ do not relax the fast/full test-suite budgets.
 - R1's [forward-scan evidence](validation/r1-forward-scan-matrix.md) covers one
   lifted line per field at all 30 specified pitches and two scan resolutions.
   The Fourier-model envelope excluded hidden \(B=b\) barriers on those lines;
-  16/30 pitch probes per resolution still ended at a censored four-period window.
+  Shared scans resumed from 4 to 8 to at most 16 periods; this produced a
+  complete `n3are` well with \(A,K\) at \(\lambda_n=0.5\). Sixteen of 30 pitch
+  probes per resolution still had a censored finite window.
   A certificate for roots inside a window does not establish complete global
-  line or atlas coverage. Up to ten cells per line retained unverified extrema,
+  line or atlas coverage. Up to 28 cells per line retained unverified extrema,
   so R2 must continue or enclose those local families rather than treating the
   sampled extrema itinerary as a stable branch label. Batched \(A,K\) values
   retain summed numerical estimates and an independent adaptive comparison,

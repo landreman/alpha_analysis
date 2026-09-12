@@ -62,9 +62,9 @@ def test_shared_catalogue_matches_independent_well_traces():
     assert catalogue.scanned_periods == 2  # pitch queries reused the same samples
 
 
-def test_window_end_is_not_passing_and_catalogue_resumes_without_losing_first_crossing():
-    # B=2-cos(0.2 zeta) has a well extending over five 2*pi windows.
-    field = SyntheticFourierField(
+def _long_well_field():
+    """B=2-cos(0.2 zeta) has a well spanning several 2*pi windows."""
+    return SyntheticFourierField(
         nfp=1,
         m=np.array([0, 1]),
         n=np.array([0, 0]),
@@ -74,12 +74,22 @@ def test_window_end_is_not_passing_and_catalogue_resumes_without_losing_first_cr
         G_coefficients=np.array([1.0]),
         I_coefficients=np.array([0.0]),
     )
+
+
+def test_window_end_is_not_passing():
+    field = _long_well_field()
     catalogue = ForwardLineCatalogue(field, 0.5, -np.pi / 2, 0.0)
     catalogue.extend_to(2)
     censored = catalogue.query(2.0)
     assert not censored.passing_certified
     assert censored.open_right
     assert not censored.root_complete
+
+
+def test_catalogue_resumes_without_losing_first_crossing():
+    field = _long_well_field()
+    catalogue = ForwardLineCatalogue(field, 0.5, -np.pi / 2, 0.0)
+    catalogue.extend_to(2)
     first_samples = catalogue.sample_count
     catalogue.extend_to(4)
     resolved = catalogue.query(2.0)
@@ -88,6 +98,8 @@ def test_window_end_is_not_passing_and_catalogue_resumes_without_losing_first_cr
     np.testing.assert_allclose(resolved.wells[0].zeta_in, 0.0, atol=1e-11)
     np.testing.assert_allclose(resolved.wells[0].zeta_out, 5 * np.pi, atol=1e-10)
 
+
+def test_near_incoming_root_remains_window_censored():
     # A point merely close to the incoming root cannot become an exact root.
     simple = _field([2.0, -1.0], [0, 1])
     close_start = -2 * np.pi / 3 + 5e-11
@@ -238,3 +250,5 @@ def test_exact_separatrix_does_not_get_a_finite_critical_K():
     assert result.tangent_candidates
     assert not result.passing_certified
     assert not result.wells
+    assert "tangent" in result.reason
+    assert "window boundary" in result.reason

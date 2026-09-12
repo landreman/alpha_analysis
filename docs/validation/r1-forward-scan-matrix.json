@@ -1,12 +1,12 @@
 {
-  "baseline_commit": "92b057746b94c7bb835ecfb83637cddabb37d581",
+  "baseline_commit": "ff3bfecd3d78302aecb3b5549fdb918b4a11ef6a",
   "source": "h(rho)=1 (UniformSourceProfile); scans and A/K are source independent",
   "pitch_provenance": "R0 sampled radially global extrema estimates; not field bounds",
   "software_scope": "Fourier-model root envelope; A/K n-versus-2n estimates; no field enclosure",
   "hardware": "macOS-14.7.6-arm64-arm-64bit",
   "worker_count": 1,
   "cache_state": "new field objects, warm OS file cache uncontrolled",
-  "code_sha256": "d4c9dd499a066b051a64de1bc4d5860cd169a270c681d9224d52b50d87cfdec8",
+  "code_sha256": "e837ee181d8b3aa17c3bf717ea9042f512b4a1a6ccbe054424676d0f4da50750",
   "cases": [
     {
       "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
@@ -17,14 +17,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1829,
-      "scan_seconds_shared": 0.0727551250020042,
-      "query_seconds": 0.003104125033132732,
-      "batch_seconds": 1.6249832697212696e-06,
-      "fresh_scan_query_seconds": 0.06481279199942946,
+      "shared_catalogue_sample_count": 1829,
+      "scan_seconds_shared": 0.06944962497800589,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.0026892079622484744,
+      "batch_seconds": 1.667009200900793e-06,
+      "fresh_scan_query_seconds": 0.062001666985452175,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -47,14 +61,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1829,
-      "scan_seconds_shared": 0.0727551250020042,
-      "query_seconds": 0.002752250002231449,
-      "batch_seconds": 1.207983586937189e-06,
-      "fresh_scan_query_seconds": 0.06233750004321337,
+      "shared_catalogue_sample_count": 1829,
+      "scan_seconds_shared": 0.06944962497800589,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.0025215829955413938,
+      "batch_seconds": 1.2909877113997936e-06,
+      "fresh_scan_query_seconds": 0.06522454199148342,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -77,22 +105,44 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1829,
-      "scan_seconds_shared": 0.0727551250020042,
-      "query_seconds": 0.004430832981597632,
-      "batch_seconds": 0.012752707989420742,
-      "fresh_scan_query_seconds": 0.06409112503752112,
+      "sample_count": 3657,
+      "shared_catalogue_sample_count": 3657,
+      "scan_seconds_shared": 0.06944962497800589,
+      "resume_scan_seconds_shared": 0.05353375000413507,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 2,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 6,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 8,
+      "query_seconds": 0.011574083007872105,
+      "batch_seconds": 0.027499708987306803,
+      "fresh_scan_query_seconds": 0.12227695801993832,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
-      "open_right": true,
+      "open_right": false,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 5,
-      "complete_well_count": 2,
+      "extrema_unverified_cell_count": 14,
+      "complete_well_count": 6,
       "wells": [
         {
           "u_in": 1.2532472056136803,
@@ -113,17 +163,57 @@
           "K_error_estimate": 7.743006236182737e-10,
           "integral_status": "REGULAR",
           "method": "batched_gl"
+        },
+        {
+          "u_in": 5.391460283364461,
+          "u_out": 6.615180791962168,
+          "A": 4.275429622016942,
+          "K": 54.76761320385583,
+          "A_error_estimate": 3.659295089164516e-13,
+          "K_error_estimate": 2.76685341304983e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 7.037975863220921,
+          "u_out": 8.668744173607681,
+          "A": 4.507642741384884,
+          "K": 121.6018074367467,
+          "A_error_estimate": 1.944971961265196e-14,
+          "K_error_estimate": 1.9425652197924137e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 9.122302647847953,
+          "u_out": 10.343078100758406,
+          "A": 4.2539285772516555,
+          "K": 54.635942285970934,
+          "A_error_estimate": 3.3280045386163692e-12,
+          "K_error_estimate": 7.59929008609106e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 11.271739745066839,
+          "u_out": 12.380404995303275,
+          "A": 3.8684369609973195,
+          "K": 52.5156204591281,
+          "A_error_estimate": 1.5509815654013437e-12,
+          "K_error_estimate": 3.6121861057836213e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
         }
       ],
       "adaptive_first_well": {
         "status": "REGULAR",
         "A": 4.264969767950841,
         "K": 54.775152755195535,
-        "seconds": 0.01428308297181502
+        "seconds": 0.012697790982201695
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.024673457955941558,
+        "seconds": 0.020704667025711387,
         "A": 4.264969767950826,
         "K": 54.77515275524569
       },
@@ -138,22 +228,52 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1829,
-      "scan_seconds_shared": 0.0727551250020042,
-      "query_seconds": 0.004273958969861269,
-      "batch_seconds": 0.011370082967914641,
-      "fresh_scan_query_seconds": 0.06846937496447936,
+      "sample_count": 7313,
+      "shared_catalogue_sample_count": 7313,
+      "scan_seconds_shared": 0.06944962497800589,
+      "resume_scan_seconds_shared": 0.10142458300106227,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 1,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 2,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 5,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.023923417960759252,
+      "batch_seconds": 0.03975541703402996,
+      "fresh_scan_query_seconds": 0.23538841697154567,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 5,
-      "complete_well_count": 1,
+      "extrema_unverified_cell_count": 28,
+      "complete_well_count": 5,
       "wells": [
         {
           "u_in": 2.8029609867406196,
@@ -164,17 +284,57 @@
           "K_error_estimate": 3.0738873422198054e-06,
           "integral_status": "REGULAR",
           "method": "batched_gl"
+        },
+        {
+          "u_in": 5.126027767302775,
+          "u_out": 10.764644763404213,
+          "A": 23.770705060506703,
+          "K": 251.24842352804058,
+          "A_error_estimate": 1.12905902509286e-09,
+          "K_error_estimate": 2.833596519646875e-07,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 10.808091179103968,
+          "u_out": 12.925749083860984,
+          "A": 7.559231602484539,
+          "K": 118.08889629958759,
+          "A_error_estimate": 2.07878776414816e-08,
+          "K_error_estimate": 1.319691023127234e-08,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 12.983754657036263,
+          "u_out": 18.566237143055158,
+          "A": 23.782945360703042,
+          "K": 203.6598029470918,
+          "A_error_estimate": 3.069369020058943e-08,
+          "K_error_estimate": 3.3382982511653836e-07,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 18.734496882032317,
+          "u_out": 20.805954292957647,
+          "A": 7.553125178317219,
+          "K": 102.17634247925582,
+          "A_error_estimate": 7.800706303129346e-09,
+          "K_error_estimate": 1.157442639510009e-07,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
         }
       ],
       "adaptive_first_well": {
         "status": "REGULAR",
         "A": 7.617230873976802,
         "K": 138.57686167821038,
-        "seconds": 0.038004875008482486
+        "seconds": 0.029083125002216548
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.051189917023293674,
+        "seconds": 0.04105070803780109,
         "A": 7.617230873977078,
         "K": 138.57686169644907
       },
@@ -189,21 +349,43 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1829,
-      "scan_seconds_shared": 0.0727551250020042,
-      "query_seconds": 0.0025198329822160304,
-      "batch_seconds": 1.249951310455799e-06,
-      "fresh_scan_query_seconds": 0.05996670795138925,
+      "sample_count": 7313,
+      "shared_catalogue_sample_count": 7313,
+      "scan_seconds_shared": 0.06944962497800589,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.011987207981292158,
+      "batch_seconds": 2.207991201430559e-06,
+      "fresh_scan_query_seconds": 0.237374083022587,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 5,
+      "extrema_unverified_cell_count": 28,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -219,21 +401,43 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1829,
-      "scan_seconds_shared": 0.0727551250020042,
-      "query_seconds": 0.0027351659955456853,
-      "batch_seconds": 1.2500095181167126e-06,
-      "fresh_scan_query_seconds": 0.07012762501835823,
+      "sample_count": 7313,
+      "shared_catalogue_sample_count": 7313,
+      "scan_seconds_shared": 0.06944962497800589,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.011833915952593088,
+      "batch_seconds": 1.167005393654108e-06,
+      "fresh_scan_query_seconds": 0.22712058300385252,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 5,
+      "extrema_unverified_cell_count": 28,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -249,14 +453,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3657,
-      "scan_seconds_shared": 0.12557062500854954,
-      "query_seconds": 0.005643000011332333,
-      "batch_seconds": 1.4170072972774506e-06,
-      "fresh_scan_query_seconds": 0.1312195000355132,
+      "shared_catalogue_sample_count": 3657,
+      "scan_seconds_shared": 0.1081438340479508,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.005041999975219369,
+      "batch_seconds": 1.541979145258665e-06,
+      "fresh_scan_query_seconds": 0.1083306249929592,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -279,14 +497,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3657,
-      "scan_seconds_shared": 0.12557062500854954,
-      "query_seconds": 0.005389458034187555,
-      "batch_seconds": 1.0830117389559746e-06,
-      "fresh_scan_query_seconds": 0.13454599998658523,
+      "shared_catalogue_sample_count": 3657,
+      "scan_seconds_shared": 0.1081438340479508,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.005072625004686415,
+      "batch_seconds": 1.333013642579317e-06,
+      "fresh_scan_query_seconds": 0.11111333302687854,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -309,22 +541,44 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3657,
-      "scan_seconds_shared": 0.12557062500854954,
-      "query_seconds": 0.006922332977410406,
-      "batch_seconds": 0.013764915987849236,
-      "fresh_scan_query_seconds": 0.1397411249927245,
+      "sample_count": 7313,
+      "shared_catalogue_sample_count": 7313,
+      "scan_seconds_shared": 0.1081438340479508,
+      "resume_scan_seconds_shared": 0.10652304202085361,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 2,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 6,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 8,
+      "query_seconds": 0.01873333303956315,
+      "batch_seconds": 0.028157291002571583,
+      "fresh_scan_query_seconds": 0.21991491701919585,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
-      "open_right": true,
+      "open_right": false,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
-      "complete_well_count": 2,
+      "extrema_unverified_cell_count": 6,
+      "complete_well_count": 6,
       "wells": [
         {
           "u_in": 1.25324720561368,
@@ -345,13 +599,53 @@
           "K_error_estimate": 8.029503728579357e-10,
           "integral_status": "REGULAR",
           "method": "batched_gl"
+        },
+        {
+          "u_in": 5.391460283364462,
+          "u_out": 6.615180791962168,
+          "A": 4.275429622016944,
+          "K": 54.76761320390047,
+          "A_error_estimate": 3.6637359812630166e-13,
+          "K_error_estimate": 2.4084201299956476e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 7.037975863220923,
+          "u_out": 8.668744173607681,
+          "A": 4.50764274138488,
+          "K": 121.60180743398607,
+          "A_error_estimate": 1.189326415129699e-14,
+          "K_error_estimate": 2.440572188788792e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 9.122302647847949,
+          "u_out": 10.343078100758405,
+          "A": 4.253928577251655,
+          "K": 54.63594228629026,
+          "A_error_estimate": 3.33200134150502e-12,
+          "K_error_estimate": 9.98113591776928e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 11.271739745066837,
+          "u_out": 12.380404995303275,
+          "A": 3.8684369609973173,
+          "K": 52.51562045930895,
+          "A_error_estimate": 1.5492052085619434e-12,
+          "K_error_estimate": 4.1821834884103737e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
         }
       ],
       "adaptive_first_well": {
         "status": "REGULAR",
         "A": 4.264969767950841,
         "K": 54.77515275524502,
-        "seconds": 0.017772542021702975
+        "seconds": 0.01038450002670288
       },
       "legacy_first_well": null,
       "reason": "well crosses a finite scan-window boundary"
@@ -365,22 +659,52 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3657,
-      "scan_seconds_shared": 0.12557062500854954,
-      "query_seconds": 0.006554624997079372,
-      "batch_seconds": 0.012365292001049966,
-      "fresh_scan_query_seconds": 0.27827595797134563,
+      "sample_count": 14625,
+      "shared_catalogue_sample_count": 14625,
+      "scan_seconds_shared": 0.1081438340479508,
+      "resume_scan_seconds_shared": 0.20700399996712804,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 1,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 2,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 5,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.0387065420509316,
+      "batch_seconds": 0.03920829197159037,
+      "fresh_scan_query_seconds": 0.42106754204723984,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
-      "complete_well_count": 1,
+      "extrema_unverified_cell_count": 12,
+      "complete_well_count": 5,
       "wells": [
         {
           "u_in": 2.8029609867406196,
@@ -391,13 +715,53 @@
           "K_error_estimate": 3.0722487172063495e-06,
           "integral_status": "REGULAR",
           "method": "batched_gl"
+        },
+        {
+          "u_in": 5.126027767302772,
+          "u_out": 10.764644763404213,
+          "A": 23.77070506050671,
+          "K": 251.24842352897286,
+          "A_error_estimate": 1.129061663607267e-09,
+          "K_error_estimate": 2.8262924667288303e-07,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 10.808091179103968,
+          "u_out": 12.925749083861,
+          "A": 7.559231602484536,
+          "K": 118.08889630449832,
+          "A_error_estimate": 2.078787408876792e-08,
+          "K_error_estimate": 1.4062926823044108e-08,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 12.983754657036304,
+          "u_out": 18.566237143055158,
+          "A": 23.782945360703042,
+          "K": 203.6598029386909,
+          "A_error_estimate": 3.069369627906049e-08,
+          "K_error_estimate": 3.400778916251568e-07,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 18.73449688203231,
+          "u_out": 20.805954292957647,
+          "A": 7.553125178317218,
+          "K": 102.17634248157847,
+          "A_error_estimate": 7.800708523575395e-09,
+          "K_error_estimate": 1.1398361721148831e-07,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
         }
       ],
       "adaptive_first_well": {
         "status": "REGULAR",
         "A": 7.617230873976797,
         "K": 138.5768616802085,
-        "seconds": 0.06402445799903944
+        "seconds": 0.02889750001486391
       },
       "legacy_first_well": null,
       "reason": "well crosses a finite scan-window boundary"
@@ -411,21 +775,43 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3657,
-      "scan_seconds_shared": 0.12557062500854954,
-      "query_seconds": 0.009126124961767346,
-      "batch_seconds": 2.7500209398567677e-06,
-      "fresh_scan_query_seconds": 0.31817237503128126,
+      "sample_count": 14625,
+      "shared_catalogue_sample_count": 14625,
+      "scan_seconds_shared": 0.1081438340479508,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.02330608305055648,
+      "batch_seconds": 2.540997229516506e-06,
+      "fresh_scan_query_seconds": 0.4375428329803981,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
+      "extrema_unverified_cell_count": 12,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -441,21 +827,43 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3657,
-      "scan_seconds_shared": 0.12557062500854954,
-      "query_seconds": 0.005729791009798646,
-      "batch_seconds": 1.4170072972774506e-06,
-      "fresh_scan_query_seconds": 0.21830437501193956,
+      "sample_count": 14625,
+      "shared_catalogue_sample_count": 14625,
+      "scan_seconds_shared": 0.1081438340479508,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.024312541994731873,
+      "batch_seconds": 1.374981366097927e-06,
+      "fresh_scan_query_seconds": 0.48278025002218783,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
+      "extrema_unverified_cell_count": 12,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -471,14 +879,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1817,
-      "scan_seconds_shared": 0.10198362497612834,
-      "query_seconds": 0.006744250014889985,
-      "batch_seconds": 2.541986759752035e-06,
-      "fresh_scan_query_seconds": 0.0939536250079982,
+      "shared_catalogue_sample_count": 1817,
+      "scan_seconds_shared": 0.05257666698889807,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.002557332976721227,
+      "batch_seconds": 1.6249832697212696e-06,
+      "fresh_scan_query_seconds": 0.05288120801560581,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -501,14 +923,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1817,
-      "scan_seconds_shared": 0.10198362497612834,
-      "query_seconds": 0.0033240419579669833,
-      "batch_seconds": 1.292035449296236e-06,
-      "fresh_scan_query_seconds": 0.08871283399639651,
+      "shared_catalogue_sample_count": 1817,
+      "scan_seconds_shared": 0.05257666698889807,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.0026627500192262232,
+      "batch_seconds": 9.999494068324566e-07,
+      "fresh_scan_query_seconds": 0.05027887498727068,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -531,22 +967,44 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1817,
-      "scan_seconds_shared": 0.10198362497612834,
-      "query_seconds": 0.007148458040319383,
-      "batch_seconds": 0.010759665980003774,
-      "fresh_scan_query_seconds": 0.10036458302056417,
+      "sample_count": 3633,
+      "shared_catalogue_sample_count": 3633,
+      "scan_seconds_shared": 0.05257666698889807,
+      "resume_scan_seconds_shared": 0.04964783298783004,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 2,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 6,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 8,
+      "query_seconds": 0.011064374994020909,
+      "batch_seconds": 0.008887915988452733,
+      "fresh_scan_query_seconds": 0.10830187500687316,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
-      "open_right": true,
+      "open_right": false,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
-      "complete_well_count": 2,
+      "extrema_unverified_cell_count": 3,
+      "complete_well_count": 6,
       "wells": [
         {
           "u_in": 1.2280862631285252,
@@ -564,7 +1022,47 @@
           "A": 2.3375286321817983,
           "K": 44.320046995623294,
           "A_error_estimate": 8.37241387330323e-12,
-          "K_error_estimate": 4.9383572786609875e-09,
+          "K_error_estimate": 4.926985042175147e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 5.520630101747965,
+          "u_out": 6.552435806983657,
+          "A": 3.3011372740663485,
+          "K": 51.25032349384627,
+          "A_error_estimate": 2.7430475668666077e-09,
+          "K_error_estimate": 1.9710528320615595e-08,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 7.288980999329491,
+          "u_out": 8.363551992761407,
+          "A": 3.5973066119798904,
+          "K": 50.386001629382335,
+          "A_error_estimate": 4.720668300706166e-12,
+          "K_error_estimate": 1.4799184100411367e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 9.029413451277945,
+          "u_out": 10.100664974839958,
+          "A": 3.5597113659716237,
+          "K": 50.30458344157341,
+          "A_error_estimate": 1.8262347190045602e-10,
+          "K_error_estimate": 8.530989248356491e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 11.191426565681725,
+          "u_out": 11.999055384246107,
+          "A": 2.390349348228889,
+          "K": 45.4436944199727,
+          "A_error_estimate": 2.0337065365083618e-11,
+          "K_error_estimate": 6.476597036453313e-12,
           "integral_status": "REGULAR",
           "method": "batched_gl"
         }
@@ -573,11 +1071,11 @@
         "status": "REGULAR",
         "A": 3.496826377208638,
         "K": 50.400124555314136,
-        "seconds": 0.021192791988141835
+        "seconds": 0.007099624956026673
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.04059141699690372,
+        "seconds": 0.017064959043636918,
         "A": 3.496826377208648,
         "K": 50.4001245553367
       },
@@ -592,30 +1090,72 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1817,
-      "scan_seconds_shared": 0.10198362497612834,
-      "query_seconds": 0.005028625018894672,
-      "batch_seconds": 0.004369791015051305,
-      "fresh_scan_query_seconds": 0.12796508404426277,
+      "sample_count": 3633,
+      "shared_catalogue_sample_count": 3633,
+      "scan_seconds_shared": 0.05257666698889807,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 1,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 3,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 8,
+      "query_seconds": 0.009490125987213105,
+      "batch_seconds": 0.015962917008437216,
+      "fresh_scan_query_seconds": 0.11004574998514727,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
-      "open_right": true,
+      "open_right": false,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
-      "complete_well_count": 1,
+      "extrema_unverified_cell_count": 3,
+      "complete_well_count": 3,
       "wells": [
         {
           "u_in": 2.884514246960183,
           "u_out": 4.816574582923187,
-          "A": 6.29752838226372,
-          "K": 90.98561607256183,
-          "A_error_estimate": 1.7867146429040304e-07,
-          "K_error_estimate": 6.762358850664896e-07,
+          "A": 6.2975283822616115,
+          "K": 90.98561607327416,
+          "A_error_estimate": 2.1085355683680973e-12,
+          "K_error_estimate": 3.5227643024882127e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 5.274980508197696,
+          "u_out": 10.348284100069126,
+          "A": 20.51731659924123,
+          "K": 181.7368307875764,
+          "A_error_estimate": 6.110667527536862e-13,
+          "K_error_estimate": 4.222787453045385e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 10.621606005656963,
+          "u_out": 12.482773881501464,
+          "A": 6.295141789687536,
+          "K": 84.97523667197598,
+          "A_error_estimate": 3.744560217455728e-12,
+          "K_error_estimate": 2.397300136181002e-09,
           "integral_status": "REGULAR",
           "method": "batched_gl"
         }
@@ -624,11 +1164,11 @@
         "status": "REGULAR",
         "A": 6.297528382262332,
         "K": 90.98561607257405,
-        "seconds": 0.016845916979946196
+        "seconds": 0.010112666001077741
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.05807887500850484,
+        "seconds": 0.027807542006485164,
         "A": 6.297528382262147,
         "K": 90.9856158509352
       },
@@ -643,21 +1183,51 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1817,
-      "scan_seconds_shared": 0.10198362497612834,
-      "query_seconds": 0.0037619159556925297,
-      "batch_seconds": 2.7458008844405413e-05,
-      "fresh_scan_query_seconds": 0.10466125002130866,
+      "sample_count": 7265,
+      "shared_catalogue_sample_count": 7265,
+      "scan_seconds_shared": 0.05257666698889807,
+      "resume_scan_seconds_shared": 0.18558120797388256,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.01665083406260237,
+      "batch_seconds": 1.541979145258665e-06,
+      "fresh_scan_query_seconds": 0.22202937497058883,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
+      "extrema_unverified_cell_count": 3,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -673,21 +1243,43 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1817,
-      "scan_seconds_shared": 0.10198362497612834,
-      "query_seconds": 0.0029349169926717877,
-      "batch_seconds": 9.170034900307655e-07,
-      "fresh_scan_query_seconds": 0.1010404999833554,
+      "sample_count": 7265,
+      "shared_catalogue_sample_count": 7265,
+      "scan_seconds_shared": 0.05257666698889807,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.011857540986966342,
+      "batch_seconds": 2.625049091875553e-06,
+      "fresh_scan_query_seconds": 0.2296581250266172,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
+      "extrema_unverified_cell_count": 3,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -703,14 +1295,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3629,
-      "scan_seconds_shared": 0.1627597080077976,
-      "query_seconds": 0.006483624980319291,
+      "shared_catalogue_sample_count": 3629,
+      "scan_seconds_shared": 0.10658829199383035,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.005035415990278125,
       "batch_seconds": 1.2500095181167126e-06,
-      "fresh_scan_query_seconds": 0.17888112500077114,
+      "fresh_scan_query_seconds": 0.11288383300416172,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -733,14 +1339,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3629,
-      "scan_seconds_shared": 0.1627597080077976,
-      "query_seconds": 0.006627792026847601,
-      "batch_seconds": 1.1249794624745846e-06,
-      "fresh_scan_query_seconds": 0.19198241597041488,
+      "shared_catalogue_sample_count": 3629,
+      "scan_seconds_shared": 0.10658829199383035,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.0050651669735088944,
+      "batch_seconds": 1.334003172814846e-06,
+      "fresh_scan_query_seconds": 0.11040233302628621,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -763,22 +1383,44 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3629,
-      "scan_seconds_shared": 0.1627597080077976,
-      "query_seconds": 0.018768750014714897,
-      "batch_seconds": 0.010067624971270561,
-      "fresh_scan_query_seconds": 0.17747716599842533,
+      "sample_count": 7257,
+      "shared_catalogue_sample_count": 7257,
+      "scan_seconds_shared": 0.10658829199383035,
+      "resume_scan_seconds_shared": 0.10490812495118007,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 2,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 6,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 8,
+      "query_seconds": 0.020540416007861495,
+      "batch_seconds": 0.008554917003493756,
+      "fresh_scan_query_seconds": 0.32214662502519786,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
-      "open_right": true,
+      "open_right": false,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
-      "complete_well_count": 2,
+      "extrema_unverified_cell_count": 2,
+      "complete_well_count": 6,
       "wells": [
         {
           "u_in": 1.2280862631285272,
@@ -796,7 +1438,47 @@
           "A": 2.3375286321818014,
           "K": 44.320046989381495,
           "A_error_estimate": 8.377964988426356e-12,
-          "K_error_estimate": 9.612456608465436e-09,
+          "K_error_estimate": 9.595392924666157e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 5.520630101748186,
+          "u_out": 6.5524358069836595,
+          "A": 3.3011372740663494,
+          "K": 51.25032348441874,
+          "A_error_estimate": 2.743055560472385e-09,
+          "K_error_estimate": 2.6397422914214985e-08,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 7.28898099932949,
+          "u_out": 8.363551992761405,
+          "A": 3.5973066119798913,
+          "K": 50.386001629336235,
+          "A_error_estimate": 4.721112389916016e-12,
+          "K_error_estimate": 9.99982319171977e-11,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 9.029413451277941,
+          "u_out": 10.10066497483996,
+          "A": 3.5597113659716224,
+          "K": 50.304583441674765,
+          "A_error_estimate": 1.8262480416808557e-10,
+          "K_error_estimate": 7.781899569181405e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 11.191426565681796,
+          "u_out": 11.999055384246105,
+          "A": 2.390349348228888,
+          "K": 45.443694415728594,
+          "A_error_estimate": 2.0337731498898393e-11,
+          "K_error_estimate": 3.1773979003446584e-09,
           "integral_status": "REGULAR",
           "method": "batched_gl"
         }
@@ -805,7 +1487,7 @@
         "status": "REGULAR",
         "A": 3.496826377208639,
         "K": 50.4001245494043,
-        "seconds": 0.015851167030632496
+        "seconds": 0.006984917039517313
       },
       "legacy_first_well": null,
       "reason": "well crosses a finite scan-window boundary"
@@ -819,30 +1501,72 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3629,
-      "scan_seconds_shared": 0.1627597080077976,
-      "query_seconds": 0.01084866700693965,
-      "batch_seconds": 0.00655679201008752,
-      "fresh_scan_query_seconds": 0.16009195800870657,
+      "sample_count": 7257,
+      "shared_catalogue_sample_count": 7257,
+      "scan_seconds_shared": 0.10658829199383035,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 1,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 3,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 8,
+      "query_seconds": 0.016843833029270172,
+      "batch_seconds": 0.017503874958492815,
+      "fresh_scan_query_seconds": 0.22223804099485278,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
-      "open_right": true,
+      "open_right": false,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
-      "complete_well_count": 1,
+      "extrema_unverified_cell_count": 2,
+      "complete_well_count": 3,
       "wells": [
         {
           "u_in": 2.8845142469601734,
           "u_out": 4.816574582923177,
-          "A": 6.297528382263722,
-          "K": 90.985616072452,
-          "A_error_estimate": 1.786714580731541e-07,
-          "K_error_estimate": 6.763138102883204e-07,
+          "A": 6.297528382261609,
+          "K": 90.98561607242918,
+          "A_error_estimate": 2.113420549676448e-12,
+          "K_error_estimate": 3.8399150525947334e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 5.27498050819768,
+          "u_out": 10.348284100069124,
+          "A": 20.51731659924123,
+          "K": 181.73683078976356,
+          "A_error_estimate": 6.119549311733863e-13,
+          "K_error_estimate": 1.9846773113840754e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 10.621606005656965,
+          "u_out": 12.482773881501462,
+          "A": 6.295141789687536,
+          "K": 84.97523667186499,
+          "A_error_estimate": 3.746336574295128e-12,
+          "K_error_estimate": 2.3054695930113667e-09,
           "integral_status": "REGULAR",
           "method": "batched_gl"
         }
@@ -851,7 +1575,7 @@
         "status": "REGULAR",
         "A": 6.297528382262332,
         "K": 90.98561607241396,
-        "seconds": 0.017286416026763618
+        "seconds": 0.010317499982193112
       },
       "legacy_first_well": null,
       "reason": "well crosses a finite scan-window boundary"
@@ -865,21 +1589,51 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3629,
-      "scan_seconds_shared": 0.1627597080077976,
-      "query_seconds": 0.005744207999669015,
-      "batch_seconds": 2.792046871036291e-06,
-      "fresh_scan_query_seconds": 0.14850500004831702,
+      "sample_count": 14513,
+      "shared_catalogue_sample_count": 14513,
+      "scan_seconds_shared": 0.10658829199383035,
+      "resume_scan_seconds_shared": 0.21480924997013062,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.0325119579792954,
+      "batch_seconds": 1.8749851733446121e-06,
+      "fresh_scan_query_seconds": 0.4186076669720933,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
+      "extrema_unverified_cell_count": 2,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -895,21 +1649,43 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3629,
-      "scan_seconds_shared": 0.1627597080077976,
-      "query_seconds": 0.0054427499999292195,
-      "batch_seconds": 1.0410440154373646e-06,
-      "fresh_scan_query_seconds": 0.1648763749981299,
+      "sample_count": 14513,
+      "shared_catalogue_sample_count": 14513,
+      "scan_seconds_shared": 0.10658829199383035,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.023835000989492983,
+      "batch_seconds": 1.0409858077764511e-06,
+      "fresh_scan_query_seconds": 0.640515792008955,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
+      "extrema_unverified_cell_count": 2,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -925,14 +1701,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1865,
-      "scan_seconds_shared": 0.08264429197879508,
-      "query_seconds": 0.004918166960123926,
-      "batch_seconds": 0.014512875000946224,
-      "fresh_scan_query_seconds": 0.07228466699598357,
+      "shared_catalogue_sample_count": 1865,
+      "scan_seconds_shared": 0.05424425000092015,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 4,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.00423016696004197,
+      "batch_seconds": 0.009218459017574787,
+      "fresh_scan_query_seconds": 0.05771758302580565,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -987,11 +1777,11 @@
         "status": "REGULAR",
         "A": 0.6204482337404649,
         "K": 47.95119868208262,
-        "seconds": 0.005835333024151623
+        "seconds": 0.0035559580428525805
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.017311458010226488,
+        "seconds": 0.01176787499571219,
         "A": 0.6204482337404585,
         "K": 47.95119867326603
       },
@@ -1006,14 +1796,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1865,
-      "scan_seconds_shared": 0.08264429197879508,
-      "query_seconds": 0.004517374967690557,
-      "batch_seconds": 0.006280458008404821,
-      "fresh_scan_query_seconds": 0.06999762495979667,
+      "shared_catalogue_sample_count": 1865,
+      "scan_seconds_shared": 0.05424425000092015,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 4,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.0042993329698219895,
+      "batch_seconds": 0.0054395830375142395,
+      "fresh_scan_query_seconds": 0.06006262497976422,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -1068,11 +1872,11 @@
         "status": "REGULAR",
         "A": 1.9497219818353466,
         "K": 40.51128372776311,
-        "seconds": 0.004885500005912036
+        "seconds": 0.005579709017183632
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.016494249983225018,
+        "seconds": 0.01334816700546071,
         "A": 1.9497219818353462,
         "K": 40.511283727737336
       },
@@ -1087,14 +1891,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1865,
-      "scan_seconds_shared": 0.08264429197879508,
-      "query_seconds": 0.004733083012979478,
-      "batch_seconds": 0.00638254196383059,
-      "fresh_scan_query_seconds": 0.06880649999948218,
+      "shared_catalogue_sample_count": 1865,
+      "scan_seconds_shared": 0.05424425000092015,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 4,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.004030417010653764,
+      "batch_seconds": 0.005807750043459237,
+      "fresh_scan_query_seconds": 0.05429599998751655,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -1149,11 +1967,11 @@
         "status": "REGULAR",
         "A": 8.116573145425694,
         "K": 35.80494263918561,
-        "seconds": 0.01181820803321898
+        "seconds": 0.010129125032108277
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.023138875025324523,
+        "seconds": 0.01831100002164021,
         "A": 8.116573145434597,
         "K": 35.804942645774695
       },
@@ -1168,14 +1986,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1865,
-      "scan_seconds_shared": 0.08264429197879508,
-      "query_seconds": 0.004446750041097403,
-      "batch_seconds": 0.02155150001635775,
-      "fresh_scan_query_seconds": 0.07395629200618714,
+      "shared_catalogue_sample_count": 1865,
+      "scan_seconds_shared": 0.05424425000092015,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 4,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.004137333016842604,
+      "batch_seconds": 0.012878957961220294,
+      "fresh_scan_query_seconds": 0.059940457984339446,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -1230,11 +2062,11 @@
         "status": "REGULAR",
         "A": 11.322389844358288,
         "K": 50.66112701954229,
-        "seconds": 0.015924957988318056
+        "seconds": 0.012291208025999367
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.02792475000023842,
+        "seconds": 0.026332542009186,
         "A": 11.322389844358684,
         "K": 50.66112705622487
       },
@@ -1249,22 +2081,52 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1865,
-      "scan_seconds_shared": 0.08264429197879508,
-      "query_seconds": 0.004457040980923921,
-      "batch_seconds": 0.007891874993219972,
-      "fresh_scan_query_seconds": 0.0697632500086911,
+      "sample_count": 7457,
+      "shared_catalogue_sample_count": 7457,
+      "scan_seconds_shared": 0.05424425000092015,
+      "resume_scan_seconds_shared": 0.18464733305154368,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 1,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 3,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 8,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.023553083010483533,
+      "batch_seconds": 0.035678874992299825,
+      "fresh_scan_query_seconds": 0.22773570899153128,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
-      "open_right": true,
+      "open_right": false,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
-      "complete_well_count": 1,
+      "extrema_unverified_cell_count": 3,
+      "complete_well_count": 8,
       "wells": [
         {
           "u_in": 3.223514822751867,
@@ -1272,7 +2134,77 @@
           "A": 12.302020378933845,
           "K": 48.213515430351876,
           "A_error_estimate": 9.510436882465001e-11,
-          "K_error_estimate": 4.474877357552032e-09,
+          "K_error_estimate": 4.433502454048721e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 4.824039363367315,
+          "u_out": 9.306731526266873,
+          "A": 37.14730839713272,
+          "K": 133.73962799895085,
+          "A_error_estimate": 4.113518414783357e-10,
+          "K_error_estimate": 9.186525318227723e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 9.463649841892453,
+          "u_out": 10.927511297878521,
+          "A": 12.30746645110881,
+          "K": 47.70547851796968,
+          "A_error_estimate": 1.9846790877409148e-10,
+          "K_error_estimate": 2.4001572285214934e-08,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 11.113340875564262,
+          "u_out": 15.634651655653926,
+          "A": 37.18038389654902,
+          "K": 141.57534927147825,
+          "A_error_estimate": 4.2153214252493854e-10,
+          "K_error_estimate": 2.5482158605427685e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 15.67812694740463,
+          "u_out": 17.175208685256184,
+          "A": 12.305033170216285,
+          "K": 53.62933912322636,
+          "A_error_estimate": 4.4377390651106907e-10,
+          "K_error_estimate": 2.2608759309150628e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 17.372875216241933,
+          "u_out": 18.84938553929707,
+          "A": 12.299147036792846,
+          "K": 49.53163983874062,
+          "A_error_estimate": 8.404565932096375e-11,
+          "K_error_estimate": 3.182424990200161e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 18.94792499416527,
+          "u_out": 23.442300018700788,
+          "A": 37.16239578416754,
+          "K": 135.72628668662026,
+          "A_error_estimate": 3.3425973100520423e-10,
+          "K_error_estimate": 2.05311145862197e-08,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 23.616634334348007,
+          "u_out": 25.07980273755507,
+          "A": 12.309975064653957,
+          "K": 47.587230624035456,
+          "A_error_estimate": 2.2152946144160524e-10,
+          "K_error_estimate": 7.765510900981099e-09,
           "integral_status": "REGULAR",
           "method": "batched_gl"
         }
@@ -1281,11 +2213,11 @@
         "status": "REGULAR",
         "A": 12.302020378933836,
         "K": 48.21351542638748,
-        "seconds": 0.022021375014446676
+        "seconds": 0.014210666995495558
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.031226292019709945,
+        "seconds": 0.02572579198749736,
         "A": 12.30202037893383,
         "K": 48.213515415851056
       },
@@ -1300,21 +2232,43 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1865,
-      "scan_seconds_shared": 0.08264429197879508,
-      "query_seconds": 0.0030661660130135715,
-      "batch_seconds": 1.9160215742886066e-06,
-      "fresh_scan_query_seconds": 0.07201233401428908,
+      "sample_count": 7457,
+      "shared_catalogue_sample_count": 7457,
+      "scan_seconds_shared": 0.05424425000092015,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.012104416964575648,
+      "batch_seconds": 3.0829687602818012e-06,
+      "fresh_scan_query_seconds": 0.22943212499376386,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
+      "extrema_unverified_cell_count": 3,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -1330,14 +2284,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3725,
-      "scan_seconds_shared": 0.14466504100710154,
-      "query_seconds": 0.007556541997473687,
-      "batch_seconds": 0.012475833995267749,
-      "fresh_scan_query_seconds": 0.21777745801955462,
+      "shared_catalogue_sample_count": 3725,
+      "scan_seconds_shared": 0.10646404197905213,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 4,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.006793749984353781,
+      "batch_seconds": 0.007824834028724581,
+      "fresh_scan_query_seconds": 0.11923258396564052,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -1392,7 +2360,7 @@
         "status": "REGULAR",
         "A": 0.6204482337404686,
         "K": 47.95119867385628,
-        "seconds": 0.0046366669703274965
+        "seconds": 0.004419083998072892
       },
       "legacy_first_well": null,
       "reason": null
@@ -1406,14 +2374,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3725,
-      "scan_seconds_shared": 0.14466504100710154,
-      "query_seconds": 0.008815167006105185,
-      "batch_seconds": 0.00699283299036324,
-      "fresh_scan_query_seconds": 0.13338100002147257,
+      "shared_catalogue_sample_count": 3725,
+      "scan_seconds_shared": 0.10646404197905213,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 4,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.007063833996653557,
+      "batch_seconds": 0.006291749945376068,
+      "fresh_scan_query_seconds": 0.11268370901234448,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -1468,7 +2450,7 @@
         "status": "REGULAR",
         "A": 1.949721981835347,
         "K": 40.511283727752314,
-        "seconds": 0.004645915993023664
+        "seconds": 0.004431875015143305
       },
       "legacy_first_well": null,
       "reason": null
@@ -1482,14 +2464,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3725,
-      "scan_seconds_shared": 0.14466504100710154,
-      "query_seconds": 0.008198499970603734,
-      "batch_seconds": 0.007257874996867031,
-      "fresh_scan_query_seconds": 0.14413654198870063,
+      "shared_catalogue_sample_count": 3725,
+      "scan_seconds_shared": 0.10646404197905213,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 4,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.006369166017975658,
+      "batch_seconds": 0.007478167011868209,
+      "fresh_scan_query_seconds": 0.12645395804429427,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -1544,7 +2540,7 @@
         "status": "REGULAR",
         "A": 8.11657314542569,
         "K": 35.80494264591586,
-        "seconds": 0.014499999990221113
+        "seconds": 0.011483624984975904
       },
       "legacy_first_well": null,
       "reason": null
@@ -1558,14 +2554,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3725,
-      "scan_seconds_shared": 0.14466504100710154,
-      "query_seconds": 0.007731208053883165,
-      "batch_seconds": 0.02085441700182855,
-      "fresh_scan_query_seconds": 0.17731933400500566,
+      "shared_catalogue_sample_count": 3725,
+      "scan_seconds_shared": 0.10646404197905213,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 4,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.006520082999486476,
+      "batch_seconds": 0.015258333005476743,
+      "fresh_scan_query_seconds": 0.10934374999487773,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -1620,7 +2630,7 @@
         "status": "REGULAR",
         "A": 11.322389844358284,
         "K": 50.66112701965527,
-        "seconds": 0.016174999997019768
+        "seconds": 0.01234962500166148
       },
       "legacy_first_well": null,
       "reason": null
@@ -1634,22 +2644,52 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3725,
-      "scan_seconds_shared": 0.14466504100710154,
-      "query_seconds": 0.0060084579745307565,
-      "batch_seconds": 0.007827874971553683,
-      "fresh_scan_query_seconds": 0.13912620802875608,
+      "sample_count": 14897,
+      "shared_catalogue_sample_count": 14897,
+      "scan_seconds_shared": 0.10646404197905213,
+      "resume_scan_seconds_shared": 0.32671020802808926,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 1,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 3,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 8,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.0407067509368062,
+      "batch_seconds": 0.035628208017442375,
+      "fresh_scan_query_seconds": 0.4818909169989638,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
-      "open_right": true,
+      "open_right": false,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
-      "complete_well_count": 1,
+      "extrema_unverified_cell_count": 3,
+      "complete_well_count": 8,
       "wells": [
         {
           "u_in": 3.223514822751926,
@@ -1657,7 +2697,77 @@
           "A": 12.302020378933845,
           "K": 48.21351542466506,
           "A_error_estimate": 9.509903975413181e-11,
-          "K_error_estimate": 3.439737383814645e-10,
+          "K_error_estimate": 2.906155316395598e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 4.8240393633674,
+          "u_out": 9.306731526266873,
+          "A": 37.147308397132704,
+          "K": 133.73962798800162,
+          "A_error_estimate": 4.11359835084113e-10,
+          "K_error_estimate": 1.0151524065804551e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 9.463649841892206,
+          "u_out": 10.927511297878494,
+          "A": 12.307466451108809,
+          "K": 47.70547854450114,
+          "A_error_estimate": 1.9846346788199298e-10,
+          "K_error_estimate": 1.4458834129982279e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 11.113340875564264,
+          "u_out": 15.634651655653931,
+          "A": 37.18038389654902,
+          "K": 141.57534927320836,
+          "A_error_estimate": 4.2153658341703704e-10,
+          "K_error_estimate": 1.1577547809338284e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 15.678126947404634,
+          "u_out": 17.17520868525621,
+          "A": 12.30503317021628,
+          "K": 53.62933912481425,
+          "A_error_estimate": 4.4376768926213117e-10,
+          "K_error_estimate": 1.0690293095194647e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 17.372875216241933,
+          "u_out": 18.84938553929705,
+          "A": 12.299147036792846,
+          "K": 49.53163983555012,
+          "A_error_estimate": 8.404832385622285e-11,
+          "K_error_estimate": 8.040679233545234e-10,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 18.94792499416522,
+          "u_out": 23.44230001870102,
+          "A": 37.16239578416754,
+          "K": 135.7262867199832,
+          "A_error_estimate": 3.3425262557784663e-10,
+          "K_error_estimate": 6.7058891772830975e-09,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 23.616634334348056,
+          "u_out": 25.079802737555116,
+          "A": 12.309975064653953,
+          "K": 47.58723062382223,
+          "A_error_estimate": 2.2152502054950673e-10,
+          "K_error_estimate": 7.120100065094448e-10,
           "integral_status": "REGULAR",
           "method": "batched_gl"
         }
@@ -1666,7 +2776,7 @@
         "status": "REGULAR",
         "A": 12.302020378933836,
         "K": 48.21351542443516,
-        "seconds": 0.019584958965424448
+        "seconds": 0.022766292036976665
       },
       "legacy_first_well": null,
       "reason": "well crosses a finite scan-window boundary"
@@ -1680,21 +2790,43 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3725,
-      "scan_seconds_shared": 0.14466504100710154,
-      "query_seconds": 0.005319165997207165,
-      "batch_seconds": 1.9999570213258266e-06,
-      "fresh_scan_query_seconds": 0.15747637499589473,
+      "sample_count": 14897,
+      "shared_catalogue_sample_count": 14897,
+      "scan_seconds_shared": 0.10646404197905213,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.027765748905949295,
+      "batch_seconds": 3.958004526793957e-06,
+      "fresh_scan_query_seconds": 0.5276315420051105,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 1,
+      "extrema_unverified_cell_count": 3,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -1710,14 +2842,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1789,
-      "scan_seconds_shared": 0.07404970901552588,
-      "query_seconds": 0.004265249997843057,
-      "batch_seconds": 0.008904083981178701,
-      "fresh_scan_query_seconds": 0.06696062500122935,
+      "shared_catalogue_sample_count": 1789,
+      "scan_seconds_shared": 0.050522583012934774,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 3,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.003910666971933097,
+      "batch_seconds": 0.008036417013499886,
+      "fresh_scan_query_seconds": 0.05275608302326873,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -1762,11 +2908,11 @@
         "status": "REGULAR",
         "A": 0.007225525836145422,
         "K": 15.616191578996272,
-        "seconds": 0.007785167021211237
+        "seconds": 0.0061232500011101365
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.017601999978069216,
+        "seconds": 0.011467875039670616,
         "A": 0.007225525836147771,
         "K": 15.616191577890467
       },
@@ -1781,14 +2927,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1789,
-      "scan_seconds_shared": 0.07404970901552588,
-      "query_seconds": 0.010634709033183753,
-      "batch_seconds": 0.008518709044437855,
-      "fresh_scan_query_seconds": 0.07361754204612225,
+      "shared_catalogue_sample_count": 1789,
+      "scan_seconds_shared": 0.050522583012934774,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 3,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.0037792500224895775,
+      "batch_seconds": 0.011321250000037253,
+      "fresh_scan_query_seconds": 0.05645491601899266,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -1833,11 +2993,11 @@
         "status": "REGULAR",
         "A": 0.18314450684101233,
         "K": 15.70709346628159,
-        "seconds": 0.008544250042177737
+        "seconds": 0.0038514999905601144
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.039913333021104336,
+        "seconds": 0.012780709017533809,
         "A": 0.18314450684101413,
         "K": 15.707093465088652
       },
@@ -1852,14 +3012,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1789,
-      "scan_seconds_shared": 0.07404970901552588,
-      "query_seconds": 0.005815792013891041,
-      "batch_seconds": 0.013689708022866398,
-      "fresh_scan_query_seconds": 0.09071404195856303,
+      "shared_catalogue_sample_count": 1789,
+      "scan_seconds_shared": 0.050522583012934774,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 3,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.003786124987527728,
+      "batch_seconds": 0.005313166999258101,
+      "fresh_scan_query_seconds": 0.05380533396964893,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
@@ -1904,11 +3078,11 @@
         "status": "REGULAR",
         "A": 1.6238351759128857,
         "K": 22.122528895269994,
-        "seconds": 0.01169237500289455
+        "seconds": 0.01299954199930653
       },
       "legacy_first_well": {
         "status": "REGULAR",
-        "seconds": 0.02737700002035126,
+        "seconds": 0.017830749973654747,
         "A": 1.623835175912807,
         "K": 22.122528895228104
       },
@@ -1923,14 +3097,44 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1789,
-      "scan_seconds_shared": 0.07404970901552588,
-      "query_seconds": 0.0037364590098150074,
-      "batch_seconds": 2.5420449674129486e-06,
-      "fresh_scan_query_seconds": 0.06039029196836054,
+      "sample_count": 7153,
+      "shared_catalogue_sample_count": 7153,
+      "scan_seconds_shared": 0.050522583012934774,
+      "resume_scan_seconds_shared": 0.15091629204107448,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 2,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.0191627080203034,
+      "batch_seconds": 0.01279262499883771,
+      "fresh_scan_query_seconds": 0.23241766699356958,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
@@ -1938,10 +3142,41 @@
       "passing_certified": false,
       "unknown_cell_count": 0,
       "extrema_unverified_cell_count": 1,
-      "complete_well_count": 0,
-      "wells": [],
-      "adaptive_first_well": null,
-      "legacy_first_well": null,
+      "complete_well_count": 2,
+      "wells": [
+        {
+          "u_in": 3.839588428783932,
+          "u_out": 11.32079993621143,
+          "A": 16.687001482381508,
+          "K": 135.91104332101582,
+          "A_error_estimate": 5.187524949601396e-07,
+          "K_error_estimate": 5.700127140961797e-06,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 11.374567591476115,
+          "u_out": 17.520300597708005,
+          "A": 14.00782753299788,
+          "K": 106.8355351726199,
+          "A_error_estimate": 6.396712397549464e-07,
+          "K_error_estimate": 5.289803493013778e-07,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        }
+      ],
+      "adaptive_first_well": {
+        "status": "REGULAR",
+        "A": 16.687001482381444,
+        "K": 135.91104331876718,
+        "seconds": 0.05691679095616564
+      },
+      "legacy_first_well": {
+        "status": "REGULAR",
+        "seconds": 0.10328654199838638,
+        "A": 16.687001482380985,
+        "K": 135.9110432999831
+      },
       "reason": "well crosses a finite scan-window boundary"
     },
     {
@@ -1953,14 +3188,36 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1789,
-      "scan_seconds_shared": 0.07404970901552588,
-      "query_seconds": 0.002417750016320497,
-      "batch_seconds": 1.166015863418579e-06,
-      "fresh_scan_query_seconds": 0.060088958009146154,
+      "sample_count": 7153,
+      "shared_catalogue_sample_count": 7153,
+      "scan_seconds_shared": 0.050522583012934774,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.011610790970735252,
+      "batch_seconds": 2.374988980591297e-06,
+      "fresh_scan_query_seconds": 0.21237041702261195,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
@@ -1983,14 +3240,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1789,
-      "scan_seconds_shared": 0.07404970901552588,
-      "query_seconds": 1.529202563688159e-05,
-      "batch_seconds": 1.5840050764381886e-06,
-      "fresh_scan_query_seconds": 0.0566316670156084,
+      "shared_catalogue_sample_count": 7153,
+      "scan_seconds_shared": 0.050522583012934774,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "NO_WELL",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 3.7500285543501377e-06,
+      "batch_seconds": 1.00000761449337e-06,
+      "fresh_scan_query_seconds": 0.053466874989680946,
       "root_complete_within_window": true,
       "status": "NO_WELL",
       "open_left": false,
@@ -2013,14 +3284,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3577,
-      "scan_seconds_shared": 0.11065545800374821,
-      "query_seconds": 0.006609958014450967,
-      "batch_seconds": 0.01041908300248906,
-      "fresh_scan_query_seconds": 0.12300087499897927,
+      "shared_catalogue_sample_count": 3577,
+      "scan_seconds_shared": 0.10169375000987202,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 3,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.006221916002687067,
+      "batch_seconds": 0.009518958977423608,
+      "fresh_scan_query_seconds": 0.10631320800166577,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -2065,7 +3350,7 @@
         "status": "REGULAR",
         "A": 0.007225525836145422,
         "K": 15.616191565439346,
-        "seconds": 0.008252625004388392
+        "seconds": 0.0056664159637875855
       },
       "legacy_first_well": null,
       "reason": null
@@ -2079,14 +3364,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3577,
-      "scan_seconds_shared": 0.11065545800374821,
-      "query_seconds": 0.007124666997697204,
-      "batch_seconds": 0.009181750006973743,
-      "fresh_scan_query_seconds": 0.13074387499364093,
+      "shared_catalogue_sample_count": 3577,
+      "scan_seconds_shared": 0.10169375000987202,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 3,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.006303542002569884,
+      "batch_seconds": 0.006567167001776397,
+      "fresh_scan_query_seconds": 0.10476412496063858,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -2131,7 +3430,7 @@
         "status": "REGULAR",
         "A": 0.18314450684101252,
         "K": 15.7070934651345,
-        "seconds": 0.0054448749870061874
+        "seconds": 0.004986084008123726
       },
       "legacy_first_well": null,
       "reason": null
@@ -2145,14 +3444,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3577,
-      "scan_seconds_shared": 0.11065545800374821,
-      "query_seconds": 0.006702917045913637,
-      "batch_seconds": 0.007309957989491522,
-      "fresh_scan_query_seconds": 0.14790266699856147,
+      "shared_catalogue_sample_count": 3577,
+      "scan_seconds_shared": 0.10169375000987202,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 3,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.006138916010968387,
+      "batch_seconds": 0.0051756660104729235,
+      "fresh_scan_query_seconds": 0.10728145798202604,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
@@ -2197,7 +3510,7 @@
         "status": "REGULAR",
         "A": 1.6238351759128855,
         "K": 22.122528895253154,
-        "seconds": 0.023913832963444293
+        "seconds": 0.008537249988876283
       },
       "legacy_first_well": null,
       "reason": "well crosses a finite scan-window boundary"
@@ -2211,14 +3524,44 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3577,
-      "scan_seconds_shared": 0.11065545800374821,
-      "query_seconds": 0.005491125048138201,
-      "batch_seconds": 3.0829687602818012e-06,
-      "fresh_scan_query_seconds": 0.12804279098054394,
+      "sample_count": 14305,
+      "shared_catalogue_sample_count": 14305,
+      "scan_seconds_shared": 0.10169375000987202,
+      "resume_scan_seconds_shared": 0.3397505420143716,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 2,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.03500820806948468,
+      "batch_seconds": 0.012180250021629035,
+      "fresh_scan_query_seconds": 0.4725138750509359,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
@@ -2226,9 +3569,35 @@
       "passing_certified": false,
       "unknown_cell_count": 0,
       "extrema_unverified_cell_count": 1,
-      "complete_well_count": 0,
-      "wells": [],
-      "adaptive_first_well": null,
+      "complete_well_count": 2,
+      "wells": [
+        {
+          "u_in": 3.8395884287838866,
+          "u_out": 11.32079993621164,
+          "A": 16.687001482381515,
+          "K": 135.91104333155585,
+          "A_error_estimate": 5.187524978467195e-07,
+          "K_error_estimate": 5.692291606962385e-06,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        },
+        {
+          "u_in": 11.374567591475962,
+          "u_out": 17.52030059770813,
+          "A": 14.007827532997887,
+          "K": 106.83553518392421,
+          "A_error_estimate": 6.396712288747608e-07,
+          "K_error_estimate": 5.205868562896399e-07,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        }
+      ],
+      "adaptive_first_well": {
+        "status": "REGULAR",
+        "A": 16.68700148238145,
+        "K": 135.9110433321765,
+        "seconds": 0.05188716598786414
+      },
       "legacy_first_well": null,
       "reason": "well crosses a finite scan-window boundary"
     },
@@ -2241,14 +3610,36 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 3577,
-      "scan_seconds_shared": 0.11065545800374821,
-      "query_seconds": 0.004807166988030076,
-      "batch_seconds": 1.0409858077764511e-06,
-      "fresh_scan_query_seconds": 0.13409216603031382,
+      "sample_count": 14305,
+      "shared_catalogue_sample_count": 14305,
+      "scan_seconds_shared": 0.10169375000987202,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.023603000037837774,
+      "batch_seconds": 2.0830193534493446e-06,
+      "fresh_scan_query_seconds": 0.4481272079865448,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
@@ -2271,14 +3662,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 3577,
-      "scan_seconds_shared": 0.11065545800374821,
-      "query_seconds": 1.850002445280552e-05,
-      "batch_seconds": 1.167005393654108e-06,
-      "fresh_scan_query_seconds": 0.13353745901258662,
+      "shared_catalogue_sample_count": 14305,
+      "scan_seconds_shared": 0.10169375000987202,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "NO_WELL",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 9.29197994992137e-06,
+      "batch_seconds": 1.0420335456728935e-06,
+      "fresh_scan_query_seconds": 0.09892479103291407,
       "root_complete_within_window": true,
       "status": "NO_WELL",
       "open_left": false,
@@ -2301,14 +3706,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1477,
-      "scan_seconds_shared": 0.04330995900090784,
-      "query_seconds": 0.0021470829960890114,
-      "batch_seconds": 1.2500095181167126e-06,
-      "fresh_scan_query_seconds": 0.047746790980454534,
+      "shared_catalogue_sample_count": 1477,
+      "scan_seconds_shared": 0.03890841698739678,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.0020726670045405626,
+      "batch_seconds": 1.249951310455799e-06,
+      "fresh_scan_query_seconds": 0.040665959008038044,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -2331,14 +3750,28 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1477,
-      "scan_seconds_shared": 0.04330995900090784,
-      "query_seconds": 0.0021479169954545796,
-      "batch_seconds": 1.4579854905605316e-06,
-      "fresh_scan_query_seconds": 0.056748791015706956,
+      "shared_catalogue_sample_count": 1477,
+      "scan_seconds_shared": 0.03890841698739678,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.0022562500089406967,
+      "batch_seconds": 1.167005393654108e-06,
+      "fresh_scan_query_seconds": 0.04208962497068569,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -2361,25 +3794,68 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1477,
-      "scan_seconds_shared": 0.04330995900090784,
-      "query_seconds": 0.0039031250053085387,
-      "batch_seconds": 1.208973117172718e-06,
-      "fresh_scan_query_seconds": 0.053317416983190924,
+      "sample_count": 2953,
+      "shared_catalogue_sample_count": 2953,
+      "scan_seconds_shared": 0.03890841698739678,
+      "resume_scan_seconds_shared": 0.04768970800796524,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 1,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 8,
+      "query_seconds": 0.0072206659824587405,
+      "batch_seconds": 0.010593332990538329,
+      "fresh_scan_query_seconds": 0.08164979098364711,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
-      "open_right": true,
+      "open_right": false,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 10,
-      "complete_well_count": 0,
-      "wells": [],
-      "adaptive_first_well": null,
-      "legacy_first_well": null,
+      "extrema_unverified_cell_count": 14,
+      "complete_well_count": 1,
+      "wells": [
+        {
+          "u_in": 8.153109130784514,
+          "u_out": 13.19105734648869,
+          "A": 11.383079296954321,
+          "K": 233.65897800551153,
+          "A_error_estimate": 7.500489118683618e-11,
+          "K_error_estimate": 1.2947732974666337e-07,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        }
+      ],
+      "adaptive_first_well": {
+        "status": "REGULAR",
+        "A": 11.383079296954337,
+        "K": 233.65897798092192,
+        "seconds": 0.021768625010736287
+      },
+      "legacy_first_well": {
+        "status": "REGULAR",
+        "seconds": 0.04087533301208168,
+        "A": 11.383079296954199,
+        "K": 233.6589779908311
+      },
       "reason": "well crosses a finite scan-window boundary"
     },
     {
@@ -2391,21 +3867,51 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1477,
-      "scan_seconds_shared": 0.04330995900090784,
-      "query_seconds": 0.0019790000515058637,
-      "batch_seconds": 1.125037670135498e-06,
-      "fresh_scan_query_seconds": 0.049232207995373756,
+      "sample_count": 5905,
+      "shared_catalogue_sample_count": 5905,
+      "scan_seconds_shared": 0.03890841698739678,
+      "resume_scan_seconds_shared": 0.07415825000498444,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.013311582966707647,
+      "batch_seconds": 1.9170111045241356e-06,
+      "fresh_scan_query_seconds": 0.1654139999882318,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 10,
+      "extrema_unverified_cell_count": 24,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -2421,21 +3927,43 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 1477,
-      "scan_seconds_shared": 0.04330995900090784,
-      "query_seconds": 0.0020302910124883056,
-      "batch_seconds": 1.5409896150231361e-06,
-      "fresh_scan_query_seconds": 0.049470333964563906,
+      "sample_count": 5905,
+      "shared_catalogue_sample_count": 5905,
+      "scan_seconds_shared": 0.03890841698739678,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.009685542027000338,
+      "batch_seconds": 1.459033228456974e-06,
+      "fresh_scan_query_seconds": 0.16202124999836087,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 10,
+      "extrema_unverified_cell_count": 24,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -2451,21 +3979,35 @@
       "controls": {
         "samples_per_period": 64,
         "samples_per_wavelength": 24,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 1477,
-      "scan_seconds_shared": 0.04330995900090784,
-      "query_seconds": 1.0000017937272787e-05,
-      "batch_seconds": 1.3750395737588406e-06,
-      "fresh_scan_query_seconds": 0.048329042037948966,
+      "shared_catalogue_sample_count": 5905,
+      "scan_seconds_shared": 0.03890841698739678,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "NO_WELL",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 3.541994374245405e-06,
+      "batch_seconds": 9.579816833138466e-07,
+      "fresh_scan_query_seconds": 0.038316708989441395,
       "root_complete_within_window": true,
       "status": "NO_WELL",
       "open_left": false,
       "open_right": false,
       "passing_certified": true,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 10,
+      "extrema_unverified_cell_count": 24,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -2481,14 +4023,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 2953,
-      "scan_seconds_shared": 0.08787200000369921,
-      "query_seconds": 0.0045827500289306045,
-      "batch_seconds": 1.167005393654108e-06,
-      "fresh_scan_query_seconds": 0.09954420803114772,
+      "shared_catalogue_sample_count": 2953,
+      "scan_seconds_shared": 0.07474633300444111,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.00427745800698176,
+      "batch_seconds": 1.2090313248336315e-06,
+      "fresh_scan_query_seconds": 0.07984154199948534,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -2511,14 +4067,28 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 2953,
-      "scan_seconds_shared": 0.08787200000369921,
-      "query_seconds": 0.004702041973359883,
-      "batch_seconds": 1.2500095181167126e-06,
-      "fresh_scan_query_seconds": 0.10046108398819342,
+      "shared_catalogue_sample_count": 2953,
+      "scan_seconds_shared": 0.07474633300444111,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "REGULAR",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 0.004128707980271429,
+      "batch_seconds": 1.04197533801198e-06,
+      "fresh_scan_query_seconds": 0.07857533299829811,
       "root_complete_within_window": true,
       "status": "REGULAR",
       "open_left": false,
@@ -2541,24 +4111,62 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 2953,
-      "scan_seconds_shared": 0.08787200000369921,
-      "query_seconds": 0.00542012503137812,
-      "batch_seconds": 1.4159595593810081e-06,
-      "fresh_scan_query_seconds": 0.08560295798815787,
+      "sample_count": 5905,
+      "shared_catalogue_sample_count": 5905,
+      "scan_seconds_shared": 0.07474633300444111,
+      "resume_scan_seconds_shared": 0.07439291704213247,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 1,
+          "open_left": true,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 8,
+      "query_seconds": 0.013577207981143147,
+      "batch_seconds": 0.01411391602596268,
+      "fresh_scan_query_seconds": 0.17097249999642372,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
-      "open_right": true,
+      "open_right": false,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 3,
-      "complete_well_count": 0,
-      "wells": [],
-      "adaptive_first_well": null,
+      "extrema_unverified_cell_count": 5,
+      "complete_well_count": 1,
+      "wells": [
+        {
+          "u_in": 8.15310913078475,
+          "u_out": 13.191057346488655,
+          "A": 11.383079296954323,
+          "K": 233.65897793464939,
+          "A_error_estimate": 7.502132248760063e-11,
+          "K_error_estimate": 7.782647992726766e-08,
+          "integral_status": "REGULAR",
+          "method": "batched_gl"
+        }
+      ],
+      "adaptive_first_well": {
+        "status": "REGULAR",
+        "A": 11.383079296954328,
+        "K": 233.65897795316585,
+        "seconds": 0.022200000006705523
+      },
       "legacy_first_well": null,
       "reason": "well crosses a finite scan-window boundary"
     },
@@ -2571,21 +4179,51 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 2953,
-      "scan_seconds_shared": 0.08787200000369921,
-      "query_seconds": 0.003944292024243623,
-      "batch_seconds": 9.589712135493755e-07,
-      "fresh_scan_query_seconds": 0.08674079203046858,
+      "sample_count": 11809,
+      "shared_catalogue_sample_count": 11809,
+      "scan_seconds_shared": 0.07474633300444111,
+      "resume_scan_seconds_shared": 0.14452533301664516,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 8,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.027003832976333797,
+      "batch_seconds": 1.6249832697212696e-06,
+      "fresh_scan_query_seconds": 0.4160207499517128,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 3,
+      "extrema_unverified_cell_count": 8,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -2601,21 +4239,43 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
-      "sample_count": 2953,
-      "scan_seconds_shared": 0.08787200000369921,
-      "query_seconds": 0.004476832982618362,
-      "batch_seconds": 8.330098353326321e-07,
-      "fresh_scan_query_seconds": 0.09480712498771027,
+      "sample_count": 11809,
+      "shared_catalogue_sample_count": 11809,
+      "scan_seconds_shared": 0.07474633300444111,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        },
+        {
+          "periods": 16,
+          "status": "MAX_PERIODS",
+          "complete_wells": 0,
+          "open_left": true,
+          "open_right": true,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 16,
+      "query_seconds": 0.020283874997403473,
+      "batch_seconds": 3.2500247471034527e-06,
+      "fresh_scan_query_seconds": 0.33399783296044916,
       "root_complete_within_window": false,
       "status": "MAX_PERIODS",
       "open_left": true,
       "open_right": true,
       "passing_certified": false,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 3,
+      "extrema_unverified_cell_count": 8,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -2631,21 +4291,35 @@
       "controls": {
         "samples_per_period": 128,
         "samples_per_wavelength": 48,
-        "max_periods": 4,
+        "initial_periods": 4,
+        "max_periods": 16,
         "max_cell_subdivisions": 12
       },
       "sample_count": 2953,
-      "scan_seconds_shared": 0.08787200000369921,
-      "query_seconds": 1.7167010810226202e-05,
-      "batch_seconds": 7.92031642049551e-07,
-      "fresh_scan_query_seconds": 0.0951654160162434,
+      "shared_catalogue_sample_count": 11809,
+      "scan_seconds_shared": 0.07474633300444111,
+      "resume_scan_seconds_shared": 0.0,
+      "resume_stages": [
+        {
+          "periods": 4,
+          "status": "NO_WELL",
+          "complete_wells": 0,
+          "open_left": false,
+          "open_right": false,
+          "unknown_cells": 0
+        }
+      ],
+      "final_scanned_periods": 4,
+      "query_seconds": 9.500014130026102e-06,
+      "batch_seconds": 3.1669624149799347e-06,
+      "fresh_scan_query_seconds": 0.08335216698469594,
       "root_complete_within_window": true,
       "status": "NO_WELL",
       "open_left": false,
       "open_right": false,
       "passing_certified": true,
       "unknown_cell_count": 0,
-      "extrema_unverified_cell_count": 3,
+      "extrema_unverified_cell_count": 8,
       "complete_well_count": 0,
       "wells": [],
       "adaptive_first_well": null,
@@ -2657,7 +4331,7 @@
     {
       "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
       "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
-      "load_seconds": 0.006647332978900522,
+      "load_seconds": 0.005154584010597318,
       "line": {
         "s": 0.5,
         "theta0": 0.0,
@@ -2667,7 +4341,7 @@
     {
       "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
       "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
-      "load_seconds": 0.006340958992950618,
+      "load_seconds": 0.004187958023976535,
       "line": {
         "s": 0.5,
         "theta0": 0.0,
@@ -2677,7 +4351,7 @@
     {
       "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
       "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
-      "load_seconds": 0.007544834050349891,
+      "load_seconds": 0.003562707977835089,
       "line": {
         "s": 0.5,
         "theta0": 0.0,
@@ -2687,7 +4361,7 @@
     {
       "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
       "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
-      "load_seconds": 0.00811808300204575,
+      "load_seconds": 0.004704166960436851,
       "line": {
         "s": 0.5,
         "theta0": 0.0,
@@ -2697,7 +4371,7 @@
     {
       "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
       "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
-      "load_seconds": 0.0062702500144951046,
+      "load_seconds": 0.0039108749479055405,
       "line": {
         "s": 0.5,
         "theta0": 0.0,

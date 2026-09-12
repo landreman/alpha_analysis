@@ -87,7 +87,11 @@ class OrdinaryWell:
 
 @dataclass(frozen=True)
 class PitchQuery:
-    """Ordinary wells and explicit limitations for one b within scan coverage."""
+    """Ordinary wells and explicit limitations for one b within scan coverage.
+
+    ``MAX_PERIODS`` means the current recorded window ended inside a well; a
+    caller may still extend the catalogue if its configured cap permits.
+    """
 
     b: float
     wells: tuple[OrdinaryWell, ...]
@@ -211,7 +215,11 @@ class ForwardLineCatalogue:
 
     @property
     def cache_key(self) -> tuple:
-        """Runtime key including field identity, lift, controls and coverage (§9.1)."""
+        """In-process key with field identity, lift, controls and coverage (§9.1).
+
+        ``id(field)`` is not a persistent content identity. Before restart or
+        cross-process caching, replace it with a verified field content hash.
+        """
         return (
             id(self.field),
             self.s,
@@ -494,13 +502,14 @@ class ForwardLineCatalogue:
         end_B = self.B_samples[-1]
         end_rounding = 32 * np.finfo(float).eps * max(abs(end_B), abs(b), 1.0)
         open_right = bool(end_B < b - end_rounding or entry is not None)
-        reason = None
+        reasons = []
         if tangent_candidates:
-            reason = "B=b tangent or transition limit in scanned window"
-        elif unknown:
-            reason = "unresolved possible B=b barrier in scan cells"
-        elif open_left or open_right or censored:
-            reason = "well crosses a finite scan-window boundary"
+            reasons.append("B=b tangent or transition limit in scanned window")
+        if unknown:
+            reasons.append("unresolved possible B=b barrier in scan cells")
+        if open_left or open_right or censored:
+            reasons.append("well crosses a finite scan-window boundary")
+        reason = "; ".join(reasons) if reasons else None
         return PitchQuery(
             float(b),
             tuple(wells),

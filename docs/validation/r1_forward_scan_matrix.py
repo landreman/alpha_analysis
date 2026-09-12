@@ -50,7 +50,9 @@ def run() -> None:
     for case in payload["cases"]:
         by_field.setdefault(case["file"], []).append(case)
     PLOTS.mkdir(exist_ok=True)
-    baseline = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    baseline = subprocess.check_output(
+        ["git", "merge-base", "HEAD", "main"], text=True
+    ).strip()
     evidence = {
         "baseline_commit": baseline,
         "source": "h(rho)=1 (UniformSourceProfile); scans and A/K are source independent",
@@ -81,21 +83,70 @@ def run() -> None:
             ("coarse", dict(samples_per_period=64, samples_per_wavelength=24)),
             ("fine", dict(samples_per_period=128, samples_per_wavelength=48)),
         ):
-            config = ForwardScanConfig(max_periods=4, **controls)
+            cap_periods = 16
+            config = ForwardScanConfig(max_periods=cap_periods, **controls)
             catalogue = ForwardLineCatalogue(field, 0.5, 0.0, 0.0, config)
             scan_start = time.perf_counter()
             catalogue.extend_to(4)
             scan_seconds = time.perf_counter() - scan_start
+            initial_queries = {}
+            initial_query_seconds = {}
             for case in cases:
                 query_start = time.perf_counter()
-                query = catalogue.query(case["b"])
-                query_seconds = time.perf_counter() - query_start
+                initial_queries[case["b"]] = catalogue.query(case["b"])
+                initial_query_seconds[case["b"]] = time.perf_counter() - query_start
+            for case in cases:
+                query = initial_queries[case["b"]]
+                query_seconds = initial_query_seconds[case["b"]]
+                resume_scan_seconds = 0.0
+                stages = [
+                    {
+                        "periods": 4,
+                        "status": query.status.name,
+                        "complete_wells": len(query.wells),
+                        "open_left": query.open_left,
+                        "open_right": query.open_right,
+                        "unknown_cells": len(query.unknown_cells),
+                    }
+                ]
+                if query.open_right and catalogue.scanned_periods > 4:
+                    query_start = time.perf_counter()
+                    query = catalogue.query(case["b"])
+                    query_seconds += time.perf_counter() - query_start
+                    stages.append(
+                        {
+                            "periods": catalogue.scanned_periods,
+                            "status": query.status.name,
+                            "complete_wells": len(query.wells),
+                            "open_left": query.open_left,
+                            "open_right": query.open_right,
+                            "unknown_cells": len(query.unknown_cells),
+                        }
+                    )
+                while query.open_right and catalogue.scanned_periods < cap_periods:
+                    next_periods = min(cap_periods, 2 * catalogue.scanned_periods)
+                    resume_start = time.perf_counter()
+                    catalogue.extend_to(next_periods)
+                    resume_scan_seconds += time.perf_counter() - resume_start
+                    query_start = time.perf_counter()
+                    query = catalogue.query(case["b"])
+                    query_seconds += time.perf_counter() - query_start
+                    stages.append(
+                        {
+                            "periods": next_periods,
+                            "status": query.status.name,
+                            "complete_wells": len(query.wells),
+                            "open_left": query.open_left,
+                            "open_right": query.open_right,
+                            "unknown_cells": len(query.unknown_cells),
+                        }
+                    )
                 batch_start = time.perf_counter()
                 integrals = batched_bounce_integrals(catalogue, query.wells)
                 batch_seconds = time.perf_counter() - batch_start
                 fresh_start = time.perf_counter()
                 fresh = ForwardLineCatalogue(field, 0.5, 0.0, 0.0, config)
-                fresh.extend_to(4)
+                fresh.extend_to(query.scanned_periods)
                 fresh_query = fresh.query(case["b"])
                 fresh_scan_query_seconds = time.perf_counter() - fresh_start
                 if len(fresh_query.wells) != len(query.wells):
@@ -120,7 +171,7 @@ def run() -> None:
                             case["b"],
                             query.wells[0].q_in,
                             WellTraceConfig(
-                                max_field_periods=4,
+                                max_field_periods=cap_periods,
                                 quadrature_rtol=1e-7,
                                 quadrature_atol=1e-9,
                             ),
@@ -145,9 +196,19 @@ def run() -> None:
                     "lambda_n": case["lambda_n"],
                     "b": case["b"],
                     "level": level,
-                    "controls": dict(controls, max_periods=4, max_cell_subdivisions=12),
-                    "sample_count": catalogue.sample_count,
+                    "controls": dict(
+                        controls,
+                        initial_periods=4,
+                        max_periods=cap_periods,
+                        max_cell_subdivisions=12,
+                    ),
+                    "sample_count": query.scanned_periods * catalogue.steps_per_period
+                    + 1,
+                    "shared_catalogue_sample_count": catalogue.sample_count,
                     "scan_seconds_shared": scan_seconds,
+                    "resume_scan_seconds_shared": resume_scan_seconds,
+                    "resume_stages": stages,
+                    "final_scanned_periods": query.scanned_periods,
                     "query_seconds": query_seconds,
                     "batch_seconds": batch_seconds,
                     "fresh_scan_query_seconds": fresh_scan_query_seconds,
@@ -198,10 +259,16 @@ def run() -> None:
                         catalogue,
                         query,
                         field_label=name,
+                        integrals=integrals,
                         output_path=PLOTS / f"field-{file_index}.png",
                     )
                     plt.close(figure)
         OUT.write_text(json.dumps(evidence, indent=2, allow_nan=False) + "\n")
+    if not any(
+        row["file_index"] == 4 and row["complete_well_count"] > 0
+        for row in evidence["cases"]
+    ):
+        raise AssertionError("n3are still has no complete well or A/K probe")
     REPORT.write_text(render_report(evidence))
 
 
@@ -209,14 +276,25 @@ def render_report(evidence) -> str:
     cases = evidence["cases"]
     status_counts = Counter((row["level"], row["status"]) for row in cases)
     shared_time = sum(
-        row["scan_seconds_shared"] / 6 + row["query_seconds"] for row in cases
+        row["scan_seconds_shared"] / 6
+        + row["resume_scan_seconds_shared"]
+        + row["query_seconds"]
+        for row in cases
     )
     fresh_time = sum(row["fresh_scan_query_seconds"] for row in cases)
+    resume_time = sum(row["resume_scan_seconds_shared"] for row in cases)
+    integral_counts = Counter(
+        (row["level"], well["integral_status"])
+        for row in cases
+        for well in row["wells"]
+    )
+    unresolved_cells = sum(row["unknown_cell_count"] for row in cases)
     by_key = {}
     for row in cases:
         by_key.setdefault((row["file_index"], row["lambda_n"]), {})[row["level"]] = row
     differences = []
     reference_differences = []
+    legacy_differences = []
     for levels in by_key.values():
         coarse, fine = levels["coarse"], levels["fine"]
         if len(coarse["wells"]) != len(fine["wells"]):
@@ -236,6 +314,20 @@ def render_report(evidence) -> str:
                 abs(first[name] - reference[name]) / abs(reference[name])
                 for name in ("A", "K")
             )
+            legacy = row["legacy_first_well"]
+            if legacy is not None and legacy["status"] == "REGULAR":
+                legacy_differences.extend(
+                    abs(first[name] - legacy[name]) / abs(legacy[name])
+                    for name in ("A", "K")
+                )
+    summary = []
+    for level in ("coarse", "fine"):
+        summary.append(
+            f"{level}: {status_counts[(level, 'REGULAR')]} complete-window, "
+            f"{status_counts[(level, 'MAX_PERIODS')]} censored-window, "
+            f"{status_counts[(level, 'NO_WELL')]} analytic passing-line probes, "
+            f"{integral_counts[(level, 'REGULAR')]} finite A/K results"
+        )
     lines = [
         "# R1 shared forward-scan evidence",
         "",
@@ -248,37 +340,48 @@ def render_report(evidence) -> str:
         f"Source declaration: `{evidence['source']}`.",
         f"Pitch source: {evidence['pitch_provenance']}.",
         f"Numerical scope: {evidence['software_scope']}.",
-        "The scan uses s=0.5, theta0=zeta0=0 and four field periods; a window",
-        "boundary stays censored. Each catalogue is shared over all six pitches.",
+        "The scan uses s=0.5, theta0=zeta0=0. Each catalogue begins with four",
+        "field periods and resumes 4→8→16 while a queried pitch remains open at",
+        "the right boundary. The 16-period cap is a work limit, not passing proof.",
+        "One catalogue is shared over all six pitches per field and resolution.",
         "The table reports complete wells only; incomplete roots are not assigned",
         "zero action or classified passing.",
-        "Per resolution: "
-        f"{status_counts[('coarse', 'REGULAR')]} complete-window probes, "
-        f"{status_counts[('coarse', 'MAX_PERIODS')]} censored-window probes, "
-        f"{status_counts[('coarse', 'NO_WELL')]} analytic passing-line proofs. "
-        "No B=b root cell remained unresolved in these sampled lines; "
-        f"up to {max(row['extrema_unverified_cell_count'] for row in cases)} "
+        *summary,
+        f"Unresolved B=b root cells across all probes: {unresolved_cells}. "
+        f"Up to {max(row['extrema_unverified_cell_count'] for row in cases)} "
         "cells per line still lack an extrema-completeness proof.",
         f"Measured shared scan+query: {shared_time:.3f} s across both grids and all "
         f"pitches; fresh catalogue scan+query per pitch: {fresh_time:.3f} s "
         f"({fresh_time/shared_time:.2f}x cost ratio).",
+        f"The shared total includes {resume_time:.3f} s of incremental scan extensions; "
+        "the JSON records each 4/8/16-period query snapshot and extension cost.",
+        "Initial scan time is repeated in each row for context; count it once",
+        "per field/resolution when summing shared wall time.",
         "This comparison uses the same field objects and one line per field;",
         "it excludes quadrature from both sides and is not a whole-equilibrium speed claim.",
         f"Maximum matched coarse/fine relative A or K difference: "
         f"{max(differences) if differences else float('nan'):.3e} "
         "(resolution diagnostic only).",
-        "All 64 complete-well integrals across the two grids returned finite A/K. "
+        f"Complete-well integrals with a non-REGULAR status: "
+        f"{sum(row['complete_well_count'] for row in cases) - sum(integral_counts[(level, 'REGULAR')] for level in ('coarse', 'fine'))}. "
         f"Maximum first-well relative difference from independent adaptive "
-        f"quadrature: {max(reference_differences) if reference_differences else float('nan'):.3e}.",
+        f"quadrature: {max(reference_differences) if reference_differences else float('nan'):.3e}; "
+        f"from the legacy tracer on coarse probes: "
+        f"{max(legacy_differences) if legacy_differences else float('nan'):.3e}.",
+        f"The n3are field yielded "
+        f"{sum(row['complete_well_count'] for row in cases if row['file_index'] == 4)} "
+        "complete wells across both resolutions after resumption; higher-pitch "
+        "windows that remain censored are retained as such.",
         "",
-        "| field | λn | level | complete wells | status | unknown cells | scan s | query+batch s |",
-        "| --- | ---: | --- | ---: | --- | ---: | ---: | ---: |",
+        "| field | λn | level | periods | complete wells | status | unknown cells | initial+resume scan s | query+batch s |",
+        "| --- | ---: | --- | ---: | ---: | --- | ---: | ---: | ---: |",
     ]
     for case in cases:
         lines.append(
             f"| {case['file_index']} | {case['lambda_n']} | {case['level']} | "
-            f"{case['complete_well_count']} | {case['status']} | "
-            f"{case['unknown_cell_count']} | {case['scan_seconds_shared']:.3f} | "
+            f"4→{case['final_scanned_periods']} | {case['complete_well_count']} | "
+            f"{case['status']} | {case['unknown_cell_count']} | "
+            f"{case['scan_seconds_shared'] + case['resume_scan_seconds_shared']:.3f} | "
             f"{case['query_seconds'] + case['batch_seconds']:.3f} |"
         )
     lines += ["", "## Files and diagnostic plots", ""]
