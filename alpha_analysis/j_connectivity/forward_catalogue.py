@@ -31,6 +31,7 @@ class ForwardScanConfig:
     root_atol_B: float = 1e-10
     root_atol_zeta: float = 1e-12
     tangent_atol_B: float = 1e-9
+    second_derivative_tolerance: float = 1e-10
     quadrature_atol: float = 1e-9
     quadrature_rtol: float = 1e-7
     max_quadrature_order: int = 256
@@ -48,6 +49,7 @@ class ForwardScanConfig:
             "root_atol_B",
             "root_atol_zeta",
             "tangent_atol_B",
+            "second_derivative_tolerance",
             "quadrature_atol",
             "quadrature_rtol",
         ):
@@ -62,7 +64,7 @@ class ScanExtremum:
     u: float
     zeta: float
     B: float
-    kind: int  # -1 maximum, +1 minimum
+    kind: int  # -1 maximum, +1 minimum, 0 degenerate/unknown
 
 
 @dataclass(frozen=True)
@@ -292,15 +294,48 @@ class ForwardLineCatalogue:
                 second = self.sigma**2 * _scalar(
                     self.field.D2_B(self.s, *self.coordinates(root))
                 )
+                degenerate = (
+                    not np.isfinite(second)
+                    or abs(second) <= self.config.second_derivative_tolerance
+                )
+                if degenerate:
+                    unverified.append((float(self.u[i]), float(self.u[i + 1])))
                 extrema.append(
                     ScanExtremum(
                         float(root),
                         float(self.coordinates(root)[1]),
                         float(self._B(root)),
-                        1 if second > 0 else -1,
+                        0 if degenerate else 1 if second > 0 else -1,
                     )
                 )
-        self.extrema = tuple(extrema)
+        for j in range(max(1, first_cell), len(self.u) - 1):
+            if (
+                self.D_samples[j] == 0
+                and self.D_samples[j - 1] * self.D_samples[j + 1] < 0
+            ):
+                root = float(self.u[j])
+                second = _scalar(self.field.D2_B(self.s, *self.coordinates(root)))
+                degenerate = (
+                    not np.isfinite(second)
+                    or abs(second) <= self.config.second_derivative_tolerance
+                )
+                if degenerate:
+                    unverified.append((float(self.u[j - 1]), float(self.u[j + 1])))
+                extrema.append(
+                    ScanExtremum(
+                        root,
+                        float(self.coordinates(root)[1]),
+                        float(self._B(root)),
+                        0 if degenerate else 1 if second > 0 else -1,
+                    )
+                )
+        extrema.sort(key=lambda item: item.u)
+        self.extrema = tuple(
+            item
+            for index, item in enumerate(extrema)
+            if index == 0
+            or abs(item.u - extrema[index - 1].u) > 4 * self.config.root_atol_zeta
+        )
         self.extrema_unverified_cells = tuple(unverified)
 
     def _cell_roots(self, left, right, Bl, Br, Dl, Dr, depth, roots, unknown):
@@ -631,9 +666,13 @@ def _batch_order(catalogue: ForwardLineCatalogue, wells, segments, order: int):
     K = common / np.sqrt(radicand)
     if not np.all(np.isfinite(A)) or not np.all(np.isfinite(K)):
         raise ValueError("nonfinite bounce quadrature")
+    segment_A = np.sum(A * x_weight, axis=1)
+    segment_K = np.sum(K * x_weight, axis=1)
     return (
-        np.bincount(owner, weights=np.sum(A * x_weight, axis=1), minlength=len(wells)),
-        np.bincount(owner, weights=np.sum(K * x_weight, axis=1), minlength=len(wells)),
+        np.bincount(owner, weights=segment_A, minlength=len(wells)),
+        np.bincount(owner, weights=segment_K, minlength=len(wells)),
+        segment_A,
+        segment_K,
     )
 
 
@@ -728,16 +767,28 @@ def batched_bounce_integrals(
         segments.extend(
             (index, left, right) for left, right in zip(edges[:-1], edges[1:])
         )
+    owner = np.array([segment[0] for segment in segments], dtype=int)
     cfg = catalogue.config
     previous = None
-    last_error = None
     order = 16
     try:
         while order <= cfg.max_quadrature_order:
             current = _batch_order(catalogue, wells, segments, order)
             if previous is not None:
-                error = (abs(current[0] - previous[0]), abs(current[1] - previous[1]))
-                last_error = error
+                # Sum local estimates before checking the global A/K budget;
+                # opposite-signed segment errors must not cancel (§9.3).
+                error = (
+                    np.bincount(
+                        owner,
+                        weights=abs(current[2] - previous[2]),
+                        minlength=len(wells),
+                    ),
+                    np.bincount(
+                        owner,
+                        weights=abs(current[3] - previous[3]),
+                        minlength=len(wells),
+                    ),
+                )
                 okay = (
                     error[0]
                     <= np.maximum(
