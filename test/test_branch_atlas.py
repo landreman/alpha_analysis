@@ -3,7 +3,7 @@
 import numpy as np
 from dataclasses import replace
 from scipy.integrate import quad
-from scipy.optimize import root
+from scipy.optimize import brentq, root
 
 from alpha_analysis.j_connectivity.branch_atlas import (
     AtlasConfig,
@@ -141,8 +141,21 @@ def test_barrier_crossing_creates_matched_additive_ports():
     assert len(event.ports) == 3
     assert {port.role for port in event.ports} == {"parent", "child_1", "child_3"}
     actions = {port.role: port.action_length for port in event.ports}
+    ports = {port.role: port for port in event.ports}
     np.testing.assert_allclose(
         actions["parent"], actions["child_1"] + actions["child_3"], rtol=0, atol=1e-8
+    )
+    np.testing.assert_allclose(
+        [ports["child_1"].zeta_out, ports["child_3"].zeta_in],
+        [event.marginal_zeta[0]] * 2,
+        atol=1e-10,
+        rtol=0,
+    )
+    np.testing.assert_allclose(
+        [ports["child_1"].zeta_in, ports["child_3"].zeta_out],
+        [ports["parent"].zeta_in, ports["parent"].zeta_out],
+        atol=1e-10,
+        rtol=0,
     )
     a = np.arccos(0.25)
     expected = quad(
@@ -152,7 +165,37 @@ def test_barrier_crossing_creates_matched_additive_ports():
         epsabs=1e-11,
     )[0]
     np.testing.assert_allclose(actions["parent"], expected, rtol=1e-8)
-    assert len({port.event_parameter for port in event.ports}) == 1
+    # Independently solve ordinary roots on both sides of the height crossing.
+    # The reported limiting actions must agree with these one-sided well actions.
+    eps = 1e-5
+    lower, upper = 1.4 - eps, 1.4 + eps
+
+    def B(z):
+        return float(f.B(0.5, 0.2, z))
+
+    def action(pitch, left, right):
+        return quad(
+            lambda z: 3 / B(z) * np.sqrt(max(0, 1 - B(z) / pitch)),
+            left,
+            right,
+            epsabs=1e-11,
+        )[0]
+
+    outer = brentq(lambda z: B(z) - lower, 1.0, 1.6)
+    inner = brentq(lambda z: B(z) - lower, 0.0, 0.2)
+    parent_outer = brentq(lambda z: B(z) - upper, 1.0, 1.6)
+    np.testing.assert_allclose(
+        [actions["child_1"], actions["child_3"], actions["parent"]],
+        [
+            action(lower, -outer, -inner),
+            action(lower, inner, outer),
+            action(upper, -parent_outer, parent_outer),
+        ],
+        atol=3e-4,
+        rtol=0,
+    )
+    np.testing.assert_allclose(event.parameter, [0.5, 0.2], atol=0, rtol=0)
+    assert all(port.event_parameter == event.parameter for port in event.ports)
 
 
 def test_cell_detects_or_encloses_closed_barrier_loop_and_two_crossings():
@@ -187,7 +230,11 @@ def test_unknown_multiplicity_remains_in_coverage_bound():
     atlas = build_atlas(f, 1.4, AtlasConfig(2, 2, 2))
     assert atlas.unknown_area > 0
     assert atlas.multiplicity_area_upper is None
-    assert atlas.known_owned_area < 2 * np.pi
+    assert np.isclose(sum(cell.area for cell in atlas.cells), 2 * np.pi)
+    assert np.isclose(
+        atlas.unknown_area,
+        sum(cell.area for cell in atlas.cells if cell.multiplicity_upper is None),
+    )
 
 
 def test_refinement_preserves_unknown_complement_and_owned_area():
@@ -248,6 +295,19 @@ def test_dmerc_reference_has_physical_generic_ports():
     assert len(event.ports) == 3
     np.testing.assert_allclose(event.marginal_zeta, [z], atol=1e-8)
     actions = {p.role: p.action_length for p in event.ports}
+    ports = {p.role: p for p in event.ports}
+    np.testing.assert_allclose(
+        [ports["child_1"].zeta_out, ports["child_3"].zeta_in],
+        [z, z],
+        atol=1e-8,
+        rtol=0,
+    )
+    np.testing.assert_allclose(
+        [ports["child_1"].zeta_in, ports["child_3"].zeta_out],
+        [ports["parent"].zeta_in, ports["parent"].zeta_out],
+        atol=1e-8,
+        rtol=0,
+    )
     np.testing.assert_allclose(
         actions["parent"], actions["child_1"] + actions["child_3"], atol=1e-7, rtol=0
     )

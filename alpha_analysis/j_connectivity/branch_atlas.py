@@ -136,7 +136,7 @@ class HeightSample:
 
 @dataclass(frozen=True)
 class AtlasPort:
-    """One limiting well at a common (s, alpha) event parameter (§10.2)."""
+    """Pointwise limiting well at common (s, alpha), unbound to an atlas branch (§10.2)."""
 
     role: str
     event_parameter: tuple[float, float]
@@ -148,7 +148,10 @@ class AtlasPort:
 
 @dataclass(frozen=True)
 class AtlasTransition:
-    """Generic three-port relation or enclosed simultaneous multiway event."""
+    """Pointwise three-port relation or enclosed multiway event (§10.2–10.3).
+
+    A generic local event is not a certified port curve or atlas branch binding.
+    """
 
     status: str
     parameter: tuple[float, float]
@@ -208,7 +211,7 @@ def _line(field: BoozerFieldLike, s: float, alpha: float, periods: int):
 def _owned(scan: ForwardLineCatalogue, b: float, compute_actions: bool):
     result = scan.query(b)
     L = scan.period
-    wells = [w for w in result.wells if 0 <= w.u_in < L - scan.config.root_atol_zeta]
+    wells = [w for w in result.wells if 0 <= w.u_in < L]
     actions = [np.nan] * len(wells)
     action_status = ["not_computed"] * len(wells)
     action_reasons = [None] * len(wells)
@@ -382,6 +385,12 @@ def _certified_roots(
     rounding = (
         128 * np.finfo(float).eps * max(1.0, abs(b), np.max(np.abs(scan.B_samples)))
     )
+    if vB > 0 and np.any(np.abs(scan.B_samples - b) <= vB + rounding):
+        return (
+            None,
+            f"transverse B envelope (vB={vB:.3g} B units) overlaps b at a scan node; "
+            "narrow the s/alpha cell",
+        )
     roots = []
 
     def visit(l, r, Bl, Br, Dl, Dr, depth):
@@ -817,11 +826,31 @@ def transition_at(
         )
     if k == 1:
         actions = {port.role: port for port in ports}
-        gap = abs(
-            actions["parent"].action_length
-            - actions["child_1"].action_length
-            - actions["child_3"].action_length
+        parent, child_1, child_3 = (
+            actions["parent"],
+            actions["child_1"],
+            actions["child_3"],
         )
+        marginal_zeta = float(maxima[0].zeta)
+        if any(
+            abs(left - right) > 1e-10
+            for left, right in (
+                (child_1.zeta_out, marginal_zeta),
+                (child_3.zeta_in, marginal_zeta),
+                (child_1.zeta_in, parent.zeta_in),
+                (child_3.zeta_out, parent.zeta_out),
+            )
+        ):
+            return AtlasTransition(
+                "unknown",
+                (float(s), float(alpha)),
+                tuple(x.zeta for x in maxima),
+                (),
+                "limiting port endpoints do not match the certified marginal maximum",
+            )
+        # The gap checks quadrature consistency for this partition. Independent
+        # one-sided well actions are compared in the acceptance test (§10.2).
+        gap = abs(parent.action_length - child_1.action_length - child_3.action_length)
         allowance = max(1e-8, 10 * sum(port.error_estimate for port in ports))
         if gap > allowance:
             return AtlasTransition(
@@ -829,7 +858,7 @@ def transition_at(
                 (float(s), float(alpha)),
                 tuple(x.zeta for x in maxima),
                 tuple(ports),
-                f"independent action additivity failed: gap={gap:.3g}",
+                f"limiting action partition consistency failed: gap={gap:.3g}",
             )
     return AtlasTransition(
         "generic" if k == 1 else "multiway_unknown",
@@ -906,6 +935,24 @@ def plot_atlas_diagnostics(atlas: BranchAtlas, event: AtlasTransition | None = N
         ]
         if points:
             ax.scatter(*np.asarray(points).T, s=12)
+        failed = [
+            sample.alpha
+            for sample in atlas.samples
+            for well in sample.wells
+            if well.action_status != "not_computed"
+            and not np.isfinite(well.action_length)
+        ]
+        if failed:
+            ax.scatter(
+                failed,
+                [0.04] * len(failed),
+                transform=ax.get_xaxis_transform(),
+                marker="x",
+                color="tab:red",
+                s=22,
+                label="unresolved A",
+            )
+            ax.legend(loc="best")
         ax.set(
             xlabel="chart alpha [rad]",
             ylabel="A [length]",

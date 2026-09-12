@@ -354,6 +354,10 @@ def run(repository: Path, output: Path, report: Path, plot_dir: Path):
         )
         for case in cases
     )
+    coarse_certified = sum(case["coarse"].get("certified_cells", 0) for case in cases)
+    fine_certified = sum(case["fine"].get("certified_cells", 0) for case in cases)
+    coarse_total = (coarse.n_s - 1) * coarse.n_alpha * len(cases)
+    fine_total = (fine.n_s - 1) * fine.n_alpha * len(cases)
     report.write_text(
         "# R2 root-labelled atlas evidence\n\n"
         "All 30 physical file/pitch cases were probed at 3×4 and 5×8 transverse "
@@ -367,6 +371,11 @@ def run(repository: Path, output: Path, report: Path, plot_dir: Path):
         f"Hardware: `{result['hardware']}`; one worker; new field objects, "
         "warm OS cache uncontrolled. "
         f"Total elapsed: {result['elapsed_seconds']:.2f} s.\n\n"
+        f"Only {coarse_certified}/{coarse_total} coarse and "
+        f"{fine_certified}/{fine_total} fine cells have certified multiplicity. "
+        "This broad unresolved coverage is the main feasibility risk for the "
+        "later reachability and accuracy milestones; a narrower transverse cell "
+        "is often needed when its B envelope overlaps b at a scan node.\n\n"
         "| Field | λn | Coarse owned samples | Coarse known/unknown cells | "
         "Fine known/unknown cells | Fixed local counts (wide/narrow) | "
         "Owned target counts (wide/narrow) | "

@@ -93,14 +93,22 @@ do not relax the fast/full test-suite budgets.
   representative local probes, not a final \(f\) runtime or accuracy claim.
 - R2's [atlas matrix](validation/r2-atlas-matrix.md) exercises all 30 required
   field/pitch cases with coarse and fine grids and local refinement. It certified
-  positive local multiplicity in 13 targeted narrow patches, while all coarse
-  global cells and most fine cells remained unknown. The atlas has explicit
+  positive local multiplicity in 13 targeted narrow patches, but 0/240 coarse
+  and 3/960 fine cells: broad unresolved coverage is the main feasibility risk
+  for R4–R8, not evidence for a useful global bound. The atlas has explicit
   physical root ownership, twisted-seam lifts, disjoint unknown complements, and
   pointwise generic ports; the DMercFail \(\lambda_n=0.8\) event passed an
-  independent same-parameter action-additivity check. These are finite
-  represented-field/model results, not field or \(f\) enclosures. R3 should use
-  an independent continuous contour oracle to challenge atlas connectivity,
-  including enclosed crossings and unresolved global links.
+  independent marginal-root solve and same-parameter action partition check.
+  The analytic split test also compares one-sided ordinary-well actions.
+  These ports are pointwise candidates without atlas branch IDs or incident
+  chart ownership; §10.1 branch
+  binding must precede their use as certified transitions. §8.2 matching across
+  neighboring radii and §10.4 port curves, monotone/constant segments, full
+  preimages and self-transitions are deferred to R3–R5. Do not infer those links
+  from coordinate proximity. These are finite represented-field/model results,
+  not field or \(f\) enclosures. R3 should use an independent continuous contour
+  oracle to challenge atlas connectivity, including enclosed crossings and
+  unresolved global links.
 - Keep the physical trace direction `sign(G + iota I)`, authoritative half-bounce
   action `A` and time length `K`, lifted root/port identities, and explicit
   `MAX_PERIODS`, root, quadrature and topology failures. A capped or clipped well
