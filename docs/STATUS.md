@@ -13,12 +13,12 @@ implementation milestone complete.
 
 ## Active plan
 
-**Next milestone: R0. All redesign milestones remain unchecked.** Follow the
-dependencies in `DESIGN.md` §23; retired milestones are not prerequisites.
+**Next milestone: R1. R0 is complete.** Follow the dependencies in `DESIGN.md`
+§23; retired milestones are not prerequisites.
 
 | ID | Milestone | Goal | Done | PR |
 | --- | --- | --- | --- | --- |
-| R0 | Baseline migration and independent population ledger | Establish the accepted code baseline, preserve historical evidence and tests, and independently account for trapped population and unresolved weight | [ ] | |
+| R0 | Baseline migration and independent population ledger | Establish the accepted code baseline, preserve historical evidence and tests, and independently account for trapped population and unresolved weight | [x] | #26 |
 | R1 | Efficient shared forward scans and bounce integrals | Share field-line scans, enumerate maximal wells, and evaluate batched \(A,K\) with error accounting | [ ] | |
 | R2 | Root-labelled atlas and barrier-height transitions | Build local well charts, explicit seam ownership and certified generic transition relations | [ ] | |
 | R3 | Independent continuous contour oracle | Follow constant-action contours and permitted branch transitions without relying on the atlas reachability implementation | [ ] | |
@@ -43,12 +43,11 @@ do not relax the fast/full test-suite budgets.
 
 ## Baseline and next-step notes
 
-- PR #24 is the incomplete milestone-10.3 branch, not an accepted redesign
-  baseline. **Do not merge it as-is.** Land the planning documentation separately
-  on `main`; retain the branch, validation reports and failure evidence. R0 must
-  verify the baseline and selectively salvage only needed fixes with their tests.
-  Approval of ADR 0010 does not automatically accept PR #24's code or proposed
-  ADRs 0007/0008. This planning edit changes no Python or test implementation.
+- R0 verified the green plan-bearing `main` baseline and imported no implementation
+  code from PR #24. That PR remains the incomplete milestone-10.3 branch, not an
+  accepted redesign baseline, and must not be merged as-is. Its branch, validation
+  reports and failure evidence remain preserved. Approval of ADR 0010 does not
+  automatically accept PR #24's code or proposed ADRs 0007/0008.
 - The recorded 10.3 matrix achieved 42/120 resolved-or-no-transition cases, below
   its required threshold; see [the report](validation/milestone10.3-real-equilibria.md)
   and [ADR 0009](adr/0009-matrix-resolved-fraction-shortfall.md). Its deliberately
@@ -56,6 +55,15 @@ do not relax the fast/full test-suite budgets.
   R0's gate migration. Preserve the historical failure as evidence and keep the
   scientific regression checks; do not relabel 10.3 complete or claim that
   PR #24 met its acceptance gate.
+- R0's independent population evidence covers the five fields and six required
+  pitches with declared `h(rho)=1`; see
+  [the report](validation/r0-population-ledger.md) and its JSON/PNG companions.
+  These are explicitly quadrature estimates under a dense-line assumption, not
+  field enclosures or accessibility classifications. The nonsingular whole-band
+  fraction changed by at most 3.351e-4 between the recorded grids, but individual
+  fixed-b tensor estimates changed by as much as 46.8% near their integrable
+  singularity. R1 must retain explicit incomplete/root/quadrature outcomes and
+  must not promote those slice grid differences into bounds.
 - Existing public functions, CLI entry points and legacy mesh/extractor tests
   remain compatibility obligations. The old numerical path is also a useful
   reference on cases it resolves; it is not the production prerequisite for R2–R8.
