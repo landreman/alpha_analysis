@@ -7,6 +7,126 @@ import numpy as np
 from .denominator import DenominatorConvergence, GlobalBBounds
 
 
+def plot_forward_catalogue(
+    catalogue, query, *, field_label: str, integrals, output_path=None
+):
+    """Show lifted B, extrema, root pairs and A/K (DESIGN.md §§17, 23 R1).
+
+    Horizontal coordinates are physical scan distance ``u=|zeta-zeta0|`` in
+    radians. Blue spans are certified maximal B<b wells. Orange bands are
+    extrema-incomplete cells; red hatching is unresolved B=b root coverage.
+    Annotated A/K lengths have numerical estimate scope, not field bounds.
+    A clipped window is named in the title, never presented as passing.
+    """
+    import matplotlib.pyplot as plt
+
+    integrals = tuple(integrals)
+    if len(integrals) != len(query.wells):
+        raise ValueError("one A/K result is required per certified well")
+    u_max = query.scanned_periods * catalogue.period
+    within_window = catalogue.u <= u_max + 8 * np.finfo(float).eps * u_max
+    figure, axis = plt.subplots(figsize=(10, 4.5), constrained_layout=True)
+    axis.plot(
+        catalogue.u[within_window],
+        catalogue.B_samples[within_window],
+        color="0.2",
+        lw=1,
+    )
+    axis.axhline(query.b, color="tab:red", ls="--", lw=1, label="bounce field b")
+    for index, (left, right) in enumerate(catalogue.extrema_unverified_cells):
+        if left >= u_max:
+            continue
+        axis.axvspan(
+            left,
+            min(right, u_max),
+            facecolor="gold",
+            edgecolor="darkorange",
+            alpha=0.32,
+            label="extremum not certified" if index == 0 else None,
+        )
+    for kind, marker, color, label in (
+        (-1, "^", "purple", "maximum"),
+        (1, "v", "green", "minimum"),
+        (0, "x", "black", "degenerate extremum"),
+    ):
+        selected = [
+            item for item in catalogue.extrema if item.kind == kind and item.u <= u_max
+        ]
+        if selected:
+            axis.scatter(
+                [item.u for item in selected],
+                [item.B for item in selected],
+                marker=marker,
+                color=color,
+                s=24,
+                zorder=4,
+                label=label,
+            )
+    y_min = float(np.min(catalogue.B_samples[within_window]))
+    y_range = float(np.ptp(catalogue.B_samples[within_window]))
+    for index, (well, integral) in enumerate(zip(query.wells, integrals)):
+        axis.axvspan(
+            well.u_in,
+            well.u_out,
+            color="tab:blue",
+            alpha=0.18,
+            label="certified ordinary well" if index == 0 else None,
+        )
+        axis.plot(
+            [well.u_in, well.u_out],
+            [query.b, query.b],
+            marker="o",
+            ls="none",
+            color="tab:blue",
+            markersize=3,
+        )
+        if np.isfinite(integral.A) and np.isfinite(integral.K):
+            annotation = (
+                f"A={integral.A:.3g}\nK={integral.K:.3g}\n" f"{integral.error_scope}"
+            )
+        else:
+            annotation = f"A/K unresolved\n{integral.status.name}"
+        axis.text(
+            0.5 * (well.u_in + well.u_out),
+            y_min + 0.06 * y_range,
+            annotation,
+            fontsize=6,
+            ha="center",
+            va="bottom",
+            bbox={"facecolor": "white", "alpha": 0.75, "edgecolor": "none"},
+        )
+    for index, (left, right) in enumerate(query.unknown_cells):
+        axis.axvspan(
+            left,
+            right,
+            facecolor="none",
+            edgecolor="tab:red",
+            hatch="///",
+            label="possible B=b barrier" if index == 0 else None,
+        )
+    axis.set_xlabel(r"physical scan distance $u$ [rad]")
+    axis.set_xlim(0, u_max)
+    axis.set_ylabel("B [field units]")
+    short_label = (
+        field_label
+        if len(field_label) <= 50
+        else f"{field_label[:28]}…{field_label[-18:]}"
+    )
+    axis.set_title(
+        f"{short_label}\n"
+        f"b={query.b:.6g}, {len(query.wells)} complete wells, "
+        f"{query.status.name} (window={query.scanned_periods} periods)\n"
+        f"samples/period={catalogue.config.samples_per_period}, "
+        f"samples/wavelength={catalogue.config.samples_per_wavelength}, "
+        f"max cell subdivisions={catalogue.config.max_cell_subdivisions}"
+    )
+    axis.grid(alpha=0.3)
+    axis.legend(fontsize=7, ncol=2)
+    if output_path is not None:
+        figure.savefig(output_path, dpi=160)
+    return figure, axis
+
+
 def plot_population_diagnostics(
     slices,
     *,
