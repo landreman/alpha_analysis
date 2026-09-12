@@ -1626,8 +1626,11 @@ implemented. Document any new physics/bound ambiguity in an ADR rather than gues
 
 Use a separate `codex/` branch/worktree from the appropriate plan-bearing baseline,
 preserving the user's uncommitted work. Open implementation PRs as drafts and require
-green GitHub Tests before completion. Optional Claude review does not block next
-work when unavailable; its applicable findings still deserve review. Do not merge
+green GitHub Tests before completion. Once the applicable milestone gates and Tests
+pass on the final revision, automatically mark the PR ready to trigger Claude Code
+Review; no further user request is needed. Unresolved STOP conditions leave the PR
+draft. Optional Claude review does not block next work when unavailable; its
+applicable findings still deserve review. Do not merge
 without user authorization. Planning-only edits do not require scientific mutations
 or a full matrix run; check document consistency and disclose known baseline failures.
 

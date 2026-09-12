@@ -1,6 +1,6 @@
 ---
 name: milestone
-description: Implement one active milestone from docs/DESIGN.md §23 through tests, verification, STATUS.md and a draft PR. Use for an explicit milestone implementation or "next milestone" request; planning-only revisions do not start implementation.
+description: Implement one active milestone from docs/DESIGN.md §23 through tests, verification, STATUS.md and a PR marked ready after CI passes. Use for an explicit milestone implementation or "next milestone" request; planning-only revisions do not start implementation.
 ---
 
 # Implement an active milestone
@@ -82,12 +82,17 @@ and open/update a **draft** PR with:
 
 Wait for GitHub `Tests`, fix failures and verify the final code revision. Do not
 claim CI passed because an earlier revision passed. Never merge without user
-instruction. Mark ready only after applicable gates and desired review are satisfied.
+instruction. Once the applicable milestone gates and GitHub `Tests` pass on the
+final revision, automatically mark the PR ready with `gh pr ready <number>` to
+trigger Claude Code Review; do not wait for another user request or for Claude
+review before marking ready. Unresolved STOP conditions still leave the PR draft.
 
-Claude review runs on ready-for-review events in this repository. If a review is
-requested/available, address applicable findings; record disagreements with evidence.
-Its absence or failure is not a dependency gate. Avoid repeatedly toggling readiness
-merely to solicit an unchanged review.
+When Claude review runs, address applicable findings and record disagreements with
+evidence. For a further review pass after fixes, convert the PR to draft, push the
+fixes, wait for `Tests` to pass on that revision, then mark it ready again. Avoid
+repeatedly toggling readiness merely to solicit an unchanged review. Leave the PR
+ready when finished; do not merge. Claude review's absence or failure is not a
+dependency gate.
 
 ## New STOP conditions
 
