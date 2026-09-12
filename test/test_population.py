@@ -312,3 +312,5 @@ def test_r0_real_field_evidence_covers_matrix_as_estimates():
     assert all(len(field["sha256"]) == 64 for field in payload["fields"])
     assert len(payload["provenance"]["population_module_sha256"]) == 64
     assert payload["provenance"]["worker_count"] == 1
+    assert payload["provenance"]["population_module_dirty"] is False
+    assert payload["convergence_diagnostics"]["maximum_slice_relative_change"] > 0.0

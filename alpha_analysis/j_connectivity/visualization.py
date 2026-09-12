@@ -22,6 +22,8 @@ def plot_population_diagnostics(
     surface-maximum upper model is not mistaken for accessibility or a field
     enclosure.
     """
+    import textwrap
+
     import matplotlib.pyplot as plt
 
     slices = tuple(slices)
@@ -51,9 +53,8 @@ def plot_population_diagnostics(
     axes[1].set_ylabel(r"radial density of $Q_{total}$")
     axes[1].grid(True)
     axes[1].legend(fontsize="x-small")
-    figure.suptitle(
-        f"Independent population ledger: {field_label}; source {source_label}"
-    )
+    title = f"Independent population ledger: {field_label}; source {source_label}"
+    figure.suptitle(textwrap.fill(title, width=95), fontsize="medium")
     if output_path is not None:
         figure.savefig(output_path, dpi=160)
     return figure, axes

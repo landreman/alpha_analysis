@@ -71,6 +71,29 @@ def run(repository: Path, output: Path, report: Path, plot_directory: Path) -> N
     cases: list[dict] = []
     fields: list[dict] = []
     start_all = time.perf_counter()
+    implementation_revision = _git_value(
+        repository,
+        "log",
+        "-1",
+        "--format=%H",
+        "--",
+        "alpha_analysis/j_connectivity/population.py",
+    )
+    population_module_was_dirty = (
+        subprocess.run(
+            (
+                "git",
+                "diff",
+                "--quiet",
+                implementation_revision,
+                "--",
+                "alpha_analysis/j_connectivity/population.py",
+            ),
+            cwd=repository,
+            check=False,
+        ).returncode
+        != 0
+    )
     plot_directory.mkdir(parents=True, exist_ok=True)
 
     for file_index, filename in enumerate(FILES):
@@ -174,6 +197,14 @@ def run(repository: Path, output: Path, report: Path, plot_directory: Path) -> N
     population_module = (
         repository / "alpha_analysis" / "j_connectivity" / "population.py"
     )
+    max_slice_relative_change = max(
+        case["coarse_fine_absolute_change"]
+        / max(abs(case["fine_total_weight"]), np.finfo(float).tiny)
+        for case in cases
+    )
+    max_band_absolute_change = max(
+        field["full_band_fraction_absolute_change"] for field in fields
+    )
     payload = {
         "milestone": "R0",
         "result_scope": "ledger-only quadrature estimates; no accessibility classification",
@@ -195,17 +226,24 @@ def run(repository: Path, output: Path, report: Path, plot_directory: Path) -> N
             "lambda_n": list(LAMBDA_N),
         },
         "provenance": {
-            "git_revision": _git_value(repository, "rev-parse", "HEAD"),
-            "working_tree_dirty": bool(_git_value(repository, "status", "--porcelain")),
+            "git_revision": implementation_revision,
+            "population_module_dirty": population_module_was_dirty,
             "population_module_sha256": _sha256(population_module),
             "platform": platform.platform(),
             "machine": platform.machine(),
             "python": platform.python_version(),
             "worker_count": 1,
-            "cache_state": "cold field load per equilibrium; no persistent numerical cache",
+            "cache_state": (
+                "new field object per equilibrium; no persistent numerical cache; "
+                "operating-system file cache uncontrolled (warm rerun)"
+            ),
         },
         "fields": fields,
         "cases": cases,
+        "convergence_diagnostics": {
+            "maximum_slice_relative_change": max_slice_relative_change,
+            "maximum_full_band_fraction_absolute_change": max_band_absolute_change,
+        },
         "elapsed_seconds": time.perf_counter() - start_all,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -220,7 +258,7 @@ def run(repository: Path, output: Path, report: Path, plot_directory: Path) -> N
         "",
         f"Source: `{payload['source']}`. Revision: `{payload['provenance']['git_revision']}`.",
         f"Total wall time: {payload['elapsed_seconds']:.3f} s on {payload['provenance']['platform']}",
-        "with one worker and cold field loads.",
+        "with one worker, new field objects, and an uncontrolled warm OS file cache.",
         "",
         "## Assumptions and uncontrolled scope",
         "",
@@ -245,6 +283,17 @@ def run(repository: Path, output: Path, report: Path, plot_directory: Path) -> N
             "| {full_band_fraction_fine:.8g} | {full_band_fraction_absolute_change:.3e} "
             "| {elapsed_seconds:.3f} |".format(**item)
         )
+    lines.extend(
+        [
+            "",
+            "The nonsingular whole-band primitive changes by at most "
+            f"{max_band_absolute_change:.3e} between these grids. Individual fixed-b",
+            "tensor estimates change by as much as "
+            f"{max_slice_relative_change:.1%}: their integrable B=b singularity is not",
+            "resolved by this fixed-node diagnostic. Those slice numbers are not bounds",
+            "and later bounded slice quadrature must not treat their grid difference as one.",
+        ]
+    )
     lines.extend(
         [
             "",
