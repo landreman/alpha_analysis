@@ -7,6 +7,111 @@ import numpy as np
 from .denominator import DenominatorConvergence, GlobalBBounds
 
 
+def plot_population_diagnostics(
+    slices,
+    *,
+    field_label: str,
+    source_label: str,
+    comparison_slices=None,
+    output_path=None,
+):
+    """Plot independent trapped weight versus pitch and radius (§§17.4, 23 R0).
+
+    The left panel shows the unnormalized total slice weight ``Q_total(b)``.
+    The right panel shows its source-weighted radial density at the quadrature
+    nodes.  Trapping and bound scope are included in labels so an estimate or
+    surface-maximum upper model is not mistaken for accessibility or a field
+    enclosure.
+    """
+    import textwrap
+
+    import matplotlib.pyplot as plt
+
+    slices = tuple(slices)
+    if not slices:
+        raise ValueError("at least one population slice is required")
+    source_names = {item.source_name for item in slices}
+    if len(source_names) != 1:
+        raise ValueError("population diagnostics require one declared source")
+    if comparison_slices is not None:
+        comparison_slices = tuple(comparison_slices)
+        if len(comparison_slices) != len(slices):
+            raise ValueError("comparison_slices must match the primary slice count")
+        primary_b = np.array([item.b for item in slices])
+        comparison_b = np.array([item.b for item in comparison_slices])
+        if not np.array_equal(primary_b, comparison_b):
+            raise ValueError("comparison_slices must use the same pitches in order")
+
+    figure, axes = plt.subplots(1, 2, figsize=(11, 4), constrained_layout=True)
+    pitch = np.array([item.b for item in slices])
+    total_lower = np.array([item.total_weight_lower for item in slices])
+    total_upper = np.array([item.total_weight_upper for item in slices])
+    total_midpoint = 0.5 * (total_lower + total_upper)
+    order = np.argsort(pitch)
+    axes[0].errorbar(
+        pitch[order],
+        total_midpoint[order],
+        yerr=np.vstack(
+            (
+                total_midpoint[order] - total_lower[order],
+                total_upper[order] - total_midpoint[order],
+            )
+        ),
+        fmt="o-",
+        capsize=3,
+        label="primary grid and trapping interval",
+    )
+    if comparison_slices is not None:
+        comparison_midpoint = np.array(
+            [
+                0.5 * (item.total_weight_lower + item.total_weight_upper)
+                for item in comparison_slices
+            ]
+        )
+        axes[0].plot(
+            pitch[order],
+            comparison_midpoint[order],
+            "s--",
+            label="comparison grid",
+        )
+        axes[0].fill_between(
+            pitch[order],
+            np.minimum(total_midpoint, comparison_midpoint)[order],
+            np.maximum(total_midpoint, comparison_midpoint)[order],
+            color="0.75",
+            alpha=0.35,
+            label="grid spread (diagnostic only)",
+        )
+    axes[0].set_xlabel(r"conserved pitch $b=B_{bounce}$")
+    axes[0].set_ylabel(r"total trapped weight $Q_{total}(b)$")
+    axes[0].grid(True)
+    axes[0].legend(fontsize="x-small")
+
+    for index in order:
+        item = slices[index]
+        radial_midpoint = 0.5 * (item.radial_density_lower + item.radial_density_upper)
+        axes[1].plot(
+            item.nodes_s,
+            radial_midpoint,
+            label=f"b={item.b:.5g} ({item.trapping_scope}; {item.bound_scope})",
+        )
+        axes[1].fill_between(
+            item.nodes_s,
+            item.radial_density_lower,
+            item.radial_density_upper,
+            alpha=0.15,
+        )
+    axes[1].set_xlabel(r"normalized toroidal flux $s$")
+    axes[1].set_ylabel(r"radial density of $Q_{total}$")
+    axes[1].grid(True)
+    axes[1].legend(fontsize="x-small")
+    title = f"Independent population ledger: {field_label}; source {source_label}"
+    figure.suptitle(textwrap.fill(title, width=95), fontsize="medium")
+    if output_path is not None:
+        figure.savefig(output_path, dpi=160)
+    return figure, axes
+
+
 def plot_critical_curves(curves, *, output_path=None):
     """Plot classified marginal polylines from DESIGN.md §§17.3 and 23.
 

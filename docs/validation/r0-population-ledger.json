@@ -1,0 +1,757 @@
+{
+  "assumptions": [
+    "dense-line surface-maximum equality is assumed, not certified on rational plateaus",
+    "surface maxima at population nodes are sampled-grid estimates, not upper bounds",
+    "coarse-fine differences are convergence diagnostics, not error enclosures",
+    "field interpolation, extrema, population and denominator quadrature errors are uncontrolled",
+    "radial support boundaries where b crosses B_max(s) are unresolved by fixed Gauss nodes (DESIGN 13.2)"
+  ],
+  "cases": [
+    {
+      "b": 7.9314345648115845,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 1.4866185976234094,
+      "coarse_total_weight": 6.150099743406421,
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "fine_total_weight": 7.63671834102983,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.05,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 8.147184858800973,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 8.92966772441389,
+      "coarse_total_weight": 77.2242630388273,
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "fine_total_weight": 68.29459531441341,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.1,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 9.873187210716075,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 27.28969894783785,
+      "coarse_total_weight": 343.9525952908469,
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "fine_total_weight": 316.66289634300904,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.5,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 11.167688974652405,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 45.951666953673794,
+      "coarse_total_weight": 145.99044396545423,
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "fine_total_weight": 191.94211091912803,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.8,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 11.59918956263118,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 35.261158799781526,
+      "coarse_total_weight": 77.52145873006135,
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "fine_total_weight": 112.78261752984288,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.9,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 11.814939856620569,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 18.08351633817265,
+      "coarse_total_weight": 26.956479879935074,
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "fine_total_weight": 45.039996218107724,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.95,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 7.576918032939711,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 0.0741633391905685,
+      "coarse_total_weight": 2.1305892310499974,
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "fine_total_weight": 2.204752570240566,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.05,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 7.811419099418058,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 0.6568143679209513,
+      "coarse_total_weight": 9.413588343729252,
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "fine_total_weight": 10.070402711650203,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.1,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 9.68742763124483,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 0.02659224104399982,
+      "coarse_total_weight": 269.1623746058575,
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "fine_total_weight": 269.1357823648135,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.5,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 11.094434030114908,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 72.1843466470281,
+      "coarse_total_weight": 271.4468167882875,
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "fine_total_weight": 199.2624701412594,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.8,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 11.563436163071602,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 40.43924464757286,
+      "coarse_total_weight": 79.96322727446294,
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "fine_total_weight": 120.4024719220358,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.9,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 11.797937229549948,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 8.035641457219342,
+      "coarse_total_weight": 93.60967558984557,
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "fine_total_weight": 85.57403413262622,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.95,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 5.390959775428983,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 31.855681818724292,
+      "coarse_total_weight": 320.2546674464008,
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "fine_total_weight": 352.1103492651251,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.05,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 5.741453657785587,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 2.876212158736365,
+      "coarse_total_weight": 249.56891449104282,
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "fine_total_weight": 252.44512664977918,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.1,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 8.545404716638414,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 10.520202060856548,
+      "coarse_total_weight": 215.27170968160945,
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "fine_total_weight": 225.791911742466,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.5,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 10.648368010778036,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 7.3226908655120155,
+      "coarse_total_weight": 269.3582554480146,
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "fine_total_weight": 276.6809463135266,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.8,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 11.34935577549124,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 33.516978383679856,
+      "coarse_total_weight": 213.91044126144737,
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "fine_total_weight": 247.42741964512723,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.9,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 11.699849657847844,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 3.3462784654733184,
+      "coarse_total_weight": 144.09121829693603,
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "fine_total_weight": 147.43749676240935,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.95,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 2.34693551572541,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 0.2842878092370711,
+      "coarse_total_weight": 51.67374831180911,
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "fine_total_weight": 51.38946050257204,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.05,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 2.4008120098047856,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 8.916179110945478,
+      "coarse_total_weight": 77.17389831699309,
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "fine_total_weight": 86.09007742793857,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.1,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 2.831823962439789,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 3.687612201303608,
+      "coarse_total_weight": 147.93352329277968,
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "fine_total_weight": 144.24591109147607,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.5,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 3.155082926916042,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 4.132016922219734,
+      "coarse_total_weight": 72.01102014859298,
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "fine_total_weight": 67.87900322637324,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.8,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 3.2628359150747928,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 1.3587522726315342,
+      "coarse_total_weight": 34.64234767791564,
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "fine_total_weight": 33.2835954052841,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.9,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 3.316712409154168,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 9.492415853226225,
+      "coarse_total_weight": 10.773708443498949,
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "fine_total_weight": 20.266124296725174,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.95,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 5.017287700966896,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 0.3910819385722888,
+      "coarse_total_weight": 1.2518498044469952,
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "fine_total_weight": 1.642931743019284,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.05,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 5.125314678758602,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 0.6267293990504044,
+      "coarse_total_weight": 6.726060133941971,
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "fine_total_weight": 7.352789532992375,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.1,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 5.989530501092255,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 5.613457878660199,
+      "coarse_total_weight": 299.66415321436307,
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "fine_total_weight": 305.27761109302327,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.5,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 6.637692367842495,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 51.08351396782507,
+      "coarse_total_weight": 112.6307665170946,
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "fine_total_weight": 163.71428048491967,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.8,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 6.853746323425908,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 29.829241463993995,
+      "coarse_total_weight": 39.1224401670309,
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "fine_total_weight": 68.9516816310249,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.9,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    },
+    {
+      "b": 6.961773301217614,
+      "bound_scope": "estimate",
+      "classification": "population_estimate_only",
+      "coarse_fine_absolute_change": 2.6579684992642427,
+      "coarse_total_weight": 34.283729562337285,
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "fine_total_weight": 31.625761063073043,
+      "fine_uncontrolled_errors": [
+        "field representation / interpolation",
+        "surface-maximum profile unless independently certified",
+        "spatial quadrature",
+        "field lines are dense on almost every contributing surface"
+      ],
+      "lambda_n": 0.95,
+      "source": "h(rho)=1 (UniformSourceProfile)",
+      "surface_maximum_scope": "sampled angular maximum on 48x48 grid",
+      "trapping_scope": "dense_line_surface_maximum"
+    }
+  ],
+  "controls": {
+    "coarse_population": {
+      "n_s": 6,
+      "n_theta": 24,
+      "n_zeta": 24
+    },
+    "fine_population": {
+      "n_s": 12,
+      "n_theta": 48,
+      "n_zeta": 48
+    },
+    "global_extrema": {
+      "absolute_margin": 0.0,
+      "candidate_count": 8,
+      "n_s": 17,
+      "n_theta": 32,
+      "n_zeta": 32,
+      "safety_factor": 2.0,
+      "user_b_max": null,
+      "user_b_min": null
+    },
+    "lambda_n": [
+      0.05,
+      0.1,
+      0.5,
+      0.8,
+      0.9,
+      0.95
+    ]
+  },
+  "convergence_diagnostics": {
+    "maximum_full_band_fraction_absolute_change": 0.00033507451753522766,
+    "maximum_slice_relative_change": 0.4683883170873533
+  },
+  "elapsed_seconds": 7.19074233295396,
+  "fields": [
+    {
+      "denominator_coarse": 11.313523753036977,
+      "denominator_fine": 11.313528611289154,
+      "elapsed_seconds": 1.6952447920339182,
+      "extrema_interpolation_error_estimate": 0.03124016235964433,
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "full_band_bound_scope": "estimate",
+      "full_band_fraction_absolute_change": 0.00033507451753522766,
+      "full_band_fraction_coarse": 0.384292509760665,
+      "full_band_fraction_fine": 0.3846275842782002,
+      "nfp": 4,
+      "plot": "docs/validation/r0-population-plots/field-0-population.png",
+      "refined_B_max_estimate": 12.030690150609956,
+      "refined_B_min_estimate": 7.715684270822196,
+      "safe_B_lower_estimate": 7.6532039461029076,
+      "safe_B_upper_estimate": 12.093170475329245,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd"
+    },
+    {
+      "denominator_coarse": 10.882851671898054,
+      "denominator_fine": 10.882858136135194,
+      "elapsed_seconds": 1.3847960829734802,
+      "extrema_interpolation_error_estimate": 0.010314420085713039,
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "full_band_bound_scope": "estimate",
+      "full_band_fraction_absolute_change": 2.3498162785628995e-05,
+      "full_band_fraction_coarse": 0.36667547258924366,
+      "full_band_fraction_fine": 0.3666989707520293,
+      "nfp": 4,
+      "plot": "docs/validation/r0-population-plots/field-1-population.png",
+      "refined_B_max_estimate": 12.032438296028294,
+      "refined_B_min_estimate": 7.342416966461364,
+      "safe_B_lower_estimate": 7.321788126289938,
+      "safe_B_upper_estimate": 12.05306713619972,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e"
+    },
+    {
+      "denominator_coarse": 20.43812887177597,
+      "denominator_fine": 20.438107192702006,
+      "elapsed_seconds": 1.4046488330350257,
+      "extrema_interpolation_error_estimate": 0.013484507105445687,
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "full_band_bound_scope": "estimate",
+      "full_band_fraction_absolute_change": 4.781923011010214e-06,
+      "full_band_fraction_coarse": 0.629595637033539,
+      "full_band_fraction_fine": 0.629590855110528,
+      "nfp": 4,
+      "plot": "docs/validation/r0-population-plots/field-2-population.png",
+      "refined_B_max_estimate": 12.050343540204448,
+      "refined_B_min_estimate": 5.04046589307238,
+      "safe_B_lower_estimate": 5.013496878861488,
+      "safe_B_upper_estimate": 12.07731255441534,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7"
+    },
+    {
+      "denominator_coarse": 17.37668736548367,
+      "denominator_fine": 17.376661673134095,
+      "elapsed_seconds": 1.498819458996877,
+      "extrema_interpolation_error_estimate": 0.0017781830272176613,
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "full_band_bound_scope": "estimate",
+      "full_band_fraction_absolute_change": 5.8035006048062776e-05,
+      "full_band_fraction_coarse": 0.3962180273291084,
+      "full_band_fraction_fine": 0.3961599923230603,
+      "nfp": 5,
+      "plot": "docs/validation/r0-population-plots/field-3-population.png",
+      "refined_B_max_estimate": 3.3705889032335437,
+      "refined_B_min_estimate": 2.2930590216460347,
+      "safe_B_lower_estimate": 2.2895026555915994,
+      "safe_B_upper_estimate": 3.374145269287979,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c"
+    },
+    {
+      "denominator_coarse": 18.09087309912378,
+      "denominator_fine": 18.09086258707956,
+      "elapsed_seconds": 1.1475186250172555,
+      "extrema_interpolation_error_estimate": 0.004863056767116625,
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "full_band_bound_scope": "estimate",
+      "full_band_fraction_absolute_change": 6.299040490281849e-05,
+      "full_band_fraction_coarse": 0.2781161259067015,
+      "full_band_fraction_fine": 0.2781791163116043,
+      "nfp": 3,
+      "plot": "docs/validation/r0-population-plots/field-4-population.png",
+      "refined_B_max_estimate": 7.069800279009321,
+      "refined_B_min_estimate": 4.909260723175189,
+      "safe_B_lower_estimate": 4.8995346096409556,
+      "safe_B_upper_estimate": 7.0795263925435545,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660"
+    }
+  ],
+  "milestone": "R0",
+  "provenance": {
+    "cache_state": "new field object per equilibrium; no persistent numerical cache; operating-system file cache uncontrolled (warm rerun)",
+    "git_revision": "dc95074d6faf600b05a2ceef04230f007b51d5bb",
+    "machine": "arm64",
+    "platform": "macOS-14.7.6-arm64-arm-64bit",
+    "population_module_dirty": false,
+    "population_module_sha256": "ce39746a7b86ab1ac8134d2f543bd2bf702a4338cd85938020e1e7ccef3605cc",
+    "python": "3.10.5",
+    "worker_count": 1
+  },
+  "result_scope": "ledger-only quadrature estimates; no accessibility classification",
+  "source": "h(rho)=1 (UniformSourceProfile)",
+  "support_definition": "b=B_min_global+lambda_n*(B_max_global-B_min_global), using the recorded locally optimized extrema estimates"
+}
