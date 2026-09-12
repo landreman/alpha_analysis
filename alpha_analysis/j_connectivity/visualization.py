@@ -7,6 +7,58 @@ import numpy as np
 from .denominator import DenominatorConvergence, GlobalBBounds
 
 
+def plot_population_diagnostics(
+    slices,
+    *,
+    field_label: str,
+    source_label: str,
+    output_path=None,
+):
+    """Plot independent trapped weight versus pitch and radius (§§17.4, 23 R0).
+
+    The left panel shows the unnormalized total slice weight ``Q_total(b)``.
+    The right panel shows its source-weighted radial density at the quadrature
+    nodes.  Trapping and bound scope are included in labels so an estimate or
+    surface-maximum upper model is not mistaken for accessibility or a field
+    enclosure.
+    """
+    import matplotlib.pyplot as plt
+
+    slices = tuple(slices)
+    if not slices:
+        raise ValueError("at least one population slice is required")
+    source_names = {item.source_name for item in slices}
+    if len(source_names) != 1:
+        raise ValueError("population diagnostics require one declared source")
+
+    figure, axes = plt.subplots(1, 2, figsize=(11, 4), constrained_layout=True)
+    pitch = np.array([item.b for item in slices])
+    total_weight = np.array([item.total_weight for item in slices])
+    order = np.argsort(pitch)
+    axes[0].plot(pitch[order], total_weight[order], "o-")
+    axes[0].set_xlabel(r"conserved pitch $b=B_{bounce}$")
+    axes[0].set_ylabel(r"total trapped weight $Q_{total}(b)$")
+    axes[0].grid(True)
+
+    for index in order:
+        item = slices[index]
+        axes[1].plot(
+            item.nodes_s,
+            item.radial_density,
+            label=f"b={item.b:.5g} ({item.trapping_scope}; {item.bound_scope})",
+        )
+    axes[1].set_xlabel(r"normalized toroidal flux $s$")
+    axes[1].set_ylabel(r"radial density of $Q_{total}$")
+    axes[1].grid(True)
+    axes[1].legend(fontsize="x-small")
+    figure.suptitle(
+        f"Independent population ledger: {field_label}; source {source_label}"
+    )
+    if output_path is not None:
+        figure.savefig(output_path, dpi=160)
+    return figure, axes
+
+
 def plot_critical_curves(curves, *, output_path=None):
     """Plot classified marginal polylines from DESIGN.md §§17.3 and 23.
 
