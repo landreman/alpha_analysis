@@ -233,6 +233,43 @@ def test_surface_maximum_is_not_linewise_trapping_on_rational_plateau():
     assert unresolved.total_weight_upper > 0.0
     assert any("period cap" in item for item in unresolved.uncontrolled_errors)
 
+    with pytest.raises(ValueError, match="subset"):
+        compute_population_slice(
+            context,
+            2.5,
+            linewise_trapped=lambda s, theta, zeta, b, B: LinewiseTrappingMasks(
+                definitely_trapped=np.ones_like(B, dtype=bool),
+                possibly_trapped=np.zeros_like(B, dtype=bool),
+            ),
+        )
+    with pytest.raises(ValueError, match="B >= b"):
+        compute_population_slice(
+            context,
+            2.5,
+            linewise_trapped=lambda s, theta, zeta, b, B: LinewiseTrappingMasks(
+                definitely_trapped=np.zeros_like(B, dtype=bool),
+                possibly_trapped=np.ones_like(B, dtype=bool),
+                unresolved_reasons=("not traced",),
+            ),
+        )
+    with pytest.raises(ValueError, match="requires a recorded reason"):
+        compute_population_slice(
+            context,
+            2.5,
+            linewise_trapped=lambda s, theta, zeta, b, B: LinewiseTrappingMasks(
+                definitely_trapped=np.zeros_like(B, dtype=bool),
+                possibly_trapped=B < b,
+            ),
+        )
+    with pytest.raises(ValueError, match="below a sampled field value"):
+        build_population_context(
+            field,
+            UniformSourceProfile(),
+            config,
+            source_name="h=1",
+            surface_maximum=np.full(config.n_s, 2.9),
+        )
+
 
 def test_population_slice_matches_independent_analytic_integral():
     B0 = 2.0
@@ -400,7 +437,8 @@ def test_whole_pitch_band_upper_weight():
 
     assert bounds.lower <= band.fraction <= bounds.upper
     assert bounds.upper - bounds.lower > 0.0
-    assert bounds.upper <= bounds.pitch_weight_upper / (2.0 * bounds.denominator.lower)
+    assert bounds.lower == bounds.pitch_weight_lower / (2.0 * bounds.denominator.upper)
+    assert bounds.upper == bounds.pitch_weight_upper / (2.0 * bounds.denominator.lower)
     assert bounds.bound_scope == "field_enclosure"
     assert bounds.source_name == "h=1"
     assert bounds.dense_line_certification is not None
@@ -445,6 +483,27 @@ def test_whole_pitch_band_upper_weight():
             denominator=denominator_bounds,
             bound_scope="field_enclosure",
         )
+
+    upper_not_exact = compute_pitch_band_estimate(
+        replace(
+            context,
+            surface_maximum=np.full(config.n_s, 2.6),
+            surface_maximum_is_certified_exact=False,
+        ),
+        1.5,
+        2.6,
+        denominator.V_h,
+        dense_line_assumption=True,
+        dense_line_certification="irrational transform is constant at sqrt(2)",
+    )
+    upper_not_exact_bounds = enclose_pitch_band_fraction(
+        upper_not_exact,
+        pitch_weight_absolute_error=1.0e-4,
+        denominator=denominator_bounds,
+        bound_scope="field_enclosure",
+    )
+    assert upper_not_exact_bounds.lower == 0.0
+    assert upper_not_exact_bounds.upper > 0.0
 
     plateau_field = _field(m=(0, 1), n=(0, 0), cosine=((2.0,), (1.0,)), iota=(0.0,))
     plateau_context = build_population_context(

@@ -70,7 +70,11 @@ do not relax the fast/full test-suite budgets.
   them, so the present grid spread is not a bound. Carry source and bound scope for
   both total and owned cell weights; a field-scope total cannot elevate model-scope
   or uncontrolled cell contributions. Dense-line equality also needs its own
-  certificate before a positive lower pitch-band bound is reported.
+  certificate before a positive lower pitch-band bound is reported. The current
+  R0 certificate is caller-supplied prose; R6 must replace it with machine-checkable
+  linewise evidence or an appropriate dense-line proof before using it for physical
+  field enclosures. Preserve precursor estimate errors alongside certified results;
+  a ledger's `uncontrolled_errors` is empty by construction after certification.
 - Existing public functions, CLI entry points and legacy mesh/extractor tests
   remain compatibility obligations. The old numerical path is also a useful
   reference on cases it resolves; it is not the production prerequisite for R2–R8.
