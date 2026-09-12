@@ -202,6 +202,10 @@ class BoozerField:
     def iota(self, s: np.ndarray | float) -> np.ndarray | float:
         return self._evaluate_spline(self._iota_spline, s)
 
+    def diota_ds(self, s: np.ndarray | float) -> np.ndarray | float:
+        """Return spline derivative d iota/ds for DESIGN.md §10.1."""
+        return self._evaluate_spline(self._iota_spline.derivative(), s)
+
     def bmnc(self, s: np.ndarray | float) -> np.ndarray | float:
         return self._evaluate_coefficient_spline(self._bmnc_spline, s)
 

@@ -13,14 +13,14 @@ implementation milestone complete.
 
 ## Active plan
 
-**Next milestone: R2. R0 and R1 are complete.** Follow the dependencies in `DESIGN.md`
+**Next milestone: R3. R0–R2 are complete.** Follow the dependencies in `DESIGN.md`
 §23; retired milestones are not prerequisites.
 
 | ID | Milestone | Goal | Done | PR |
 | --- | --- | --- | --- | --- |
 | R0 | Baseline migration and independent population ledger | Establish the accepted code baseline, preserve historical evidence and tests, and independently account for trapped population and unresolved weight | [x] | #26 |
 | R1 | Efficient shared forward scans and bounce integrals | Share field-line scans, enumerate maximal wells, and evaluate batched \(A,K\) with error accounting | [x] | #27 |
-| R2 | Root-labelled atlas and barrier-height transitions | Build local well charts, explicit seam ownership and certified generic transition relations | [ ] | |
+| R2 | Root-labelled atlas and barrier-height transitions | Build local well charts, explicit seam ownership and certified generic transition relations | [x] | #28 |
 | R3 | Independent continuous contour oracle | Follow constant-action contours and permitted branch transitions without relying on the atlas reachability implementation | [ ] | |
 | R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [ ] | |
 | R5 | Transitions, cycles and global uncertainty | Transfer through common-parameter ports and propagate uncertain connectivity globally with finite termination | [ ] | |
@@ -91,6 +91,29 @@ do not relax the fast/full test-suite budgets.
   retain summed numerical estimates and an independent adaptive comparison,
   not rigorous field or quadrature enclosures. The five-field timings are
   representative local probes, not a final \(f\) runtime or accuracy claim.
+- R2's [atlas matrix](validation/r2-atlas-matrix.md) exercises all 30 required
+  field/pitch cases with coarse and fine grids and local refinement. It certified
+  positive local multiplicity in 13 targeted narrow patches, but 0/240 coarse
+  and 3/960 fine cells: broad unresolved coverage is the main feasibility risk
+  for R4–R8, not evidence for a useful global bound. The atlas has explicit
+  physical root ownership, twisted-seam lifts, disjoint unknown complements, and
+  pointwise generic ports; the DMercFail \(\lambda_n=0.8\) event passed an
+  independent marginal-root solve and same-parameter action partition check.
+  The analytic split test also compares one-sided ordinary-well actions.
+  These ports are pointwise candidates without atlas branch IDs or incident
+  chart ownership; §10.1 branch
+  binding must precede their use as certified transitions. §8.2 matching across
+  neighboring radii and §10.4 port curves, monotone/constant segments, full
+  preimages and self-transitions are deferred to R3–R5. Do not infer those links
+  from coordinate proximity. Production `transition_at` checks marginal endpoints
+  and action partition consistency; independent one-sided action limits are
+  test-only and must become a production check before R5 certifies transfers.
+  R4–R5 should exercise the sample-count/cell-certificate mismatch guard before
+  using atlas cells for weighted reachability. These are finite
+  represented-field/model results, not field or \(f\) enclosures. R3 should use
+  an independent continuous contour
+  oracle to challenge atlas connectivity, including enclosed crossings and
+  unresolved global links.
 - Keep the physical trace direction `sign(G + iota I)`, authoritative half-bounce
   action `A` and time length `K`, lifted root/port identities, and explicit
   `MAX_PERIODS`, root, quadrature and topology failures. A capped or clipped well

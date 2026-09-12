@@ -1,0 +1,2801 @@
+{
+  "milestone": "R2",
+  "source": "h(rho)=1 (declared benchmark; atlas geometry is source independent)",
+  "scope": "finite Fourier-model atlas probes; no field, K-weight, reachability or f enclosure",
+  "hardware": "macOS-14.7.6-arm64-arm-64bit",
+  "workers": 1,
+  "cache_state": "new field objects; warm OS cache uncontrolled",
+  "code_sha256": "8d11a40d0a5c6803367746eb9f728b4cc294b5d35f29699534d43a92226cda53",
+  "code_hashes": {
+    "alpha_analysis/j_connectivity/branch_atlas.py": "8d11a40d0a5c6803367746eb9f728b4cc294b5d35f29699534d43a92226cda53",
+    "alpha_analysis/j_connectivity/forward_catalogue.py": "e837ee181d8b3aa17c3bf717ea9042f512b4a1a6ccbe054424676d0f4da50750",
+    "alpha_analysis/j_connectivity/synthetic_fields.py": "ad3be8a4de26125c561daf102bd42b8eed254595fdd2408abdf325ebac03dcb3",
+    "alpha_analysis/boozer_field.py": "1132eeb1e3e528dde2bfd6b5490d0e118cc02a05852de68a60e1c4423e1ad2ac",
+    "examples/validate_r2_atlas.py": "38888d6576aee0ea41f2f6a6f5d8ea934c139111ecb61ce9ac140bb30728154a"
+  },
+  "git_head": "14d8d898e837c96b1ea690b21f5913c1bf18fc62",
+  "pitch_bounds_source_sha256": "f777d14e6f37935b6fc00fe0191142d53057cb0a8e8a3cc46200f7dbca26cce3",
+  "cases": [
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.05,
+      "b": 7.9314345648115845,
+      "load_seconds": 0.002325250010471791,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 3,
+        "samples_with_censored_or_unknown_scan": 1,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.74 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 3,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5978002079646103,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 5,
+        "samples_with_censored_or_unknown_scan": 1,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.97 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.64 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.81 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.975435332977213,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.0039 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.1027787079801783
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.00039 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.10073275002650917
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02592949999962002
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.025026583985891193
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.1,
+      "b": 8.147184858800973,
+      "load_seconds": 0.002325250010471791,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 3,
+        "samples_with_censored_or_unknown_scan": 3,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.74 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 3,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6013344589737244,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 12,
+        "samples_with_censored_or_unknown_scan": 7,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.97 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.64 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.81 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9911961249890737,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.0039 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.10146712500136346
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.99999999995339e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.22197879099985585
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.025633999961428344
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.025369665992911905
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.5,
+      "b": 9.873187210716075,
+      "load_seconds": 0.002325250010471791,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 6,
+        "samples_with_censored_or_unknown_scan": 12,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.74 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 6,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6164705000119284,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 28,
+        "samples_with_censored_or_unknown_scan": 40,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.97 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.64 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.81 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9905137090245262,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.00187 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.10042987496126443
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.226064958027564
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.161 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.024300500052049756
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.0159 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.024553333991207182
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.8,
+      "b": 11.167688974652405,
+      "load_seconds": 0.002325250010471791,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.74 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5848560419981368,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 32,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.97 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.64 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.81 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9722862500348128,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.026140417030546814
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.024867957981768996
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.9,
+      "b": 11.59918956263118,
+      "load_seconds": 0.002325250010471791,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.74 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5730634999927133,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.97 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.64 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.81 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.0486732500139624,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.025841667025815696
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02626541699282825
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.95,
+      "b": 11.814939856620569,
+      "load_seconds": 0.002325250010471791,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.74 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6004858330124989,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.97 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.64 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.81 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9714656250434928,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02616858296096325
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.025199041003361344
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.05,
+      "b": 7.576918032939711,
+      "load_seconds": 0.005103167030028999,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.78 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 2,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5577802080078982,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.16 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.74 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.82 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9473600829951465,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.00361 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.09812416700879112
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.99999999995339e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.2200865829945542
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.0249046670505777
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.024817625002469867
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.1,
+      "b": 7.811419099418058,
+      "load_seconds": 0.005103167030028999,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.78 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 2,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.560234084026888,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 3,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.16 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.74 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.82 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.8842617080081254,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.00361 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.0988080829847604
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.000361 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.0987053340068087
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.024895916983950883
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02513399999588728
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.5,
+      "b": 9.68742763124483,
+      "load_seconds": 0.005103167030028999,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 7,
+        "samples_with_censored_or_unknown_scan": 12,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.78 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 7,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5974868339835666,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 26,
+        "samples_with_censored_or_unknown_scan": 40,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.16 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.74 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.82 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.8971572919981554,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.00195 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.09774249995825812
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.2067921669804491
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.172 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.023989667010027915
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.0169 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.025071166979614645
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.8,
+      "b": 11.094434030114908,
+      "load_seconds": 0.005103167030028999,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 4,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.78 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 4,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5680093330447562,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 13,
+        "samples_with_censored_or_unknown_scan": 32,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.16 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.74 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.82 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.8959094589808956,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 3.141592653589793,
+        "coarse_cell_index": 6,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.00195 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179587,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 8.881784197001252e-16,
+            "elapsed_seconds": 0.09956308297114447
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999975593e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.2126846659812145
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.172 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.023744083009660244
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.0169 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.02284512500045821
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.9,
+      "b": 11.563436163071602,
+      "load_seconds": 0.005103167030028999,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.78 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5418693330138922,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 32,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.16 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.74 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.82 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.8584529999643564,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02468945801956579
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.024713791033718735
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.95,
+      "b": 11.797937229549948,
+      "load_seconds": 0.005103167030028999,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=7.78 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5467883750097826,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.16 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.74 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=3.82 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.8933669170364738,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.026076874986756593
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.023911249998491257
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.05,
+      "b": 5.390959775428983,
+      "load_seconds": 0.004138042044360191,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 9,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.91 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 9,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6355252920184284,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 32,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.984 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.15 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.4 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9681847500032745,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185207179586,
+            "refined_known_multiplicity_area": 9.999999999998898e-08,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.22123120800824836
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.21953825000673532
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.0771 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.024116542015690356
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.00759 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.02366687502944842
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.1,
+      "b": 5.741453657785587,
+      "load_seconds": 0.004138042044360191,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 9,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.91 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 9,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6126819160417654,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 33,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.984 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.15 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.4 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.984090665995609,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185207179586,
+            "refined_known_multiplicity_area": 9.999999999998898e-08,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.22242670797277242
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.23244158300803974
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.0771 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.02384370897198096
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.00759 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.025475416041444987
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.5,
+      "b": 8.545404716638414,
+      "load_seconds": 0.004138042044360191,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 9,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.91 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 9,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6155002089799382,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 33,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.984 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.15 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.4 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.2283451660186984,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185207179586,
+            "refined_known_multiplicity_area": 9.999999999998898e-08,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.22155004198430106
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.22018433397170156
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.0771 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.024398291017860174
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 1,
+          "reason": null,
+          "elapsed_seconds": 0.025348791969008744
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.8,
+      "b": 10.648368010778036,
+      "load_seconds": 0.004138042044360191,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 8,
+        "samples_with_censored_or_unknown_scan": 2,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.91 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 8,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6771134159644134,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 31,
+        "samples_with_censored_or_unknown_scan": 4,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.984 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.15 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.4 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.4892316249897704,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185207179586,
+            "refined_known_multiplicity_area": 9.999999999998898e-08,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.2989955410012044
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.2468826660187915
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.0771 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.02433862496400252
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.00759 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.024751874967478216
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.9,
+      "b": 11.34935577549124,
+      "load_seconds": 0.004138042044360191,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 4,
+        "samples_with_censored_or_unknown_scan": 6,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.91 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 4,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6181628750055097,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 11,
+        "samples_with_censored_or_unknown_scan": 30,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.984 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.15 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.4 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.0751676249783486,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 3.141592653589793,
+        "coarse_cell_index": 6,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185207179587,
+            "refined_known_multiplicity_area": 9.999999999997797e-08,
+            "area_partition_error": 8.881784197001252e-16,
+            "elapsed_seconds": 0.23599274997832254
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999975593e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.23140358395176008
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.0771 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.024963333969935775
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.00759 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.023965875036083162
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.95,
+      "b": 11.699849657847844,
+      "load_seconds": 0.004138042044360191,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=2.91 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5783179589780048,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 32,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.984 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.15 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.4 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.0671373329823837,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.030863750027492642
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02963833400281146
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.05,
+      "b": 2.34693551572541,
+      "load_seconds": 0.0055944169871509075,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 4,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.86 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 4,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6644764589727856,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 13,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.344 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.494 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.912 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.128772583033424,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.000305 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.10809004202019423
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.99999999995339e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.23356862500077114
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.026 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.023593457997776568
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.00254 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.02352654200512916
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.1,
+      "b": 2.4008120098047856,
+      "load_seconds": 0.0055944169871509075,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 6,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.86 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 6,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.586945666000247,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 26,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.344 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.494 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.912 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.962796417006757,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.000305 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.0984595839981921
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.99999999995339e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.21723308402579278
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.026 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.023295958002563566
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.00254 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.024147709016688168
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.5,
+      "b": 2.831823962439789,
+      "load_seconds": 0.0055944169871509075,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 6,
+        "samples_with_censored_or_unknown_scan": 3,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.86 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 6,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5918445000424981,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 24,
+        "samples_with_censored_or_unknown_scan": 16,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.344 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.494 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.912 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.909264083020389,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.000305 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.09552062494913116
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.99999999995339e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.20404991699615493
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.026 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.023106457956600934
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.00254 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.023652333009522408
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.8,
+      "b": 3.155082926916042,
+      "load_seconds": 0.0055944169871509075,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 1,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.86 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 1,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5448055419838056,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 3,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.344 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.494 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.912 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.8525820419890806,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 3.141592653589793,
+        "coarse_cell_index": 6,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.000795 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179587,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 8.881784197001252e-16,
+            "elapsed_seconds": 0.09690875001251698
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=7.95e-05 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.09814320900477469
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.024732332967687398
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02407770900754258
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.9,
+      "b": 3.2628359150747928,
+      "load_seconds": 0.0055944169871509075,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.86 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.532868292008061,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 1,
+        "unknown_cells": 31,
+        "unknown_geometric_area": 6.086835766330228,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.344 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.494 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.912 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.8737281250068918,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.024952791980467737
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.024923250020947307
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.95,
+      "b": 3.316712409154168,
+      "load_seconds": 0.0055944169871509075,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 4,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.86 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6195029999944381,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 16,
+        "certified_cells": 1,
+        "unknown_cells": 31,
+        "unknown_geometric_area": 6.086835766330228,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=0.344 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.494 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=0.912 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9637813330045901,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.0259717499720864
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.026938249997328967
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.05,
+      "b": 5.017287700966896,
+      "load_seconds": 0.004570209013763815,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=6.22 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.4548138329992071,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 1,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.23 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.85 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.96 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.456246874993667,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.01819070801138878
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.018341957998927683
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.1,
+      "b": 5.125314678758602,
+      "load_seconds": 0.004570209013763815,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=6.22 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.41220195800997317,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.23 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.85 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.96 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.374549250002019,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.018845000013243407
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.019241458969190717
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.5,
+      "b": 5.989530501092255,
+      "load_seconds": 0.004570209013763815,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 1,
+        "samples_with_censored_or_unknown_scan": 5,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=6.22 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 1,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.4203072499949485,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 4,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.23 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.85 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.96 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.3744283750420436,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 4.71238898038469,
+        "coarse_cell_index": 7,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.0026 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179587,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 8.881784197001252e-16,
+            "elapsed_seconds": 0.07445020799059421
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.08381304104113951
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.0804 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.018888584047090262
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "transverse B envelope (vB=0.00786 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "elapsed_seconds": 0.018112834019120783
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.8,
+      "b": 6.637692367842495,
+      "load_seconds": 0.004570209013763815,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 7,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=6.22 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 2,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.42712895903969184,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 4,
+        "samples_with_censored_or_unknown_scan": 23,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.23 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.85 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.96 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.409601624996867,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.0026 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.07663870899705216
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.07931225001811981
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.01937199995154515
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.018554124981164932
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.9,
+      "b": 6.853746323425908,
+      "load_seconds": 0.004570209013763815,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 1,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=6.22 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 1,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.45015958399744704,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 3,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.23 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.85 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.96 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9746545410016552,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.0026 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.13820816698716953
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "transverse B envelope (vB=0.00026 B units) overlaps b at a scan node; narrow the s/alpha cell",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.19237112504197285
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.03808895801194012
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.03762820904375985
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.95,
+      "b": 6.961773301217614,
+      "load_seconds": 0.004570209013763815,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 4,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=6.22 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.43827887502266094,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 16,
+        "certified_cells": 1,
+        "unknown_cells": 31,
+        "unknown_geometric_area": 6.086835766330228,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "transverse B envelope (vB=1.23 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=1.85 B units) overlaps b at a scan node; narrow the s/alpha cell",
+          "transverse B envelope (vB=2.96 B units) overlaps b at a scan node; narrow the s/alpha cell"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.3431098339497112,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.017286666959989816
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.01763487496646121
+        }
+      ]
+    }
+  ],
+  "dmerc_reference": {
+    "status": "generic",
+    "s": 0.8,
+    "theta": -0.1449506678656578,
+    "alpha": -0.1577992744671513,
+    "zeta": 0.013335706749138119,
+    "field_residual": [
+      0.0,
+      -1.541136349775705e-16
+    ],
+    "curvature": -63.86404621228189,
+    "port_actions": {
+      "child_1": 11.202008500006372,
+      "parent": 22.327691266337105,
+      "child_3": 11.125682766330735
+    },
+    "reason": null,
+    "scope": "represented-field event and numerical A estimates; no field enclosure"
+  },
+  "synthetic_reference": {
+    "status": "multiway_unknown",
+    "port_count": 6,
+    "plot": "synthetic-six-port-atlas.png",
+    "multicover_plot": "synthetic-multicover-atlas.png"
+  },
+  "elapsed_seconds": 82.56218725000508
+}
