@@ -65,6 +65,7 @@ class PopulationContext:
     source_name: str
     surface_maximum_scope: str
     surface_maximum_is_certified_upper: bool
+    surface_maximum_is_certified_exact: bool
     angular_measure_per_node: float
 
 
@@ -87,6 +88,8 @@ class PopulationSliceEstimate:
     surface_maximum_scope: str
     bound_scope: str
     uncontrolled_errors: tuple[str, ...]
+    surface_maximum_is_certified_upper: bool
+    surface_maximum_is_certified_exact: bool
 
 
 @dataclass(frozen=True)
@@ -110,6 +113,8 @@ class PitchBandEstimate:
     surface_maximum_scope: str
     bound_scope: str
     uncontrolled_errors: tuple[str, ...]
+    surface_maximum_is_certified_upper: bool
+    surface_maximum_is_certified_exact: bool
 
 
 @dataclass(frozen=True)
@@ -204,6 +209,7 @@ def build_population_context(
     surface_maximum: ArrayLike | Callable[[FloatArray], ArrayLike] | None = None,
     surface_maximum_scope: str = "sampled-angular-grid-estimate",
     surface_maximum_is_certified_upper: bool = False,
+    surface_maximum_is_certified_exact: bool = False,
 ) -> PopulationContext:
     """Evaluate reusable spatial data for the §12.1 population integrals.
 
@@ -242,6 +248,7 @@ def build_population_context(
     if surface_maximum is None:
         maximum = sampled_maximum
         surface_maximum_is_certified_upper = False
+        surface_maximum_is_certified_exact = False
     else:
         supplied = (
             surface_maximum(nodes_s) if callable(surface_maximum) else surface_maximum
@@ -252,6 +259,8 @@ def build_population_context(
             raise ValueError("surface maximum lies below a sampled field value")
     if not surface_maximum_scope.strip():
         raise ValueError("surface_maximum_scope must describe the maximum provenance")
+    if surface_maximum_is_certified_exact:
+        surface_maximum_is_certified_upper = True
 
     return PopulationContext(
         config=config,
@@ -266,6 +275,7 @@ def build_population_context(
         source_name=source_name,
         surface_maximum_scope=surface_maximum_scope,
         surface_maximum_is_certified_upper=surface_maximum_is_certified_upper,
+        surface_maximum_is_certified_exact=surface_maximum_is_certified_exact,
         angular_measure_per_node=(2.0 * np.pi * zeta_period)
         / (config.n_theta * config.n_zeta),
     )
@@ -356,6 +366,8 @@ def compute_population_slice(
             "spatial quadrature",
         )
         + assumptions,
+        surface_maximum_is_certified_upper=(context.surface_maximum_is_certified_upper),
+        surface_maximum_is_certified_exact=(context.surface_maximum_is_certified_exact),
     )
 
 
@@ -446,6 +458,8 @@ def compute_pitch_band_estimate(
             "denominator quadrature",
         )
         + assumptions,
+        surface_maximum_is_certified_upper=(context.surface_maximum_is_certified_upper),
+        surface_maximum_is_certified_exact=(context.surface_maximum_is_certified_exact),
     )
 
 
@@ -525,7 +539,21 @@ def enclose_pitch_band_fraction(
         raise ValueError("pitch-weight error must be finite and nonnegative")
     if not bound_scope.strip():
         raise ValueError("bound_scope must describe the certified error scope")
-    pitch_weight_lower = max(0.0, estimate.pitch_weight - pitch_weight_absolute_error)
+    if estimate.trapping_scope == "dense_line_surface_maximum":
+        if not estimate.surface_maximum_is_certified_exact:
+            raise ValueError(
+                "a two-sided dense-line band enclosure requires a certified exact "
+                "surface maximum"
+            )
+        pitch_weight_lower = max(
+            0.0, estimate.pitch_weight - pitch_weight_absolute_error
+        )
+    elif estimate.trapping_scope == "surface_maximum_upper_only":
+        if not estimate.surface_maximum_is_certified_upper:
+            raise ValueError("an upper band enclosure requires a certified maximum")
+        pitch_weight_lower = 0.0
+    else:
+        raise ValueError("pitch-band estimate has no certifiable trapping scope")
     pitch_weight_upper = estimate.pitch_weight + pitch_weight_absolute_error
     lower = pitch_weight_lower / (2.0 * denominator.upper)
     upper = pitch_weight_upper / (2.0 * denominator.lower)

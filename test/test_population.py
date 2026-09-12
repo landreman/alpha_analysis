@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -129,6 +130,7 @@ def test_population_ledger_matches_analytic_trapped_fraction():
         source_name="h(rho)=1+rho^2",
         surface_maximum=np.full(config.n_s, B0),
         surface_maximum_scope="analytic",
+        surface_maximum_is_certified_exact=True,
     )
     denominator = compute_denominator(
         field,
@@ -231,6 +233,7 @@ def test_whole_pitch_band_upper_weight():
         source_name="h=1",
         surface_maximum=np.full(config.n_s, 2.5),
         surface_maximum_scope="analytic",
+        surface_maximum_is_certified_exact=True,
     )
     denominator = compute_denominator(
         field,
@@ -255,6 +258,27 @@ def test_whole_pitch_band_upper_weight():
     assert bounds.upper - bounds.lower > 0.0
     assert bounds.upper <= bounds.pitch_weight_upper / (2.0 * bounds.denominator.lower)
     assert bounds.bound_scope == "analytic-field-with-supplied-quadrature-errors"
+
+    uncertified = compute_pitch_band_estimate(
+        replace(
+            context,
+            surface_maximum_is_certified_upper=False,
+            surface_maximum_is_certified_exact=False,
+        ),
+        1.5,
+        2.5,
+        denominator.V_h,
+        dense_line_assumption=True,
+    )
+    with pytest.raises(ValueError, match="certified exact"):
+        enclose_pitch_band_fraction(
+            uncertified,
+            pitch_weight_absolute_error=1.0e-4,
+            denominator=WeightBounds(
+                denominator.V_h - 1.0e-4, denominator.V_h + 1.0e-4
+            ),
+            bound_scope="must-not-promote-an-estimate",
+        )
 
 
 def test_population_diagnostic_shows_pitch_and_radial_weights():
