@@ -65,8 +65,12 @@ do not relax the fast/full test-suite budgets.
   singularity; the diagnostics show that coarse/fine spread explicitly. R1 should
   return `LinewiseTrappingMasks` from its scans: definite and possible masks plus
   a reason keep incomplete roots in the population interval, while the scalar
-  accessor rejects unresolved weight. Do not promote slice grid differences into
-  bounds.
+  accessor rejects unresolved weight. R6 must separately resolve radial support
+  boundaries where `b` crosses `B_max(s)` (§13.2); fixed Gauss nodes can jump across
+  them, so the present grid spread is not a bound. Carry source and bound scope for
+  both total and owned cell weights; a field-scope total cannot elevate model-scope
+  or uncontrolled cell contributions. Dense-line equality also needs its own
+  certificate before a positive lower pitch-band bound is reported.
 - Existing public functions, CLI entry points and legacy mesh/extractor tests
   remain compatibility obligations. The old numerical path is also a useful
   reference on cases it resolves; it is not the production prerequisite for R2–R8.

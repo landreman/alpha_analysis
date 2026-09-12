@@ -164,6 +164,7 @@ class PitchBandEstimate:
     uncontrolled_errors: tuple[str, ...]
     surface_maximum_is_certified_upper: bool
     surface_maximum_is_certified_exact: bool
+    dense_line_certification: str | None
 
 
 @dataclass(frozen=True)
@@ -205,8 +206,22 @@ class OwnedWeightBounds:
     owner_ids: IntArray
     lower: FloatArray
     upper: FloatArray
+    bound_scope: str
+    is_certified: bool
+    uncontrolled_errors: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        _validate_bound_scope(self.bound_scope)
+        if self.is_certified != (
+            self.bound_scope in {"model_enclosure", "field_enclosure"}
+        ):
+            raise ValueError("owned weight certification must match its bound_scope")
+        if any(not error.strip() for error in self.uncontrolled_errors):
+            raise ValueError("owned weight errors must be nonempty strings")
+        if self.is_certified and self.uncontrolled_errors:
+            raise ValueError(
+                "certified owned weights cannot retain uncontrolled errors"
+            )
         owner_ids = np.asarray(self.owner_ids)
         lower = np.asarray(self.lower, dtype=float)
         upper = np.asarray(self.upper, dtype=float)
@@ -254,7 +269,12 @@ class PopulationLedger:
 
 @dataclass(frozen=True)
 class PitchBandFractionBounds:
-    """Certified omitted-band fraction after supplied numerator/denominator errors."""
+    """Omitted-band enclosure with source and precursor-estimate provenance.
+
+    ``estimate_uncontrolled_errors`` describes errors in the precursor estimate;
+    a claimed enclosure requires the caller's supplied absolute error to control
+    the applicable numerical/field errors (DESIGN.md §13.4).
+    """
 
     lower: float
     upper: float
@@ -262,6 +282,11 @@ class PitchBandFractionBounds:
     pitch_weight_upper: float
     denominator: WeightBounds
     bound_scope: str
+    source_name: str
+    trapping_scope: str
+    surface_maximum_scope: str
+    dense_line_certification: str | None
+    estimate_uncontrolled_errors: tuple[str, ...]
 
 
 def build_population_context(
@@ -464,6 +489,7 @@ def compute_pitch_band_estimate(
     denominator_estimate: float,
     *,
     dense_line_assumption: bool = False,
+    dense_line_certification: str | None = None,
 ) -> PitchBandEstimate:
     """Integrate a whole omitted pitch band using the exact ``b**-2`` primitive.
 
@@ -473,7 +499,9 @@ def compute_pitch_band_estimate(
 
     The integration interval is intersected with ``B < b < M``.  Dividing the
     resulting pitch weight by ``2 V_h`` gives the fraction available to the
-    omitted band (DESIGN.md §§4.3, 12.1, and 12.4).
+    omitted band (DESIGN.md §§4.3, 12.1, and 12.4). A declared dense-line
+    assumption is not a proof: an independently justified certificate must be
+    supplied to permit a positive lower bound downstream.
     """
     if (
         not np.isfinite(b_lower)
@@ -484,6 +512,13 @@ def compute_pitch_band_estimate(
         raise ValueError("pitch band requires finite 0 < b_lower < b_upper")
     if not np.isfinite(denominator_estimate) or denominator_estimate <= 0.0:
         raise ValueError("denominator estimate must be finite and positive")
+    if dense_line_certification is not None and (
+        not dense_line_assumption or not dense_line_certification.strip()
+    ):
+        raise ValueError(
+            "dense-line certification requires the dense-line assumption and a "
+            "nonempty justification"
+        )
     if dense_line_assumption:
         trapping_scope = "dense_line_surface_maximum"
         bound_scope = "estimate"
@@ -546,6 +581,7 @@ def compute_pitch_band_estimate(
         + assumptions,
         surface_maximum_is_certified_upper=(context.surface_maximum_is_certified_upper),
         surface_maximum_is_certified_exact=(context.surface_maximum_is_certified_exact),
+        dense_line_certification=dense_line_certification,
     )
 
 
@@ -572,8 +608,18 @@ def build_population_ledger(
             owner_ids=np.empty(0, dtype=np.int64),
             lower=np.empty(0),
             upper=np.empty(0),
+            bound_scope=total.bound_scope,
+            is_certified=True,
         )
     categories = (reachable, nonreachable, unresolved_covered)
+    if any(not category.is_certified for category in categories):
+        raise ValueError("population ledger requires certified owned weight bounds")
+    bound_scope = (
+        "model_enclosure"
+        if "model_enclosure"
+        in (total.bound_scope, *(c.bound_scope for c in categories))
+        else "field_enclosure"
+    )
     owner_ids = np.concatenate([category.owner_ids for category in categories])
     if np.unique(owner_ids).size != owner_ids.size:
         raise ValueError("population owner IDs overlap across ledger categories")
@@ -604,7 +650,7 @@ def build_population_ledger(
         missing_weight_upper=missing_weight_upper,
         Q_lower=Q_lower,
         Q_upper=Q_upper,
-        bound_scope=total.bound_scope,
+        bound_scope=bound_scope,
         uncontrolled_errors=total.uncontrolled_errors,
     )
 
@@ -625,6 +671,11 @@ def enclose_pitch_band_fraction(
     """
     if not denominator.is_certified:
         raise ValueError("denominator bounds must be certified for an enclosure")
+    if (
+        bound_scope == "field_enclosure"
+        and denominator.bound_scope != "field_enclosure"
+    ):
+        raise ValueError("field enclosure requires a field-enclosed denominator")
     if denominator.lower <= 0.0:
         raise ValueError("denominator lower bound must be positive")
     if (
@@ -635,18 +686,20 @@ def enclose_pitch_band_fraction(
     _validate_bound_scope(bound_scope)
     if bound_scope not in {"model_enclosure", "field_enclosure"}:
         raise ValueError("pitch-band bounds require model or field enclosure scope")
-    if estimate.trapping_scope == "dense_line_surface_maximum":
-        if not estimate.surface_maximum_is_certified_exact:
-            raise ValueError(
-                "a two-sided dense-line band enclosure requires a certified exact "
-                "surface maximum"
-            )
+    if not estimate.surface_maximum_is_certified_upper:
+        raise ValueError("a band enclosure requires a certified surface maximum")
+    if (
+        estimate.trapping_scope == "dense_line_surface_maximum"
+        and estimate.dense_line_certification is not None
+        and estimate.surface_maximum_is_certified_exact
+    ):
         pitch_weight_lower = max(
             0.0, estimate.pitch_weight - pitch_weight_absolute_error
         )
-    elif estimate.trapping_scope == "surface_maximum_upper_only":
-        if not estimate.surface_maximum_is_certified_upper:
-            raise ValueError("an upper band enclosure requires a certified maximum")
+    elif estimate.trapping_scope in {
+        "dense_line_surface_maximum",
+        "surface_maximum_upper_only",
+    }:
         pitch_weight_lower = 0.0
     else:
         raise ValueError("pitch-band estimate has no certifiable trapping scope")
@@ -660,6 +713,11 @@ def enclose_pitch_band_fraction(
         pitch_weight_upper=pitch_weight_upper,
         denominator=denominator,
         bound_scope=bound_scope,
+        source_name=estimate.source_name,
+        trapping_scope=estimate.trapping_scope,
+        surface_maximum_scope=estimate.surface_maximum_scope,
+        dense_line_certification=estimate.dense_line_certification,
+        estimate_uncontrolled_errors=estimate.uncontrolled_errors,
     )
 
 

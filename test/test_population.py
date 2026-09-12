@@ -242,13 +242,14 @@ def test_population_slice_matches_independent_analytic_integral():
         m=(0, 2),
         n=(0, 0),
         cosine=((B0 * (1.0 - 0.5 * a**2),), (0.5 * B0 * a**2,)),
+        G=(2.0, 1.0),
     )
-    config = PopulationQuadratureConfig(n_s=1, n_theta=65536, n_zeta=2)
+    config = PopulationQuadratureConfig(n_s=4, n_theta=65536, n_zeta=2)
     context = build_population_context(
         field,
-        UniformSourceProfile(),
+        lambda rho: 1.0 + np.asarray(rho) ** 2,
         config,
-        source_name="h=1",
+        source_name="h(rho)=1+rho^2",
         surface_maximum=np.full(config.n_s, B0),
         surface_maximum_scope="analytic",
         surface_maximum_is_certified_exact=True,
@@ -268,7 +269,8 @@ def test_population_slice_matches_independent_analytic_integral():
         epsabs=1.0e-11,
         epsrel=1.0e-11,
     )[0]
-    expected = 2.0 * one_allowed_interval * (2.0 * np.pi / field.nfp)
+    radial_weight = quad(lambda s: (1.0 + s) * (2.0 + s), 0.0, 1.0)[0]
+    expected = 2.0 * one_allowed_interval * (2.0 * np.pi / field.nfp) * radial_weight
     np.testing.assert_allclose(result.total_weight, expected, rtol=0.01, atol=0.0)
 
 
@@ -278,12 +280,22 @@ def test_missing_weight_uses_total_upper_minus_covered_lower():
         owner_ids=np.array([10, 11]),
         lower=np.array([1.0, 1.5]),
         upper=np.array([1.2, 1.8]),
+        bound_scope="field_enclosure",
+        is_certified=True,
     )
     nonreachable = OwnedWeightBounds(
-        owner_ids=np.array([20]), lower=np.array([2.0]), upper=np.array([2.4])
+        owner_ids=np.array([20]),
+        lower=np.array([2.0]),
+        upper=np.array([2.4]),
+        bound_scope="field_enclosure",
+        is_certified=True,
     )
     unresolved = OwnedWeightBounds(
-        owner_ids=np.array([30]), lower=np.array([0.5]), upper=np.array([0.9])
+        owner_ids=np.array([30]),
+        lower=np.array([0.5]),
+        upper=np.array([0.9]),
+        bound_scope="field_enclosure",
+        is_certified=True,
     )
 
     ledger = build_population_ledger(total, reachable, nonreachable, unresolved)
@@ -295,13 +307,21 @@ def test_missing_weight_uses_total_upper_minus_covered_lower():
     assert ledger.bound_scope == "field_enclosure"
 
     overlapping = OwnedWeightBounds(
-        owner_ids=np.array([11]), lower=np.array([0.2]), upper=np.array([0.3])
+        owner_ids=np.array([11]),
+        lower=np.array([0.2]),
+        upper=np.array([0.3]),
+        bound_scope="field_enclosure",
+        is_certified=True,
     )
     with pytest.raises(ValueError, match="overlap"):
         build_population_ledger(total, reachable, nonreachable, overlapping)
 
     excessive = OwnedWeightBounds(
-        owner_ids=np.array([31]), lower=np.array([20.0]), upper=np.array([21.0])
+        owner_ids=np.array([31]),
+        lower=np.array([20.0]),
+        upper=np.array([21.0]),
+        bound_scope="field_enclosure",
+        is_certified=True,
     )
     with pytest.raises(ValueError, match="exceeds total upper"):
         build_population_ledger(total, reachable, nonreachable, excessive)
@@ -315,6 +335,19 @@ def test_missing_weight_uses_total_upper_minus_covered_lower():
     )
     with pytest.raises(ValueError, match="certified total upper"):
         build_population_ledger(estimate, reachable, nonreachable, unresolved)
+    model_reachable = replace(reachable, bound_scope="model_enclosure")
+    assert (
+        build_population_ledger(total, model_reachable, nonreachable).bound_scope
+        == "model_enclosure"
+    )
+    uncontrolled_reachable = replace(
+        reachable,
+        bound_scope="estimate",
+        is_certified=False,
+        uncontrolled_errors=("clipped-cell quadrature",),
+    )
+    with pytest.raises(ValueError, match="certified owned weight"):
+        build_population_ledger(total, uncontrolled_reachable, nonreachable)
     with pytest.raises(ValueError, match="bound_scope must be one of"):
         WeightBounds(9.0, 11.0, bound_scope="claimed-field-ish", is_certified=True)
     with pytest.raises(ValueError, match="cannot retain uncontrolled errors"):
@@ -328,7 +361,7 @@ def test_missing_weight_uses_total_upper_minus_covered_lower():
 
 
 def test_whole_pitch_band_upper_weight():
-    field = _field(m=(0, 1), n=(0, 0), cosine=((2.0,), (0.5,)))
+    field = _field(m=(0, 1), n=(0, 0), cosine=((2.0,), (0.5,)), iota=(np.sqrt(2.0),))
     config = PopulationQuadratureConfig(n_s=3, n_theta=2048, n_zeta=2)
     context = build_population_context(
         field,
@@ -350,6 +383,7 @@ def test_whole_pitch_band_upper_weight():
         2.5,
         denominator.V_h,
         dense_line_assumption=True,
+        dense_line_certification="irrational transform is constant at sqrt(2)",
     )
     denominator_bounds = WeightBounds(
         denominator.V_h - 1.0e-4,
@@ -368,6 +402,30 @@ def test_whole_pitch_band_upper_weight():
     assert bounds.upper - bounds.lower > 0.0
     assert bounds.upper <= bounds.pitch_weight_upper / (2.0 * bounds.denominator.lower)
     assert bounds.bound_scope == "field_enclosure"
+    assert bounds.source_name == "h=1"
+    assert bounds.dense_line_certification is not None
+    assert bounds.surface_maximum_scope == "analytic"
+    assert "spatial quadrature" in bounds.estimate_uncontrolled_errors
+    with pytest.raises(ValueError, match="field-enclosed denominator"):
+        enclose_pitch_band_fraction(
+            band,
+            pitch_weight_absolute_error=1.0e-4,
+            denominator=replace(denominator_bounds, bound_scope="model_enclosure"),
+            bound_scope="field_enclosure",
+        )
+
+    unproven = compute_pitch_band_estimate(
+        context, 1.5, 2.5, denominator.V_h, dense_line_assumption=True
+    )
+    unproven_bounds = enclose_pitch_band_fraction(
+        unproven,
+        pitch_weight_absolute_error=1.0e-4,
+        denominator=denominator_bounds,
+        bound_scope="field_enclosure",
+    )
+    assert unproven_bounds.lower == 0.0
+    assert unproven_bounds.upper > 0.0
+    assert unproven_bounds.dense_line_certification is None
 
     uncertified = compute_pitch_band_estimate(
         replace(
@@ -380,13 +438,49 @@ def test_whole_pitch_band_upper_weight():
         denominator.V_h,
         dense_line_assumption=True,
     )
-    with pytest.raises(ValueError, match="certified exact"):
+    with pytest.raises(ValueError, match="certified surface maximum"):
         enclose_pitch_band_fraction(
             uncertified,
             pitch_weight_absolute_error=1.0e-4,
             denominator=denominator_bounds,
             bound_scope="field_enclosure",
         )
+
+    plateau_field = _field(m=(0, 1), n=(0, 0), cosine=((2.0,), (1.0,)), iota=(0.0,))
+    plateau_context = build_population_context(
+        plateau_field,
+        UniformSourceProfile(),
+        config,
+        source_name="h=1",
+        surface_maximum=np.full(config.n_s, 3.0),
+        surface_maximum_scope="analytic",
+        surface_maximum_is_certified_exact=True,
+    )
+    plateau_band = compute_pitch_band_estimate(
+        plateau_context,
+        1.0,
+        3.0,
+        compute_denominator(
+            plateau_field,
+            UniformSourceProfile(),
+            DenominatorConfig(config.n_s, config.n_theta, config.n_zeta),
+        ).V_h,
+        dense_line_assumption=True,
+    )
+    plateau_denominator_bounds = WeightBounds(
+        plateau_band.denominator_estimate - 1.0e-4,
+        plateau_band.denominator_estimate + 1.0e-4,
+        bound_scope="field_enclosure",
+        is_certified=True,
+    )
+    plateau_bounds = enclose_pitch_band_fraction(
+        plateau_band,
+        pitch_weight_absolute_error=1.0e-4,
+        denominator=plateau_denominator_bounds,
+        bound_scope="field_enclosure",
+    )
+    assert plateau_band.pitch_weight > 0.0
+    assert plateau_bounds.lower == 0.0
 
     first = compute_pitch_band_estimate(
         context, 1.7, 2.0, denominator.V_h, dense_line_assumption=True
@@ -492,6 +586,7 @@ def test_r0_real_field_evidence_covers_matrix_as_estimates():
         for case in payload["cases"]
     )
     assert all(case["fine_uncontrolled_errors"] for case in payload["cases"])
+    assert any("radial support boundaries" in item for item in payload["assumptions"])
     repository = Path(__file__).resolve().parents[1]
     for field in payload["fields"]:
         assert (

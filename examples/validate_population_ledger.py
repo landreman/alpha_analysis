@@ -221,6 +221,7 @@ def run(repository: Path, output: Path, report: Path, plot_directory: Path) -> N
             "surface maxima at population nodes are sampled-grid estimates, not upper bounds",
             "coarse-fine differences are convergence diagnostics, not error enclosures",
             "field interpolation, extrema, population and denominator quadrature errors are uncontrolled",
+            "radial support boundaries where b crosses B_max(s) are unresolved by fixed Gauss nodes (DESIGN 13.2)",
         ],
         "controls": {
             "coarse_population": _config_dict(COARSE),
