@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+from scipy.integrate import quad
 
 from alpha_analysis.j_connectivity.denominator import (
     DenominatorConfig,
@@ -14,6 +16,7 @@ from alpha_analysis.j_connectivity.denominator import (
     compute_denominator,
 )
 from alpha_analysis.j_connectivity.population import (
+    LinewiseTrappingMasks,
     OwnedWeightBounds,
     PopulationQuadratureConfig,
     WeightBounds,
@@ -106,23 +109,27 @@ def test_historical_cut_matrix_is_preserved():
 
 
 def test_population_ledger_matches_analytic_trapped_fraction():
-    # B=B0(1-a^2 sin^2(theta)) has an exact surface maximum B0 and
-    # sqrt(1-B/Bmax)=a |sin(theta)|.  The independent angular integrals are
-    # elementary, while h(rho)=1+rho^2 makes evaluation at s detectably wrong.
+    # B=B0(1-a(s)^2 sin^2(theta)) has exact maximum B0 and
+    # sqrt(1-B/Bmax)=a(s) |sin(theta)|. The independently integrated radial
+    # variation makes h(rho)=1+rho^2 directly affect the normalized result.
     B0 = 2.0
-    a = 0.6
+    a_squared_0 = 0.16
+    a_squared_1 = 0.20
     field = _field(
         nfp=2,
         m=(0, 2),
         n=(0, 0),
-        cosine=((B0 * (1.0 - 0.5 * a**2),), (0.5 * B0 * a**2,)),
+        cosine=(
+            (B0 * (1.0 - 0.5 * a_squared_0), -0.5 * B0 * a_squared_1),
+            (0.5 * B0 * a_squared_0, 0.5 * B0 * a_squared_1),
+        ),
         G=(2.0, 1.0),
     )
 
     def source(rho):
         return 1.0 + np.asarray(rho) ** 2
 
-    config = PopulationQuadratureConfig(n_s=4, n_theta=4096, n_zeta=2)
+    config = PopulationQuadratureConfig(n_s=16, n_theta=4096, n_zeta=2)
     context = build_population_context(
         field,
         source,
@@ -139,16 +146,35 @@ def test_population_ledger_matches_analytic_trapped_fraction():
     )
     band = compute_pitch_band_estimate(
         context,
-        B0 * (1.0 - a**2),
+        B0 * (1.0 - a_squared_0 - a_squared_1),
         B0,
         denominator.V_h,
         dense_line_assumption=True,
     )
 
-    c = 1.0 - a**2
-    numerator_theta = 2.0 * a / c + 2.0 * np.arctan(a / np.sqrt(c)) / c**1.5
-    denominator_theta = np.pi * (2.0 - a**2) / c**1.5
-    expected = numerator_theta / denominator_theta
+    def angular_integrals(s):
+        a_squared = a_squared_0 + a_squared_1 * s
+        a = np.sqrt(a_squared)
+        c = 1.0 - a_squared
+        numerator = 2.0 * a / c + 2.0 * np.arctan(a / np.sqrt(c)) / c**1.5
+        denominator_theta = np.pi * (2.0 - a_squared) / c**1.5
+        return numerator, denominator_theta
+
+    numerator = quad(
+        lambda s: (1.0 + s) * (2.0 + s) * angular_integrals(s)[0],
+        0.0,
+        1.0,
+        epsabs=1.0e-12,
+        epsrel=1.0e-12,
+    )[0]
+    denominator_reference = quad(
+        lambda s: (1.0 + s) * (2.0 + s) * angular_integrals(s)[1],
+        0.0,
+        1.0,
+        epsabs=1.0e-12,
+        epsrel=1.0e-12,
+    )[0]
+    expected = numerator / denominator_reference
     np.testing.assert_allclose(band.fraction, expected, atol=3.0e-7, rtol=0.0)
     assert band.source_name == "h(rho)=1+rho^2"
     assert band.trapping_scope == "dense_line_surface_maximum"
@@ -178,19 +204,76 @@ def test_surface_maximum_is_not_linewise_trapping_on_rational_plateau():
     linewise = compute_population_slice(
         context,
         2.5,
-        linewise_trapped=lambda s, theta, zeta, b, B: np.zeros_like(B, dtype=bool),
+        linewise_trapped=lambda s, theta, zeta, b, B: LinewiseTrappingMasks(
+            definitely_trapped=np.zeros_like(B, dtype=bool),
+            possibly_trapped=np.zeros_like(B, dtype=bool),
+        ),
     )
     surface_upper = compute_population_slice(context, 2.5)
 
     assert linewise.total_weight == 0.0
-    assert linewise.trapping_scope == "linewise_mask"
-    assert surface_upper.total_weight > 0.0
+    assert linewise.trapping_scope == "linewise_masks"
+    assert surface_upper.total_weight_lower == 0.0
+    assert surface_upper.total_weight_upper > 0.0
+    with pytest.raises(ValueError, match="interval-valued"):
+        _ = surface_upper.total_weight
     assert surface_upper.trapping_scope == "surface_maximum_upper_only"
-    assert surface_upper.bound_scope == "quadrature_estimate_of_upper_model"
+    assert surface_upper.bound_scope == "estimate"
+
+    unresolved = compute_population_slice(
+        context,
+        2.5,
+        linewise_trapped=lambda s, theta, zeta, b, B: LinewiseTrappingMasks(
+            definitely_trapped=np.zeros_like(B, dtype=bool),
+            possibly_trapped=B < b,
+            unresolved_reasons=("root scan reached its period cap",),
+        ),
+    )
+    assert unresolved.total_weight_lower == 0.0
+    assert unresolved.total_weight_upper > 0.0
+    assert any("period cap" in item for item in unresolved.uncontrolled_errors)
+
+
+def test_population_slice_matches_independent_analytic_integral():
+    B0 = 2.0
+    a = 0.6
+    b = 1.9
+    field = _field(
+        m=(0, 2),
+        n=(0, 0),
+        cosine=((B0 * (1.0 - 0.5 * a**2),), (0.5 * B0 * a**2,)),
+    )
+    config = PopulationQuadratureConfig(n_s=1, n_theta=65536, n_zeta=2)
+    context = build_population_context(
+        field,
+        UniformSourceProfile(),
+        config,
+        source_name="h=1",
+        surface_maximum=np.full(config.n_s, B0),
+        surface_maximum_scope="analytic",
+        surface_maximum_is_certified_exact=True,
+    )
+    result = compute_population_slice(context, b, dense_line_assumption=True)
+
+    theta_root = np.arcsin(np.sqrt((1.0 - b / B0) / a**2))
+
+    def angular_integrand(theta):
+        B = B0 * (1.0 - a**2 * np.sin(theta) ** 2)
+        return 1.0 / (B * np.sqrt(1.0 - B / b))
+
+    one_allowed_interval = quad(
+        angular_integrand,
+        theta_root,
+        np.pi - theta_root,
+        epsabs=1.0e-11,
+        epsrel=1.0e-11,
+    )[0]
+    expected = 2.0 * one_allowed_interval * (2.0 * np.pi / field.nfp)
+    np.testing.assert_allclose(result.total_weight, expected, rtol=0.01, atol=0.0)
 
 
 def test_missing_weight_uses_total_upper_minus_covered_lower():
-    total = WeightBounds(9.0, 11.0)
+    total = WeightBounds(9.0, 11.0, bound_scope="field_enclosure", is_certified=True)
     reachable = OwnedWeightBounds(
         owner_ids=np.array([10, 11]),
         lower=np.array([1.0, 1.5]),
@@ -209,6 +292,7 @@ def test_missing_weight_uses_total_upper_minus_covered_lower():
     assert ledger.missing_weight_upper == 6.0
     assert ledger.Q_lower == 2.5
     assert ledger.Q_upper == 9.0
+    assert ledger.bound_scope == "field_enclosure"
 
     overlapping = OwnedWeightBounds(
         owner_ids=np.array([11]), lower=np.array([0.2]), upper=np.array([0.3])
@@ -221,6 +305,26 @@ def test_missing_weight_uses_total_upper_minus_covered_lower():
     )
     with pytest.raises(ValueError, match="exceeds total upper"):
         build_population_ledger(total, reachable, nonreachable, excessive)
+
+    estimate = WeightBounds(
+        9.0,
+        11.0,
+        bound_scope="estimate",
+        is_certified=False,
+        uncontrolled_errors=("spatial quadrature",),
+    )
+    with pytest.raises(ValueError, match="certified total upper"):
+        build_population_ledger(estimate, reachable, nonreachable, unresolved)
+    with pytest.raises(ValueError, match="bound_scope must be one of"):
+        WeightBounds(9.0, 11.0, bound_scope="claimed-field-ish", is_certified=True)
+    with pytest.raises(ValueError, match="cannot retain uncontrolled errors"):
+        WeightBounds(
+            9.0,
+            11.0,
+            bound_scope="field_enclosure",
+            is_certified=True,
+            uncontrolled_errors=("spatial quadrature",),
+        )
 
 
 def test_whole_pitch_band_upper_weight():
@@ -247,17 +351,23 @@ def test_whole_pitch_band_upper_weight():
         denominator.V_h,
         dense_line_assumption=True,
     )
+    denominator_bounds = WeightBounds(
+        denominator.V_h - 1.0e-4,
+        denominator.V_h + 1.0e-4,
+        bound_scope="field_enclosure",
+        is_certified=True,
+    )
     bounds = enclose_pitch_band_fraction(
         band,
         pitch_weight_absolute_error=1.0e-4,
-        denominator=WeightBounds(denominator.V_h - 1.0e-4, denominator.V_h + 1.0e-4),
-        bound_scope="analytic-field-with-supplied-quadrature-errors",
+        denominator=denominator_bounds,
+        bound_scope="field_enclosure",
     )
 
     assert bounds.lower <= band.fraction <= bounds.upper
     assert bounds.upper - bounds.lower > 0.0
     assert bounds.upper <= bounds.pitch_weight_upper / (2.0 * bounds.denominator.lower)
-    assert bounds.bound_scope == "analytic-field-with-supplied-quadrature-errors"
+    assert bounds.bound_scope == "field_enclosure"
 
     uncertified = compute_pitch_band_estimate(
         replace(
@@ -274,11 +384,56 @@ def test_whole_pitch_band_upper_weight():
         enclose_pitch_band_fraction(
             uncertified,
             pitch_weight_absolute_error=1.0e-4,
-            denominator=WeightBounds(
-                denominator.V_h - 1.0e-4, denominator.V_h + 1.0e-4
-            ),
-            bound_scope="must-not-promote-an-estimate",
+            denominator=denominator_bounds,
+            bound_scope="field_enclosure",
         )
+
+    first = compute_pitch_band_estimate(
+        context, 1.7, 2.0, denominator.V_h, dense_line_assumption=True
+    )
+    second = compute_pitch_band_estimate(
+        context, 2.0, 2.3, denominator.V_h, dense_line_assumption=True
+    )
+    joined = compute_pitch_band_estimate(
+        context, 1.7, 2.3, denominator.V_h, dense_line_assumption=True
+    )
+    np.testing.assert_allclose(
+        first.pitch_weight + second.pitch_weight,
+        joined.pitch_weight,
+        rtol=2.0e-15,
+        atol=2.0e-15,
+    )
+
+    def band_integrand(theta):
+        B = 2.0 + 0.5 * np.cos(theta)
+        lower = max(B, 2.0)
+        upper = min(2.5, 2.3)
+        if upper <= lower:
+            return 0.0
+        return (np.sqrt(1.0 - B / upper) - np.sqrt(1.0 - B / lower)) / B**2
+
+    support_root = np.arccos(0.6)
+    numerator = quad(
+        band_integrand,
+        0.0,
+        2.0 * np.pi,
+        points=[
+            support_root,
+            0.5 * np.pi,
+            np.pi,
+            1.5 * np.pi,
+            2.0 * np.pi - support_root,
+        ],
+        limit=100,
+    )[0]
+    denominator_theta = quad(
+        lambda theta: (2.0 + 0.5 * np.cos(theta)) ** -2,
+        0.0,
+        2.0 * np.pi,
+    )[0]
+    np.testing.assert_allclose(
+        second.fraction, numerator / denominator_theta, rtol=5.0e-5, atol=1.0e-8
+    )
 
 
 def test_population_diagnostic_shows_pitch_and_radial_weights():
@@ -298,11 +453,15 @@ def test_population_diagnostic_shows_pitch_and_radial_weights():
     )
 
     figure, axes = plot_population_diagnostics(
-        slices, field_label="analytic cosine field", source_label="h=1"
+        slices,
+        field_label="analytic cosine field",
+        source_label="h=1",
+        comparison_slices=slices,
     )
     assert "pitch" in axes[0].get_xlabel().lower()
     assert "s" in axes[1].get_xlabel().lower()
     assert "analytic cosine field" in figure._suptitle.get_text()
+    assert "comparison grid" in {item.get_text() for item in axes[0].get_legend().texts}
     plt.close(figure)
 
 
@@ -333,8 +492,19 @@ def test_r0_real_field_evidence_covers_matrix_as_estimates():
         for case in payload["cases"]
     )
     assert all(case["fine_uncontrolled_errors"] for case in payload["cases"])
-    assert all(len(field["sha256"]) == 64 for field in payload["fields"])
-    assert len(payload["provenance"]["population_module_sha256"]) == 64
+    repository = Path(__file__).resolve().parents[1]
+    for field in payload["fields"]:
+        assert (
+            field["sha256"]
+            == hashlib.sha256(
+                (repository / "data" / field["file"]).read_bytes()
+            ).hexdigest()
+        )
+    module = repository / "alpha_analysis" / "j_connectivity" / "population.py"
+    assert (
+        payload["provenance"]["population_module_sha256"]
+        == hashlib.sha256(module.read_bytes()).hexdigest()
+    )
     assert payload["provenance"]["worker_count"] == 1
     assert payload["provenance"]["population_module_dirty"] is False
     assert payload["convergence_diagnostics"]["maximum_slice_relative_change"] > 0.0

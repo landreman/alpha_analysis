@@ -19,8 +19,32 @@ from .field import BoozerFieldLike
 FloatArray = NDArray[np.float64]
 IntArray = NDArray[np.int64]
 BoolArray = NDArray[np.bool_]
+BOUND_SCOPES = frozenset(
+    {"model_enclosure", "field_enclosure", "estimate", "statistical_interval"}
+)
+
+
+@dataclass(frozen=True)
+class LinewiseTrappingMasks:
+    """Definite/possible linewise trapping with explicit unresolved reasons.
+
+    The masks use the population grid. ``definitely_trapped`` must be a subset
+    of ``possibly_trapped``. A nonempty difference represents unresolved line
+    tracing and requires at least one reason; it is never converted to zero
+    population (DESIGN.md §§12.1 and 21.2).
+    """
+
+    definitely_trapped: ArrayLike
+    possibly_trapped: ArrayLike
+    unresolved_reasons: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if any(not reason.strip() for reason in self.unresolved_reasons):
+            raise ValueError("linewise unresolved reasons must be nonempty strings")
+
+
 LinewiseTrapping = Callable[
-    [FloatArray, FloatArray, FloatArray, float, FloatArray], ArrayLike
+    [FloatArray, FloatArray, FloatArray, float, FloatArray], LinewiseTrappingMasks
 ]
 
 
@@ -73,16 +97,20 @@ class PopulationContext:
 class PopulationSliceEstimate:
     """Quadrature estimate of ``Q_total(b)`` from DESIGN.md §12.1.
 
-    ``total_weight`` is unnormalized and has the units of
+    The total weights are unnormalized and have the units of
     ``h |C| / B`` times the three-coordinate measure.  It is not an
-    accessibility result.  ``radial_density`` excludes Gauss weights so it can be
-    plotted as a function of normalized flux ``s``.
+    accessibility result.  The radial densities exclude Gauss weights so they
+    can be plotted as functions of normalized flux ``s``. The interval is an
+    unresolved-model interval, not a numerical enclosure unless its recorded
+    errors are subsequently bounded.
     """
 
     b: float
-    total_weight: float
+    total_weight_lower: float
+    total_weight_upper: float
     nodes_s: FloatArray
-    radial_density: FloatArray
+    radial_density_lower: FloatArray
+    radial_density_upper: FloatArray
     source_name: str
     trapping_scope: str
     surface_maximum_scope: str
@@ -90,6 +118,27 @@ class PopulationSliceEstimate:
     uncontrolled_errors: tuple[str, ...]
     surface_maximum_is_certified_upper: bool
     surface_maximum_is_certified_exact: bool
+
+    @property
+    def total_weight(self) -> float:
+        """Return a scalar only when trapping has no unresolved population."""
+        tolerance = 64.0 * np.finfo(float).eps * max(1.0, self.total_weight_upper)
+        if self.total_weight_upper - self.total_weight_lower > tolerance:
+            raise ValueError(
+                "population is interval-valued; use total_weight_lower/upper"
+            )
+        return self.total_weight_lower
+
+    @property
+    def radial_density(self) -> FloatArray:
+        """Return scalar radial density only when lower and upper agree."""
+        scale = np.maximum(1.0, np.abs(self.radial_density_upper))
+        tolerance = 64.0 * np.finfo(float).eps * scale
+        if np.any(self.radial_density_upper - self.radial_density_lower > tolerance):
+            raise ValueError(
+                "population is interval-valued; use radial_density_lower/upper"
+            )
+        return self.radial_density_lower
 
 
 @dataclass(frozen=True)
@@ -119,16 +168,29 @@ class PitchBandEstimate:
 
 @dataclass(frozen=True)
 class WeightBounds:
-    """Finite nonnegative lower/upper bounds for one population weight."""
+    """Finite nonnegative bounds with explicit certification/error scope."""
 
     lower: float
     upper: float
+    bound_scope: str
+    is_certified: bool
+    uncontrolled_errors: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not np.isfinite(self.lower) or not np.isfinite(self.upper):
             raise ValueError("weight bounds must be finite")
         if self.lower < 0.0 or self.upper < self.lower:
             raise ValueError("weight bounds require 0 <= lower <= upper")
+        _validate_bound_scope(self.bound_scope)
+        enclosure_scope = self.bound_scope in {"model_enclosure", "field_enclosure"}
+        if self.is_certified != enclosure_scope:
+            raise ValueError(
+                "is_certified must be true exactly for model/field enclosure scope"
+            )
+        if any(not error.strip() for error in self.uncontrolled_errors):
+            raise ValueError("uncontrolled errors must be nonempty strings")
+        if self.is_certified and self.uncontrolled_errors:
+            raise ValueError("certified bounds cannot retain uncontrolled errors")
 
 
 @dataclass(frozen=True)
@@ -186,6 +248,8 @@ class PopulationLedger:
     missing_weight_upper: float
     Q_lower: float
     Q_upper: float
+    bound_scope: str
+    uncontrolled_errors: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -303,59 +367,80 @@ def compute_population_slice(
     s_grid, theta_grid, zeta_grid = _coordinate_grids(context)
     allowed = context.B < b
     if linewise_trapped is not None:
-        supplied = np.asarray(
-            linewise_trapped(s_grid, theta_grid, zeta_grid, float(b), context.B)
-        )
-        try:
-            trapped = np.broadcast_to(supplied, context.B.shape).astype(
-                bool, copy=False
+        supplied = linewise_trapped(s_grid, theta_grid, zeta_grid, float(b), context.B)
+        if not isinstance(supplied, LinewiseTrappingMasks):
+            raise TypeError(
+                "linewise_trapped must return LinewiseTrappingMasks so unresolved "
+                "traces remain explicit"
             )
-        except ValueError as error:
-            raise ValueError(
-                "linewise trapping mask must broadcast over the grid"
-            ) from error
-        if np.any(trapped & ~allowed):
-            raise ValueError("linewise trapping mask includes points with B >= b")
-        trapping_scope = "linewise_mask"
+        definitely_trapped = _broadcast_bool_mask(
+            supplied.definitely_trapped, context.B.shape, "definitely_trapped"
+        )
+        possibly_trapped = _broadcast_bool_mask(
+            supplied.possibly_trapped, context.B.shape, "possibly_trapped"
+        )
+        if np.any(definitely_trapped & ~possibly_trapped):
+            raise ValueError("definitely_trapped must be a subset of possibly_trapped")
+        if np.any(possibly_trapped & ~allowed):
+            raise ValueError("linewise trapping masks include points with B >= b")
+        unresolved = possibly_trapped & ~definitely_trapped
+        if np.any(unresolved) and not supplied.unresolved_reasons:
+            raise ValueError("uncertain linewise trapping requires a recorded reason")
+        trapping_scope = "linewise_masks"
         bound_scope = "estimate"
         assumptions = ("linewise trapping predicate supplied by caller",)
+        unresolved_errors = tuple(
+            f"unresolved linewise trapping: {reason}"
+            for reason in supplied.unresolved_reasons
+        )
     else:
-        trapped = allowed & (context.surface_maximum[:, np.newaxis, np.newaxis] > b)
+        surface_trapped = allowed & (
+            context.surface_maximum[:, np.newaxis, np.newaxis] > b
+        )
         if dense_line_assumption:
+            definitely_trapped = surface_trapped
+            possibly_trapped = surface_trapped
             trapping_scope = "dense_line_surface_maximum"
             bound_scope = "estimate"
             assumptions = (
                 "field lines are dense on almost every contributing surface",
             )
+            unresolved_errors = ()
         else:
             if not context.surface_maximum_is_certified_upper:
                 raise ValueError(
                     "surface-maximum upper counting requires a certified upper profile"
                 )
+            definitely_trapped = np.zeros_like(surface_trapped)
+            possibly_trapped = surface_trapped
             trapping_scope = "surface_maximum_upper_only"
-            bound_scope = "quadrature_estimate_of_upper_model"
+            bound_scope = "estimate"
             assumptions = (
                 "certified surface maximum is only an upper count for linewise trapping",
             )
+            unresolved_errors = (
+                "linewise trapping is bounded only by the surface-maximum upper model",
+            )
 
-    integrand = np.zeros_like(context.B)
-    denominator = np.sqrt(1.0 - context.B[trapped] / b)
-    integrand[trapped] = 1.0 / (context.B[trapped] * denominator)
-    radial_density = (
-        context.source_values
-        * context.absolute_C
-        * context.angular_measure_per_node
-        * np.sum(integrand, axis=(1, 2))
-    )
-    total_weight = float(np.sum(context.weights_s * radial_density))
-    if not np.isfinite(total_weight) or total_weight < 0.0:
+    radial_density_lower = _slice_radial_density(context, b, definitely_trapped)
+    radial_density_upper = _slice_radial_density(context, b, possibly_trapped)
+    total_weight_lower = float(np.sum(context.weights_s * radial_density_lower))
+    total_weight_upper = float(np.sum(context.weights_s * radial_density_upper))
+    if (
+        not np.isfinite(total_weight_lower)
+        or not np.isfinite(total_weight_upper)
+        or total_weight_lower < 0.0
+        or total_weight_upper < total_weight_lower
+    ):
         raise ValueError("population quadrature produced an invalid weight")
 
     return PopulationSliceEstimate(
         b=float(b),
-        total_weight=total_weight,
+        total_weight_lower=total_weight_lower,
+        total_weight_upper=total_weight_upper,
         nodes_s=context.nodes_s,
-        radial_density=radial_density,
+        radial_density_lower=radial_density_lower,
+        radial_density_upper=radial_density_upper,
         source_name=context.source_name,
         trapping_scope=trapping_scope,
         surface_maximum_scope=context.surface_maximum_scope,
@@ -365,7 +450,8 @@ def compute_population_slice(
             "surface-maximum profile unless independently certified",
             "spatial quadrature",
         )
-        + assumptions,
+        + assumptions
+        + unresolved_errors,
         surface_maximum_is_certified_upper=(context.surface_maximum_is_certified_upper),
         surface_maximum_is_certified_exact=(context.surface_maximum_is_certified_exact),
     )
@@ -408,7 +494,7 @@ def compute_pitch_band_estimate(
                 "upper band counting requires a certified surface-maximum profile"
             )
         trapping_scope = "surface_maximum_upper_only"
-        bound_scope = "quadrature_estimate_of_upper_model"
+        bound_scope = "estimate"
         assumptions = ("surface maximum supplies only an upper trapping ceiling",)
 
     lower = np.maximum(context.B, b_lower)
@@ -476,6 +562,11 @@ def build_population_ledger(
     bound.  Missing weight uses ``total.upper - covered.lower``; owner overlap or
     a materially negative residual is rejected rather than clamped.
     """
+    if not total.is_certified:
+        raise ValueError(
+            "population ledger requires a certified total upper bound; an "
+            "uncontrolled estimate cannot define Q_upper"
+        )
     if unresolved_covered is None:
         unresolved_covered = OwnedWeightBounds(
             owner_ids=np.empty(0, dtype=np.int64),
@@ -513,6 +604,8 @@ def build_population_ledger(
         missing_weight_upper=missing_weight_upper,
         Q_lower=Q_lower,
         Q_upper=Q_upper,
+        bound_scope=total.bound_scope,
+        uncontrolled_errors=total.uncontrolled_errors,
     )
 
 
@@ -530,6 +623,8 @@ def enclose_pitch_band_fraction(
     function does not promote convergence differences into error bounds: the
     caller must supply a justified absolute error and describe its scope.
     """
+    if not denominator.is_certified:
+        raise ValueError("denominator bounds must be certified for an enclosure")
     if denominator.lower <= 0.0:
         raise ValueError("denominator lower bound must be positive")
     if (
@@ -537,8 +632,9 @@ def enclose_pitch_band_fraction(
         or pitch_weight_absolute_error < 0.0
     ):
         raise ValueError("pitch-weight error must be finite and nonnegative")
-    if not bound_scope.strip():
-        raise ValueError("bound_scope must describe the certified error scope")
+    _validate_bound_scope(bound_scope)
+    if bound_scope not in {"model_enclosure", "field_enclosure"}:
+        raise ValueError("pitch-band bounds require model or field enclosure scope")
     if estimate.trapping_scope == "dense_line_surface_maximum":
         if not estimate.surface_maximum_is_certified_exact:
             raise ValueError(
@@ -577,6 +673,33 @@ def _coordinate_grids(
     )
 
 
+def _broadcast_bool_mask(
+    values: ArrayLike, shape: tuple[int, ...], name: str
+) -> BoolArray:
+    array = np.asarray(values)
+    if array.dtype != np.bool_:
+        raise ValueError(f"{name} must contain booleans")
+    try:
+        array = np.broadcast_to(array, shape)
+    except ValueError as error:
+        raise ValueError(f"{name} must broadcast over the population grid") from error
+    return np.asarray(array)
+
+
+def _slice_radial_density(
+    context: PopulationContext, b: float, trapped: BoolArray
+) -> FloatArray:
+    integrand = np.zeros_like(context.B)
+    denominator = np.sqrt(1.0 - context.B[trapped] / b)
+    integrand[trapped] = 1.0 / (context.B[trapped] * denominator)
+    return (
+        context.source_values
+        * context.absolute_C
+        * context.angular_measure_per_node
+        * np.sum(integrand, axis=(1, 2))
+    )
+
+
 def _source_values(source_profile: SourceProfile, rho: FloatArray) -> FloatArray:
     values = np.asarray(source_profile(rho), dtype=float)
     try:
@@ -588,6 +711,12 @@ def _source_values(source_profile: SourceProfile, rho: FloatArray) -> FloatArray
     if not np.all(np.isfinite(values)) or np.any(values < 0.0):
         raise ValueError("source profile must be finite and nonnegative")
     return np.asarray(values)
+
+
+def _validate_bound_scope(bound_scope: str) -> None:
+    if bound_scope not in BOUND_SCOPES:
+        allowed = ", ".join(sorted(BOUND_SCOPES))
+        raise ValueError(f"bound_scope must be one of: {allowed}")
 
 
 def _profile_values(values: ArrayLike, nodes_s: FloatArray, name: str) -> FloatArray:

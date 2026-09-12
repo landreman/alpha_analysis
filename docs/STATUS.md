@@ -62,8 +62,11 @@ do not relax the fast/full test-suite budgets.
   field enclosures or accessibility classifications. The nonsingular whole-band
   fraction changed by at most 3.351e-4 between the recorded grids, but individual
   fixed-b tensor estimates changed by as much as 46.8% near their integrable
-  singularity. R1 must retain explicit incomplete/root/quadrature outcomes and
-  must not promote those slice grid differences into bounds.
+  singularity; the diagnostics show that coarse/fine spread explicitly. R1 should
+  return `LinewiseTrappingMasks` from its scans: definite and possible masks plus
+  a reason keep incomplete roots in the population interval, while the scalar
+  accessor rejects unresolved weight. Do not promote slice grid differences into
+  bounds.
 - Existing public functions, CLI entry points and legacy mesh/extractor tests
   remain compatibility obligations. The old numerical path is also a useful
   reference on cases it resolves; it is not the production prerequisite for R2–R8.

@@ -119,6 +119,7 @@ def run(repository: Path, output: Path, report: Path, plot_directory: Path) -> N
                 DenominatorConfig(config.n_s, config.n_theta, config.n_zeta),
             ).V_h
 
+        coarse_slices = []
         fine_slices = []
         for lambda_n in LAMBDA_N:
             b = bounds.refined_min + lambda_n * (
@@ -128,6 +129,7 @@ def run(repository: Path, output: Path, report: Path, plot_directory: Path) -> N
                 label: compute_population_slice(context, b, dense_line_assumption=True)
                 for label, context in contexts.items()
             }
+            coarse_slices.append(estimates["coarse"])
             fine_slices.append(estimates["fine"])
             difference = abs(
                 estimates["fine"].total_weight - estimates["coarse"].total_weight
@@ -167,6 +169,7 @@ def run(repository: Path, output: Path, report: Path, plot_directory: Path) -> N
             fine_slices,
             field_label=filename,
             source_label="h(rho)=1",
+            comparison_slices=coarse_slices,
             output_path=plot_path,
         )
         plt.close(figure)

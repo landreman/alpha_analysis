@@ -42,6 +42,7 @@ from .denominator import (
 )
 from .field import BoozerFieldLike
 from .population import (
+    LinewiseTrappingMasks,
     OwnedWeightBounds,
     PitchBandEstimate,
     PitchBandFractionBounds,
@@ -163,6 +164,7 @@ __all__ = [
     "GmshBackgroundMeshBackend",
     "GmshBackgroundMeshConfig",
     "MarchingTetrahedraExtractor",
+    "LinewiseTrappingMasks",
     "OwnedWeightBounds",
     "PitchBandEstimate",
     "PitchBandFractionBounds",
