@@ -42,6 +42,8 @@ researcher has already accepted.
 accepted basis for the active R0–R8 plan in DESIGN §23. The old cut implementation
 and its evidence remain available; completing it is not a prerequisite for the
 new production path.
+[ADR 0011](0011-pre-r4-feasibility.md) inserts the researcher-requested R3.5
+feasibility milestone before R4, retaining ADR 0010's algorithm and final contract.
 
 | ADR | Recorded status | Scope and current disposition |
 | --- | --- | --- |
@@ -55,3 +57,4 @@ new production path.
 | [0008 — Degenerate cut endpoints](0008-degenerate-endpoint-events.md) | Superseded by 0010 | Historical proposal; legacy implementation not retroactively accepted. |
 | [0009 — Matrix resolved-fraction shortfall](0009-matrix-resolved-fraction-shortfall.md) | Superseded by 0010 | Keep 32/10/77/1 outcomes and the failed 35% result as historical evidence. |
 | [0010 — Branch atlas and bounded f](0010-branch-atlas-and-bounded-f.md) | Accepted | Active metric, representation, uncertainty, acceptance, runtime, and migration decisions. |
+| [0011 — Pre-R4 feasibility milestone](0011-pre-r4-feasibility.md) | Accepted | Researcher-directed R3.5 insertion; R4 depends on demonstrated root/contour/atlas feasibility. No numerical implementation or R8 success is accepted by this planning change. |

@@ -196,6 +196,10 @@ source used in an unreproduced exploratory measurement.
 
 ### Start the active milestone sequence from main
 
+**2026-09-12 amendment:** [ADR 0011](0011-pre-r4-feasibility.md) records the
+researcher's insertion of R3.5 between R3 and R4 after PR #29 merged. The original
+sequence below is retained as history; current dependencies are in DESIGN §23.
+
 The approved sequence is R0 baseline and population ledger; R1 shared forward
 catalogue and batched \(A\)/\(K\); R2 branch atlas and local height fields;
 R3 independent continuous contour follower; R4 ordinary finite-atom

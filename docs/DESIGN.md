@@ -3,11 +3,13 @@
 **Repository:** `https://github.com/landreman/alpha_analysis`
 **Active plan:** branch-labelled well atlas and bounded accessibility, adopted 2026-09-11
 **Decision:** [ADR 0010](adr/0010-branch-atlas-and-bounded-f.md)
-**Work queue:** §23 and [STATUS.md](STATUS.md); the next milestone is **R0**
+**Work queue:** §23 and [STATUS.md](STATUS.md), which records the next active milestone
 
 This document is normative. It specifies the intended algorithm, not a claim that
 all described modules already exist. Sections 3–5 retain the physical metric and
-transition rules. R0–R8 replace the unfinished development sequence 10.3–18.
+transition rules. R0–R8, including R3.5 between R3 and R4, replace the unfinished
+development sequence 10.3–18. [ADR 0011](adr/0011-pre-r4-feasibility.md) records
+the researcher-directed R3.5 insertion after merging R3.
 Historical milestones 0–10.2 remain completed under their original criteria;
 10.3 is retired **without being marked complete**. Do not restart it to satisfy
 an obsolete cut-coverage target.
@@ -1430,8 +1432,10 @@ it does not waive scientific checks or the Tests workflow.
 
 ## 23. Active development milestones
 
-Only **R0–R8** form the active queue. Select the first unchecked active milestone
-whose listed dependencies are complete with green Tests on the chosen code baseline.
+Only **R0, R1, R2, R3, R3.5, R4, R5, R6, R7, R8** form the active queue.
+R3.5 is a required feasibility milestone, not an optional optimization. Select the
+first unchecked active milestone whose listed dependencies are complete with green
+Tests on the chosen code baseline.
 Do not select an unchecked row from historical status. A request for a retired
 number should be mapped through this table and explained, not silently implemented.
 
@@ -1441,7 +1445,8 @@ number should be mapped through this table and explained, not silently implement
 | R1 | Efficient shared forward scans and bounce integrals | R0 | old 6, measured part of 18 |
 | R2 | Root-labelled atlas and barrier-height transitions | R1 | old 3–5, 7–10.x as production path |
 | R3 | Independent continuous contour oracle | R2 | old 11 |
-| R4 | Bounded ordinary action-bin accessibility | R3 | old 12 |
+| R3.5 | Practical root certification and contour feasibility | R3 | R2/R3 feasibility follow-up |
+| R4 | Bounded ordinary action-bin accessibility | R3.5 | old 12 |
 | R5 | Transitions, cycles and global uncertainty | R4 | old 13 |
 | R6 | Weighted pitch-slice bounds and persistence | R5 | old 14–15 |
 | R7 | Outer fraction and birth-space validation | R6 | old 16 plus independent validation |
@@ -1532,10 +1537,103 @@ evidence, not an unbiased loss estimate.
 **Mutations:** omit a transition branch or a radial gradient term; accept an
 unfinished contour as closed. Do not assume agreement near PL uncertainty boundaries.
 
+### R3.5 — Practical root certification and contour feasibility
+
+**Goal:** make the R2 atlas and R3 oracle useful on real ordinary branches before
+building R4 accessibility. Repair the demonstrated scan-partition obstruction,
+improve bounded seed coverage, and discover and continue local generic events.
+R3 remains complete; its partial oracle and original failure evidence are the
+baseline, not proof of practical feasibility. See the
+[implementation brief](plans/r3-5-feasibility.md) for the fixed probes, diagnostic
+reproducers, and suggested implementation order. This section defines acceptance.
+
+**Depends on:** R3 merged in PR #29 and the plan-bearing baseline with green Tests.
+The approved physical metric, bound scopes, final accuracy targets, numerical
+dependency boundaries and §22 budgets remain unchanged. This milestone adds no
+base dependency.
+
+**Deliver:**
+
+- A deterministic, bounded seed search over transverse support and lifted windows,
+  reusing/resuming R1 scans. Report every attempted location, window and terminal;
+  distinguish no seed found from independently proved empty population. Keep the
+  original five-location probes as a separate, unchanged comparison cohort.
+- Certificates for continued incoming/first-outgoing roots that can move across
+  arbitrary scan nodes. Moving root tubes or coalesced longitudinal brackets must
+  prove uniform endpoint signs, root uniqueness/orientation and ordering, and
+  exclude every possible intervening barrier using validated local bounds.
+  Removing the current rejection without replacing its proof is forbidden.
+- Apply the certificate to R2 cell ownership and R3 contour segments. A selected
+  well query need not certify unrelated roots outside its guarded root pair;
+  atlas multiplicity still requires complete owned-root coverage and a disjoint
+  unknown complement. Preserve radial/seam matching and lifted identities.
+- Safeguarded ordinary root continuation and automatic local event discovery when
+  a bounce becomes marginal or an interior barrier approaches b. Locate the event
+  at the contour's adopted action and common physical parameter; bind and attempt
+  every incident root-labelled port, check one-sided action limits, and continue
+  into ordinary states. Caller-supplied exact events are reference comparisons,
+  not the only way the production oracle encounters an event. Degeneracies,
+  unfinished branches and exhausted budgets remain unknown.
+- Structured diagnostics separating root isolation, interval/barrier uncertainty,
+  event discovery, continuation, quadrature and each exhausted work budget. Make
+  refinement limits explicit and account for all repeated/failed work. Include
+  root-tube, contour/event and known/unknown atlas-coverage plots (§17).
+
+**Acceptance:** named tests on the production path establish the following.
+
+| Named test | Required invariant or result |
+| --- | --- |
+| `test_seed_search_resumes_without_hiding_unseen_wells` | Recover analytic wells outside the initial transverse search or scan window; preserve lifts/first returns when resuming; an exhausted search never proves zero population. |
+| `test_root_certificate_survives_scan_node_crossing` | The analytic translated ordinary well in the brief certifies at roots on and between scan nodes, at both specified cell widths, with physical orientation and periodic lifts preserved. |
+| `test_moving_root_certificate_retains_hidden_barriers` | A narrow barrier/two-crossing adversary cannot be certified as one ordinary well; an irrelevant below-b fold preserves its branch. Use analytic or independent expectations. |
+| `test_selected_well_certificate_preserves_atlas_coverage` | An unrelated ambiguous root outside the selected guarded well need not veto that query, while ambiguity inside the well or in atlas ownership remains accounted for. Check disjoint ownership and the sample-count/cell-certificate guard. |
+| `test_contour_discovers_and_continues_generic_event` | From an ordinary seed, without a supplied exact event, independently locate a synthetic event and continue all permitted ports at the same event parameter and their own actions. Missing discovery or a missing branch cannot yield false negative closure. |
+| `test_real_contour_feasibility_regressions` | Classify the original DMercFail 0.8 interior query and d23p4 0.1 interior-start query at both controlled resolutions, with independent root/action checks supporting the terminal status. Also discover a real DMercFail generic event from an ordinary seed and continue every port into ordinary states, with independent marginal-root and one-sided action checks. Split into small tests if needed for §22.5. |
+| `test_real_atlas_corridors_match_continued_roots` | On every reference field, a direct ordinary contour segment crosses adjacent certified positive-multiplicity atlas cells with matching root identity and ownership. Cover the classified real regression paths by corresponding atlas corridors; isolated vanishing patches or certified empty cells alone do not satisfy this requirement. |
+| `test_r3_5_feasibility_matrix_preserves_cases_and_gates` | Validate saved reproducible evidence for all 30 cases, both refinement levels, the fixed original query cohort, the real gates above, the diagnosis of all eight certificate-blocked baseline probes, and the per-case runtime guard. A schema-only validator is insufficient. |
+
+The eight baseline probes blocked after numerical closure/edge arrival must each
+either classify or have an independently verified physical obstruction to ordinary
+continuation of the selected well, such as an actual marginal event on its path.
+Another opaque certificate failure,
+scan-node coincidence or budget terminal does not satisfy this diagnosis gate.
+A verified event with unresolved global continuation may remain unknown; R3.5
+does not require R5's full transition graph or cycle closure. Do not assume the
+baseline's numerical closure/edge intersection supplies the expected classification.
+
+Run and preserve all 30 physical cases at two controlled atlas/contour resolutions,
+including the original R2 domains and R3 seeds. Report original and expanded search
+completion separately; report certified positive-well area/owned measure and
+unknown coverage on fixed domains, rather than treating a larger cell count as
+coverage improvement. Record both local certificate gains and the corridors used
+by the real tests. The R3.5 matrix has a 600-second wall guard per physical case,
+including its cold setup and all required query/refinement work; record active
+60/300/600-second snapshots, hardware, workers, source h=1, hashes and controls.
+Warm/shared timings are additional measurements. These local experiments do not
+establish the full-equilibrium R8 runtime or f accuracy. Preserve R2/R3 saved
+evidence; write the new report/JSON and reproducible driver separately.
+
+**Mutations:** suppress an interior-barrier exclusion or permit an uncertified
+root pair; omit a discovered incident port or treat unsuccessful event discovery
+as closed. Apply and revert at least one certificate mutation and one event
+mutation, and record the named fast tests that fail. Retain R1–R3 regressions.
+
+**Exit to R4:** all named gates, real evidence and §28/AGENTS definition of done
+must pass. Merely improving seed counts, passing synthetics or recording 30 unknown
+outcomes does not complete R3.5. If a required real gate remains unattainable,
+leave R3.5 unchecked, preserve the failure, and follow the new-ambiguity/failed-
+criterion ADR process rather than advancing R4 or relaxing an existing tolerance.
+Action/gradient quadrature estimates remain labelled estimates; field-level
+weighted bounds, global uncertainty propagation and f acceptance belong to R4–R8.
+
 ### R4 — Bounded ordinary action-bin accessibility
 
 **Goal:** terminate with correct lower/upper action-contour accessibility without
 transitions, including uncertain chart/field data.
+
+**Prerequisite:** completed R3.5, including its real atlas corridors and classified
+oracle queries. Use these as production comparisons; an unknown oracle terminal
+cannot establish either accessibility or inaccessibility.
 
 **Acceptance:** `test_ordinary_bounds_bracket_direct_contours`;
 `test_disconnected_equal_action_branches_do_not_connect`;
@@ -1655,6 +1753,8 @@ or a full matrix run; check document consistency and disclose known baseline fai
 of mandatory surface cutting, active R0–R8 sequence, migration policy and bounds
 contract. The physical state remains the incoming bounce point; only its numerical
 representation changes. Local charts do not assume a global single-valued action.
+[ADR 0011](adr/0011-pre-r4-feasibility.md) inserts R3.5 before R4 without reopening
+that representation decision or changing R8's accuracy/runtime contract.
 
 Old ADRs 0001–0006 remain explanations of retained legacy implementations.
 The proposed policies in 0007/0008 are superseded for new development, not a blanket
@@ -1672,8 +1772,8 @@ transition model is a different metric and requires a separate design decision.
 
 ## 28. Definition of done
 
-The redesigned calculation is complete only when R0–R8 meet their named tests,
-required diagnostics, source-aware field-level bounds, five-equilibrium accuracy
-and runtime evidence, compatibility gates and green GitHub Tests. An accepted
+The redesigned calculation is complete only when R0–R8, including R3.5, meet their
+named tests, required diagnostics, source-aware field-level bounds, five-equilibrium
+accuracy and runtime evidence, compatibility gates and green GitHub Tests. An accepted
 planning document, successful cut, informative failure report or narrow model-only
 interval is not completion of the scientific calculation.

@@ -8,8 +8,11 @@ so.
 `docs/STATUS.md` records which milestones are done. `docs/adr/` records decisions taken
 during implementation that `docs/DESIGN.md` did not settle.
 
-The active plan is the R0–R8 sequence in `docs/DESIGN.md` §23, adopted by accepted
-`docs/adr/0010-branch-atlas-and-bounded-f.md`. Choose the next active milestone from
+The active plan is the R0–R8 sequence, including **R3.5 between R3 and R4**, in
+`docs/DESIGN.md` §23. Accepted `docs/adr/0010-branch-atlas-and-bounded-f.md` adopts
+the algorithm; `docs/adr/0011-pre-r4-feasibility.md` records the researcher-directed
+R3.5 insertion. R4 requires completed R3.5; its implementation brief is
+`docs/plans/r3-5-feasibility.md`. Choose the next active milestone from
 `docs/STATUS.md` and the dependencies in `docs/DESIGN.md` §23. Legacy 10.3 is
 retired **without completion** and legacy 11–18 are superseded. Do not restart
 the old lowest-numbered unchecked milestone.

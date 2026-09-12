@@ -13,8 +13,8 @@ implementation milestone complete.
 
 ## Active plan
 
-**Next milestone: R4. R0–R3 are complete.** Follow the dependencies in `DESIGN.md`
-§23; retired milestones are not prerequisites.
+**Next milestone: R3.5. R0–R3 are complete; R4 depends on R3.5.** Follow the
+dependencies in `DESIGN.md` §23; retired milestones are not prerequisites.
 
 | ID | Milestone | Goal | Done | PR |
 | --- | --- | --- | --- | --- |
@@ -22,6 +22,7 @@ implementation milestone complete.
 | R1 | Efficient shared forward scans and bounce integrals | Share field-line scans, enumerate maximal wells, and evaluate batched \(A,K\) with error accounting | [x] | #27 |
 | R2 | Root-labelled atlas and barrier-height transitions | Build local well charts, explicit seam ownership and certified generic transition relations | [x] | #28 |
 | R3 | Independent continuous contour oracle | Follow constant-action contours and permitted branch transitions without relying on the atlas reachability implementation | [x] | #29 |
+| R3.5 | Practical root certification and contour feasibility | Improve seed coverage, certify moving roots and real atlas corridors, and automatically discover/continue local generic events before R4 | [ ] | |
 | R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [ ] | |
 | R5 | Transitions, cycles and global uncertainty | Transfer through common-parameter ports and propagate uncertain connectivity globally with finite termination | [ ] | |
 | R6 | Weighted pitch-slice bounds and persistence | Produce restartable slice bounds with complete weighted-population accounting | [ ] | |
@@ -43,6 +44,16 @@ do not relax the fast/full test-suite budgets.
 
 ## Baseline and next-step notes
 
+- PR #29 is merged (`39c1efd`, implementation head `45f2d73`). The researcher
+  requested R3.5 before R4; [ADR 0011](adr/0011-pre-r4-feasibility.md) records the
+  insertion. Follow [DESIGN §23](DESIGN.md#r35--practical-root-certification-and-contour-feasibility)
+  and the [R3.5 implementation brief](plans/r3-5-feasibility.md). This planning
+  update implements no numerical machinery and does not mark R3.5 complete.
+  Preserve the R2/R3 matrices as baselines. The fixed R3 fine cohort contains
+  13 no-seed cases, seven uncertified numerical closures, one uncertified edge
+  query and nine continuation failures. Seed recovery alone cannot satisfy the
+  new gate: real classifications, event continuation and certified atlas corridors
+  are required. R4 must wait for R3.5 acceptance and green Tests.
 - R0 verified the green plan-bearing `main` baseline and imported no implementation
   code from PR #24. That PR remains the incomplete milestone-10.3 branch, not an
   accepted redesign baseline, and must not be merged as-is. Its branch, validation
@@ -104,16 +115,18 @@ do not relax the fast/full test-suite budgets.
   chart ownership; §10.1 branch
   binding must precede their use as certified transitions. §8.2 matching across
   neighboring radii and §10.4 port curves, monotone/constant segments, full
-  preimages and self-transitions are deferred to R3–R5. Do not infer those links
-  from coordinate proximity. Production `transition_at` checks marginal endpoints
+  preimages and self-transitions are deferred to R3.5–R5. R3.5 owns the local
+  branch binding and one-sided action checks needed by its discovered events;
+  R5 still owns the complete transfer/parameter-preimage machinery. Do not infer
+  those links from coordinate proximity. Production `transition_at` checks
+  marginal endpoints
   and action partition consistency; independent one-sided action limits are
   test-only and must become a production check before R5 certifies transfers.
-  R4–R5 should exercise the sample-count/cell-certificate mismatch guard before
+  R3.5 must exercise the sample-count/cell-certificate mismatch guard before
   using atlas cells for weighted reachability. These are finite
-  represented-field/model results, not field or \(f\) enclosures. R3 should use
-  an independent continuous contour
-  oracle to challenge atlas connectivity, including enclosed crossings and
-  unresolved global links.
+  represented-field/model results, not field or \(f\) enclosures. R3's independent
+  continuous contour oracle and R3.5's feasibility improvements should challenge
+  atlas connectivity, including enclosed crossings and unresolved global links.
 - R3's [direct-contour matrix](validation/r3-contour-matrix.md) probes all 30
   prescribed field/pitch cases at two step sizes with fixed interior seed
   choices. It classifies 0/17 seeded cases; 13/30 find no complete seed in the
