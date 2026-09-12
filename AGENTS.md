@@ -9,9 +9,10 @@ so.
 during implementation that `docs/DESIGN.md` did not settle.
 
 The active plan is the R0–R8 sequence in `docs/DESIGN.md` §23, adopted by accepted
-`docs/adr/0010-branch-atlas-and-bounded-f.md`. All redesign milestones are initially
-unchecked; R0 is next. Legacy 10.3 is retired **without completion** and legacy
-11–18 are superseded. Do not restart the old lowest-numbered unchecked milestone.
+`docs/adr/0010-branch-atlas-and-bounded-f.md`. Choose the next active milestone from
+`docs/STATUS.md` and the dependencies in `docs/DESIGN.md` §23. Legacy 10.3 is
+retired **without completion** and legacy 11–18 are superseded. Do not restart
+the old lowest-numbered unchecked milestone.
 Historical notes in `docs/history/` are nonnormative. Approval of the redesign does
 not assert that its numerical machinery is implemented or accept PR #24 as-is.
 

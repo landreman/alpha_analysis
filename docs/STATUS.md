@@ -13,7 +13,7 @@ implementation milestone complete.
 
 ## Active plan
 
-**Next milestone: R3. R0–R2 are complete.** Follow the dependencies in `DESIGN.md`
+**Next milestone: R4. R0–R3 are complete.** Follow the dependencies in `DESIGN.md`
 §23; retired milestones are not prerequisites.
 
 | ID | Milestone | Goal | Done | PR |
@@ -21,7 +21,7 @@ implementation milestone complete.
 | R0 | Baseline migration and independent population ledger | Establish the accepted code baseline, preserve historical evidence and tests, and independently account for trapped population and unresolved weight | [x] | #26 |
 | R1 | Efficient shared forward scans and bounce integrals | Share field-line scans, enumerate maximal wells, and evaluate batched \(A,K\) with error accounting | [x] | #27 |
 | R2 | Root-labelled atlas and barrier-height transitions | Build local well charts, explicit seam ownership and certified generic transition relations | [x] | #28 |
-| R3 | Independent continuous contour oracle | Follow constant-action contours and permitted branch transitions without relying on the atlas reachability implementation | [ ] | |
+| R3 | Independent continuous contour oracle | Follow constant-action contours and permitted branch transitions without relying on the atlas reachability implementation | [x] | #29 |
 | R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [ ] | |
 | R5 | Transitions, cycles and global uncertainty | Transfer through common-parameter ports and propagate uncertain connectivity globally with finite termination | [ ] | |
 | R6 | Weighted pitch-slice bounds and persistence | Produce restartable slice bounds with complete weighted-population accounting | [ ] | |
@@ -114,6 +114,20 @@ do not relax the fast/full test-suite budgets.
   an independent continuous contour
   oracle to challenge atlas connectivity, including enclosed crossings and
   unresolved global links.
+- R3's [direct-contour matrix](validation/r3-contour-matrix.md) probes all 30
+  prescribed field/pitch cases at two step sizes with fixed interior seed
+  choices. It classifies 0/17 seeded cases; 13/30 find no complete seed in the
+  bounded search. A targeted DMercFail \(\lambda_n=0.8\) query at \(s=0.95\)
+  yields a positive edge witness with independently checked action and recorded
+  quadrature error; a numerically closed interior contour lacks a root-pattern
+  certificate. A transverse synthetic event continues every port at its adopted
+  action, while the real three-port event remains unknown after incident branches
+  are attempted. Supplied pointwise events match periodic root lifts. These are
+  represented-field numerical queries with estimated action errors, not field
+  or \(f\) enclosures. R4 must compare only
+  classified oracle paths away from PL uncertainty and retain every failed
+  query as unknown; improving lifted root-window certification and seed search
+  is a feasibility priority, not grounds to treat missing paths as inaccessible.
 - Keep the physical trace direction `sign(G + iota I)`, authoritative half-bounce
   action `A` and time length `K`, lifted root/port identities, and explicit
   `MAX_PERIODS`, root, quadrature and topology failures. A capped or clipped well

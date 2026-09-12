@@ -36,6 +36,15 @@ from .branch_atlas import (
     transition_at,
 )
 from .config import ConnectivityConfig
+from .contour_trace import (
+    ContourConfig,
+    ContourPath,
+    ContourPoint,
+    ContourResult,
+    ContourStatus,
+    DirectContourOracle,
+    plot_contour_result,
+)
 from .critical_curves import (
     CriticalCurveConfig,
     CriticalCurveError,
@@ -160,6 +169,13 @@ from .transition_events import (
 )
 
 __all__ = [
+    "ContourConfig",
+    "ContourPath",
+    "ContourPoint",
+    "ContourResult",
+    "ContourStatus",
+    "DirectContourOracle",
+    "plot_contour_result",
     "AtlasCell",
     "AtlasConfig",
     "AtlasPort",
