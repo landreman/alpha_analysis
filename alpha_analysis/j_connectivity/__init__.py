@@ -17,6 +17,24 @@ from .background_mesh import (
     signed_tetrahedron_volumes,
     tetrahedron_quality,
 )
+from .branch_atlas import (
+    AtlasCell,
+    AtlasConfig,
+    AtlasPort,
+    AtlasSample,
+    AtlasTransition,
+    AtlasWell,
+    BranchAtlas,
+    HeightSample,
+    build_atlas,
+    classify_cell,
+    height_at,
+    identify_lifted_overlap,
+    plot_atlas_diagnostics,
+    refine_atlas_cell,
+    seam_image,
+    transition_at,
+)
 from .config import ConnectivityConfig
 from .critical_curves import (
     CriticalCurveConfig,
@@ -142,6 +160,22 @@ from .transition_events import (
 )
 
 __all__ = [
+    "AtlasCell",
+    "AtlasConfig",
+    "AtlasPort",
+    "AtlasSample",
+    "AtlasTransition",
+    "AtlasWell",
+    "BranchAtlas",
+    "HeightSample",
+    "build_atlas",
+    "classify_cell",
+    "height_at",
+    "identify_lifted_overlap",
+    "plot_atlas_diagnostics",
+    "refine_atlas_cell",
+    "seam_image",
+    "transition_at",
     "BounceIntegral",
     "CatalogueLinewisePredicate",
     "ForwardLineCatalogue",

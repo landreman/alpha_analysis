@@ -139,6 +139,11 @@ class SyntheticFourierField:
         """Return rotational transform as a polynomial in normalized flux."""
         return self._polynomial(self.iota_coefficients, s)
 
+    def diota_ds(self, s: ArrayLike) -> FloatArray:
+        """Return radial shear d iota/ds for the local height gradient (§10.1)."""
+        coefficients = np.polynomial.polynomial.polyder(self.iota_coefficients)
+        return self._polynomial(coefficients, s)
+
     def G(self, s: ArrayLike) -> FloatArray:
         """Return the Boozer toroidal-current profile in its supplied units."""
         return self._polynomial(self.G_coefficients, s)

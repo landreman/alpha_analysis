@@ -1,0 +1,2741 @@
+{
+  "milestone": "R2",
+  "source": "h(rho)=1 (declared benchmark; atlas geometry is source independent)",
+  "scope": "finite Fourier-model atlas probes; no field, K-weight, reachability or f enclosure",
+  "hardware": "macOS-14.7.6-arm64-arm-64bit",
+  "workers": 1,
+  "cache_state": "new field objects; warm OS cache uncontrolled",
+  "code_sha256": "7324c3a1ee8c3c84508c18b15ccf0254385b45f7dbd76f277e6ab4688ee3ce05",
+  "code_hashes": {
+    "alpha_analysis/j_connectivity/branch_atlas.py": "7324c3a1ee8c3c84508c18b15ccf0254385b45f7dbd76f277e6ab4688ee3ce05",
+    "alpha_analysis/j_connectivity/forward_catalogue.py": "e837ee181d8b3aa17c3bf717ea9042f512b4a1a6ccbe054424676d0f4da50750",
+    "alpha_analysis/j_connectivity/synthetic_fields.py": "ad3be8a4de26125c561daf102bd42b8eed254595fdd2408abdf325ebac03dcb3",
+    "alpha_analysis/boozer_field.py": "1132eeb1e3e528dde2bfd6b5490d0e118cc02a05852de68a60e1c4423e1ad2ac",
+    "examples/validate_r2_atlas.py": "039381041a6684418c85db510cedbf720cda5b6706624f5a3cadba13e7abcc79"
+  },
+  "git_head": "4ec8d2918a6e3fdb72ea1d3b8ae282c172540bdb",
+  "pitch_bounds_source_sha256": "f777d14e6f37935b6fc00fe0191142d53057cb0a8e8a3cc46200f7dbca26cce3",
+  "cases": [
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.05,
+      "b": 7.9314345648115845,
+      "load_seconds": 0.009124582982622087,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 3,
+        "samples_with_censored_or_unknown_scan": 1,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 3,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6997325419797562,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 5,
+        "samples_with_censored_or_unknown_scan": 1,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.1241225830162875,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.11160787503467873
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.11078608297975734
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.027981791994534433
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.028170457982923836
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.1,
+      "b": 8.147184858800973,
+      "load_seconds": 0.009124582982622087,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 3,
+        "samples_with_censored_or_unknown_scan": 3,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 3,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6501553329871967,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 12,
+        "samples_with_censored_or_unknown_scan": 7,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.192805833008606,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.11294816702138633
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.99999999995339e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.27832845802186057
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.03047229105141014
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02839533402584493
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.5,
+      "b": 9.873187210716075,
+      "load_seconds": 0.009124582982622087,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 6,
+        "samples_with_censored_or_unknown_scan": 12,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 6,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.7979009579867125,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 28,
+        "samples_with_censored_or_unknown_scan": 40,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.6305189999984577,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.13452554203104228
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.2939648340106942
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.03062529204180464
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.03094454202800989
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.8,
+      "b": 11.167688974652405,
+      "load_seconds": 0.009124582982622087,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.7055383749539033,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 32,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.565315375046339,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.03350583300925791
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.029601624992210418
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.9,
+      "b": 11.59918956263118,
+      "load_seconds": 0.009124582982622087,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6864316249848343,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.7430437919683754,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.029884875053539872
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.0294838750269264
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-038_Ax_PCA_20dofs_allNfp_aspect6_eval000290_low_resolution.nc",
+      "file_index": 0,
+      "sha256": "49eec0d9ff88fb52cc377be7d190da35b6815210baa36c5daee2bea7f6ab3fbd",
+      "lambda_n": 0.95,
+      "b": 11.814939856620569,
+      "load_seconds": 0.009124582982622087,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6946587500278838,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.6942372909979895,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.031777249998413026
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.034090208006091416
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.05,
+      "b": 7.576918032939711,
+      "load_seconds": 0.005522541992831975,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 2,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.7187987079960294,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.7980329580022953,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.19574441603617743
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.99999999995339e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.38760550000006333
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.04374400002416223
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.043110832979436964
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.1,
+      "b": 7.811419099418058,
+      "load_seconds": 0.005522541992831975,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 2,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.8684134170180187,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 3,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.3347595839877613,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.11848904204089195
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.10982812504516914
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.03292670799419284
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.028100499999709427
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.5,
+      "b": 9.68742763124483,
+      "load_seconds": 0.005522541992831975,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 7,
+        "samples_with_censored_or_unknown_scan": 12,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 7,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6904356669983827,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 26,
+        "samples_with_censored_or_unknown_scan": 40,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.1066140420152806,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.17482945800293237
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.351051333011128
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.03047291695838794
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.03127237502485514
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.8,
+      "b": 11.094434030114908,
+      "load_seconds": 0.005522541992831975,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 4,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 4,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6276553749921732,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 13,
+        "samples_with_censored_or_unknown_scan": 32,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.0727931250003166,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 3.141592653589793,
+        "coarse_cell_index": 6,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179587,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 8.881784197001252e-16,
+            "elapsed_seconds": 0.11160395899787545
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999975593e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.23297679203096777
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.025695292046293616
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.026225166977383196
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.9,
+      "b": 11.563436163071602,
+      "load_seconds": 0.005522541992831975,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5641703330329619,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 32,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.0678435000008903,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02687870798399672
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.026566624990664423
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260402-01-178_TURBO_Garabedian_mpol1_xmin0p1_allNfp_aspect6_eval000155.nc",
+      "file_index": 1,
+      "sha256": "ec583795826f7b9cb213d0c63977ecc03b1e72e98bcc53de9a0621f17934202e",
+      "lambda_n": 0.95,
+      "b": 11.797937229549948,
+      "load_seconds": 0.005522541992831975,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6012452080030926,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9740291250054725,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.025808375037740916
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.025934292003512383
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.05,
+      "b": 5.390959775428983,
+      "load_seconds": 0.0038497080095112324,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 9,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 9,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.647090875019785,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 32,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.0601566249970347,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185207179586,
+            "refined_known_multiplicity_area": 9.999999999998898e-08,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.22708645899547264
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.22992162499576807
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.025085332978051156
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.02657045901287347
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.1,
+      "b": 5.741453657785587,
+      "load_seconds": 0.0038497080095112324,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 9,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 9,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6774924169876613,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 33,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.078508458973374,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185207179586,
+            "refined_known_multiplicity_area": 9.999999999998898e-08,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.22573312500026077
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.22080249997088686
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.025241583993192762
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.02490387501893565
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.5,
+      "b": 8.545404716638414,
+      "load_seconds": 0.0038497080095112324,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 9,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 9,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6317353330086917,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 33,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.0963580409879796,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185207179586,
+            "refined_known_multiplicity_area": 9.999999999998898e-08,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.2235410829889588
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.21945412503555417
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.026032708992715925
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 1,
+          "reason": null,
+          "elapsed_seconds": 0.02612337499158457
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.8,
+      "b": 10.648368010778036,
+      "load_seconds": 0.0038497080095112324,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 8,
+        "samples_with_censored_or_unknown_scan": 2,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 8,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6847024579765275,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 31,
+        "samples_with_censored_or_unknown_scan": 4,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.2164282499579713,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 0.0,
+        "coarse_cell_index": 4,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185207179586,
+            "refined_known_multiplicity_area": 9.999999999998898e-08,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.284525458002463
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999954491e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.23523037502309307
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.024868124979548156
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.03876166703412309
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.9,
+      "b": 11.34935577549124,
+      "load_seconds": 0.0038497080095112324,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 4,
+        "samples_with_censored_or_unknown_scan": 6,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 4,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5950460829772055,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 11,
+        "samples_with_censored_or_unknown_scan": 30,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.007693665975239,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 3.141592653589793,
+        "coarse_cell_index": 6,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185207179587,
+            "refined_known_multiplicity_area": 9.999999999997797e-08,
+            "area_partition_error": 8.881784197001252e-16,
+            "elapsed_seconds": 0.23717650002799928
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.999999999975593e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.24538491701241583
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.025166124978568405
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.025794791989028454
+        }
+      ]
+    },
+    {
+      "file": "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc",
+      "file_index": 2,
+      "sha256": "43346b456ee4b2654b2d6d13e9d85837ab7051de1b015b5a763c55f8007bbda7",
+      "lambda_n": 0.95,
+      "b": 11.699849657847844,
+      "load_seconds": 0.0038497080095112324,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5754112499998882,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 32,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9663957500015385,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.024542083963751793
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02539470902411267
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.05,
+      "b": 2.34693551572541,
+      "load_seconds": 0.0041787499794736505,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 4,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 4,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5850072919856757,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 13,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9458864579792134,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.1024077910115011
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.99999999995339e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.21386987500591204
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.024552083981689066
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.025351958989631385
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.1,
+      "b": 2.4008120098047856,
+      "load_seconds": 0.0041787499794736505,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 6,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 6,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6054422919987701,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 26,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9936218750081025,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.10011820797808468
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.99999999995339e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.2153153329854831
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.02646762499352917
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.02536554099060595
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.5,
+      "b": 2.831823962439789,
+      "load_seconds": 0.0041787499794736505,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 6,
+        "samples_with_censored_or_unknown_scan": 3,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 6,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.6192025839700364,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 24,
+        "samples_with_censored_or_unknown_scan": 16,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 2.030282374995295,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 0.5,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.09979866701178253
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": 1,
+            "target_reason": null,
+            "refined_unknown_area": 6.283185306179586,
+            "refined_known_multiplicity_area": 9.99999999995339e-10,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.25354558299295604
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.026008040993474424
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.02434595802333206
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.8,
+      "b": 3.155082926916042,
+      "load_seconds": 0.0041787499794736505,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 1,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 1,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.552676416002214,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 3,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9758546659722924,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 3.141592653589793,
+        "coarse_cell_index": 6,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179587,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 8.881784197001252e-16,
+            "elapsed_seconds": 0.1322397079784423
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.12955816701287404
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.0240109579754062
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02390916703734547
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.9,
+      "b": 3.2628359150747928,
+      "load_seconds": 0.0041787499794736505,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5592732499935664,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 1,
+        "unknown_cells": 31,
+        "unknown_geometric_area": 6.086835766330228,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.9455469160457142,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02446916699409485
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.033954375016037375
+        }
+      ]
+    },
+    {
+      "file": "boozmn_d23p4_tm_ns51_mbooz16_nbooz16.nc",
+      "file_index": 3,
+      "sha256": "c99156e12f828b58798b959d7768307aeb5415900f0860b4e3825156bfc4f36c",
+      "lambda_n": 0.95,
+      "b": 3.316712409154168,
+      "load_seconds": 0.0041787499794736505,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 4,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5725562089937739,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 16,
+        "certified_cells": 1,
+        "unknown_cells": 31,
+        "unknown_geometric_area": 6.086835766330228,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.911113291978836,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.023793250031303614
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.024961750023066998
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.05,
+      "b": 5.017287700966896,
+      "load_seconds": 0.0040212919702753425,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.40412858297349885,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 1,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.4925295829889365,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.01907312497496605
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.01953966700239107
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.1,
+      "b": 5.125314678758602,
+      "load_seconds": 0.0040212919702753425,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.4155157909845002,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 0,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.578587082971353,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.019602916028816253
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.02036512503400445
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.5,
+      "b": 5.989530501092255,
+      "load_seconds": 0.0040212919702753425,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 1,
+        "samples_with_censored_or_unknown_scan": 5,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 1,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.4936317080282606,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 4,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.5220030000200495,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 4.71238898038469,
+        "coarse_cell_index": 7,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179587,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 8.881784197001252e-16,
+            "elapsed_seconds": 0.08317191601963714
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.08301408297847956
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.019935499993152916
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": null,
+          "reason": "possible hidden barrier or transverse root change",
+          "elapsed_seconds": 0.020287082996219397
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.8,
+      "b": 6.637692367842495,
+      "load_seconds": 0.0040212919702753425,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 2,
+        "samples_with_censored_or_unknown_scan": 7,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 2,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.4411853330093436,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 4,
+        "samples_with_censored_or_unknown_scan": 23,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.4956598749849945,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.08946312498301268
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.08878637495217845
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.01936066703638062
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.018593084008898586
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.9,
+      "b": 6.853746323425908,
+      "load_seconds": 0.0040212919702753425,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 1,
+        "samples_with_censored_or_unknown_scan": 8,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 1,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.44180249999044463,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 3,
+        "samples_with_censored_or_unknown_scan": 24,
+        "certified_cells": 0,
+        "unknown_cells": 32,
+        "unknown_geometric_area": 6.283185307179591,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.572593999968376,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "probed",
+        "seed_s": 1.0,
+        "seed_alpha": 1.5707963267948966,
+        "coarse_cell_index": 5,
+        "probes": [
+          {
+            "width_s": 0.0001,
+            "width_alpha": 0.001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.09762216603849083
+          },
+          {
+            "width_s": 1e-05,
+            "width_alpha": 0.0001,
+            "target_count": null,
+            "target_reason": "possible hidden barrier or transverse root change",
+            "refined_unknown_area": 6.283185307179586,
+            "refined_known_multiplicity_area": 0.0,
+            "area_partition_error": 0.0,
+            "elapsed_seconds": 0.09880237496690825
+          }
+        ]
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.020926375000271946
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.020990250050090253
+        }
+      ]
+    },
+    {
+      "file": "boozmn_n3are_R7.75B5.7_mbooz18_nbooz12.nc",
+      "file_index": 4,
+      "sha256": "1b2f8b945f3bee66c473b1c0335fd072e30e183303ebafc2d3776f1d1c29e660",
+      "lambda_n": 0.95,
+      "b": 6.961773301217614,
+      "load_seconds": 0.0040212919702753425,
+      "pitch_source": "R0 radially global extrema estimates, not field bounds",
+      "coarse": {
+        "sample_count": 12,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 4,
+        "certified_cells": 0,
+        "unknown_cells": 8,
+        "unknown_geometric_area": 6.283185307179586,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 0.5108671249472536,
+        "config": {
+          "n_s": 3,
+          "n_alpha": 4,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": true
+        }
+      },
+      "fine": {
+        "sample_count": 40,
+        "owned_sample_wells": 0,
+        "samples_with_censored_or_unknown_scan": 16,
+        "certified_cells": 1,
+        "unknown_cells": 31,
+        "unknown_geometric_area": 6.086835766330228,
+        "known_multiplicity_area": 0.0,
+        "unknown_reasons": [
+          "no validated transverse field envelope",
+          "possible hidden barrier or transverse root change"
+        ],
+        "sampled_actions": 0,
+        "action_scope": "numerical estimate on sampled complete wells, no K-weight bound",
+        "elapsed_seconds": 1.8050537089584395,
+        "config": {
+          "n_s": 5,
+          "n_alpha": 8,
+          "periods": 2,
+          "cell_subdivisions": 8,
+          "compute_actions": false
+        }
+      },
+      "owned_refinement": {
+        "status": "no_complete_seed_on_coarse_grid"
+      },
+      "local_refinement_probes": [
+        {
+          "width_s": 0.01,
+          "width_alpha": 0.1,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.023717249976471066
+        },
+        {
+          "width_s": 0.001,
+          "width_alpha": 0.01,
+          "count": 0,
+          "reason": null,
+          "elapsed_seconds": 0.024845541978720576
+        }
+      ]
+    }
+  ],
+  "dmerc_reference": {
+    "status": "generic",
+    "s": 0.8,
+    "theta": -0.1449506678656578,
+    "alpha": -0.1577992744671513,
+    "zeta": 0.013335706749138119,
+    "field_residual": [
+      0.0,
+      -1.541136349775705e-16
+    ],
+    "curvature": -63.86404621228189,
+    "port_actions": {
+      "child_1": 11.202008500006372,
+      "parent": 22.327691266337105,
+      "child_3": 11.125682766330735
+    },
+    "reason": null,
+    "scope": "represented-field event and numerical A estimates; no field enclosure"
+  },
+  "synthetic_reference": {
+    "status": "multiway_unknown",
+    "port_count": 6,
+    "plot": "synthetic-six-port-atlas.png",
+    "multicover_plot": "synthetic-multicover-atlas.png"
+  },
+  "elapsed_seconds": 90.42715041700285
+}
