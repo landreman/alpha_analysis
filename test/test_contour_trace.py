@@ -1,6 +1,7 @@
 """R3 direct-contour acceptance tests against analytic field geometry (§23)."""
 
 import numpy as np
+import pytest
 from pathlib import Path
 
 from alpha_analysis import BoozerField, DATA_DIR
@@ -11,6 +12,11 @@ from alpha_analysis.j_connectivity.contour_trace import (
     ContourStatus,
 )
 from alpha_analysis.j_connectivity.branch_atlas import transition_at
+from alpha_analysis.j_connectivity.branch_atlas import (
+    AtlasConfig,
+    build_atlas,
+    classify_cell,
+)
 from alpha_analysis.j_connectivity.forward_catalogue import (
     ForwardLineCatalogue,
     ForwardScanConfig,
@@ -69,6 +75,22 @@ def test_direct_contour_reaches_edge_with_constant_action():
     assert witness is not None
     np.testing.assert_allclose(witness.points[-1].s, 1, atol=1e-8)
     assert max(abs(p.action_length - seed.action_length) for p in witness.points) < 2e-5
+
+
+def test_uncertified_edge_path_has_no_accessibility_witness():
+    """An edge intersection without its root certificate stays unknown (§11.1)."""
+    f = field((0.0, 0.15), 0.1)
+    oracle = DirectContourOracle(
+        f, 2.0, ContourConfig(step=0.025, max_steps=300, max_certificate_boxes=1)
+    )
+    result = oracle.query(oracle.seed(0.5, 0.0))
+    assert result.status is ContourStatus.UNKNOWN
+    assert result.witness is None
+    assert all(path.edge_reached for path in result.paths)
+    assert all(
+        path.reason == "edge path has uncertified root topology"
+        for path in result.paths
+    )
 
 
 def test_direct_contour_branches_at_same_event_parameter():
@@ -137,9 +159,59 @@ def test_direct_contour_branches_at_same_event_parameter():
     assert same_event_on_lift.reason == canonical.reason
 
 
-def test_transition_curve_prevents_uncertified_edge_witness():
-    # A real Γmax separates root patterns. An edge intersection through that
-    # pattern cannot become an accessibility witness without a certificate.
+def test_contour_discovers_and_continues_generic_event():
+    """An ordinary seed discovers a synthetic split without an exact event input (§23)."""
+    coeff = np.array([[2, 0], [-1, 0], [0.3, 0.25], [0.1, 0]])
+    f = SyntheticFourierField(
+        1,
+        np.array([0, 0, 0, 1]),
+        np.array([0, 1, 2, 0]),
+        coeff,
+        np.zeros_like(coeff),
+        np.array([0.0]),
+        np.array([3.0]),
+        np.array([0.0]),
+    )
+    alpha = 1.2
+    b = 1.3 + 0.25 * 0.5 + 0.1 * np.cos(alpha)
+    reference = transition_at(f, b, 0.5, alpha, periods=2)
+    oracle = DirectContourOracle(f, b)
+    child = next(port for port in reference.ports if port.role == "child_1")
+    ordinary_seed = oracle._regular_seed_near_port(reference, child)
+    assert ordinary_seed is not None
+    result = oracle.query(ordinary_seed)
+    discovery = result.event_discovery
+    assert discovery is not None and discovery.status == "verified", result.reason
+    event = discovery.event
+    np.testing.assert_allclose(event.parameter, (0.5, alpha), atol=5e-4)
+    assert (
+        abs(1.3 + 0.25 * event.parameter[0] + 0.1 * np.cos(event.parameter[1]) - b)
+        < 1e-9
+    )
+    assert abs(discovery.action_residual) <= oracle.config.action_atol
+    assert {port.role for port in event.ports} == {"parent", "child_1", "child_3"}
+    assert {role for role, _, _ in result.port_outcomes} == {
+        port.role for port in event.ports
+    }
+    actions = {port.role: port.action_length for port in event.ports}
+    np.testing.assert_allclose(
+        actions["parent"], actions["child_1"] + actions["child_3"], atol=1e-8
+    )
+    for port in event.ports:
+        assert port.event_parameter == event.parameter
+        continued = oracle._regular_seed_near_port(event, port)
+        assert continued is not None, port.role
+        assert (
+            abs(continued.action_length - port.action_length)
+            <= oracle.config.action_atol
+        )
+    assert {role for role, _ in discovery.one_sided_action_residuals} == actions.keys()
+
+
+def test_transition_curve_blocks_crossing_path_but_preserves_regular_edge_witness():
+    # One direction approaches Γmax and lacks a regular continuation; the
+    # opposite direction reaches EDGE on a certified ordinary root pair.
+    # A failed direction cannot veto an independent positive witness (§11.1).
     f = SyntheticFourierField(
         1,
         np.array([0, 0, 0, 1]),
@@ -152,10 +224,50 @@ def test_transition_curve_prevents_uncertified_edge_witness():
     )
     oracle = DirectContourOracle(f, 1.4, ContourConfig(max_steps=100))
     result = oracle.query(oracle.seed(0.5, 1.2))
-    assert result.status is ContourStatus.UNKNOWN
-    assert any(path.edge_reached for path in result.paths)
-    assert "uncertified root topology" in result.reason
-    assert result.witness is None
+    assert result.status is ContourStatus.ACCESSIBLE
+    assert result.witness is not None
+    assert len(result.paths) == 2
+    assert not result.paths[0].edge_reached
+    assert not oracle._root_pattern_certified(result.paths[0])
+    assert result.paths[1].edge_reached
+    assert oracle._root_pattern_certified(result.paths[1])
+
+
+def test_selected_well_certificate_preserves_atlas_coverage(monkeypatch):
+    """Unrelated marginal roots cannot veto a selected pair or vanish from atlas (§23)."""
+    # At alpha=pi/2, z=0 is marginal B=b, while the well around z=pi has
+    # two regular outer crossings. The local oracle may certify that well;
+    # complete atlas multiplicity remains unknown across the marginal root.
+    f = SyntheticFourierField(
+        1,
+        np.array([0, 0, 0, 1, 1]),
+        np.array([0, 3, 1, 1, -1]),
+        np.array([[2.0], [1.5], [-1.0], [0.025], [0.025]]),
+        np.zeros((5, 1)),
+        np.array([0.0]),
+        np.array([3.0]),
+        np.array([0.0]),
+    )
+    oracle = DirectContourOracle(f, 2.5)
+    seed = oracle.seed(0.5, np.pi / 2, zeta_in_hint=2.7)
+    left = oracle.sample(0.5, np.pi / 2 - 1e-4, seed)
+    right = oracle.sample(0.5, np.pi / 2 + 1e-4, seed)
+    from alpha_analysis.j_connectivity.contour_trace import ContourPath
+
+    assert oracle._root_pattern_certified(ContourPath((left, right), False, False))
+    cell = classify_cell(
+        f, 2.5, (0.49, 0.51), (np.pi / 2 - 5e-4, np.pi / 2 + 5e-4), periods=2
+    )
+    assert cell.multiplicity_upper is None and cell.unknown_reason
+
+    # Deliberately corrupt the cell count to exercise the independent sampled
+    # count guard in the production atlas builder.
+    import alpha_analysis.j_connectivity.branch_atlas as atlas_module
+
+    monkeypatch.setattr(atlas_module, "_certify_cell", lambda *args: (1, None))
+    atlas = build_atlas(field((2.0,)), 2.0, AtlasConfig(2, 2, 2))
+    assert all(c.multiplicity_upper is None for c in atlas.cells)
+    assert all("sampled root count disagrees" in c.unknown_reason for c in atlas.cells)
 
 
 def test_contour_budget_exhaustion_remains_unknown():
@@ -242,7 +354,9 @@ def test_dmerc_reference_closed_edge_and_transition_probes():
     )
     closed = oracle.query(oracle.seed(0.3, 0.0))
     assert all(path.closed for path in closed.paths)
-    assert closed.status is ContourStatus.UNKNOWN
+    # R3.5's moving-root proof now certifies the former numerical closure.
+    assert closed.status is ContourStatus.INACCESSIBLE
+    assert all(oracle._root_pattern_certified(path) for path in closed.paths)
     edge_seed = oracle.seed(0.95, -0.1577992744671513)
     # R1's independent composite quadrature includes interior extrema.
     sigma = np.sign(float(f.C(edge_seed.s)))
@@ -285,3 +399,133 @@ def test_dmerc_reference_closed_edge_and_transition_probes():
         "child_3",
     }
     assert all(port.event_parameter == event.parameter for port in branched.event_ports)
+
+
+@pytest.mark.parametrize(
+    "file_index,pitch,expected,certificate_boxes",
+    [
+        (2, 0.8, ContourStatus.INACCESSIBLE, 1024),
+        (3, 0.1, ContourStatus.ACCESSIBLE, 4096),
+    ],
+)
+def test_real_contour_feasibility_regressions(
+    file_index, pitch, expected, certificate_boxes
+):
+    """The original R3 interior seeds classify at both §23 R3.5 step sizes."""
+    import json
+
+    evidence = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "docs/validation/r3-contour-matrix.json"
+        ).read_text()
+    )
+    row = next(
+        case
+        for case in evidence["cases"]
+        if case["file_index"] == file_index and case["lambda_n"] == pitch
+    )
+    f = BoozerField.from_boozmn(Path(DATA_DIR) / row["file"])
+    for step, max_steps in ((0.04, 80), (0.02, 160)):
+        oracle = DirectContourOracle(
+            f,
+            row["b"],
+            ContourConfig(
+                step=step,
+                max_steps=max_steps,
+                max_certificate_boxes=certificate_boxes,
+                max_certificate_depth=10,
+            ),
+        )
+        seed = oracle.seed(0.3, 0.0, row["probes"][0]["seed"]["zeta_in"])
+        sigma = np.sign(float(f.C(seed.s)))
+        assert (
+            sigma
+            * float(
+                f.D_B(
+                    seed.s,
+                    seed.alpha + float(f.iota(seed.s)) * seed.zeta_in,
+                    seed.zeta_in,
+                )
+            )
+            < 0
+        )
+        assert (
+            sigma
+            * float(
+                f.D_B(
+                    seed.s,
+                    seed.alpha + float(f.iota(seed.s)) * seed.zeta_out,
+                    seed.zeta_out,
+                )
+            )
+            > 0
+        )
+        z0 = -sigma * oracle.period
+        scan = ForwardLineCatalogue(
+            f,
+            seed.s,
+            seed.alpha + float(f.iota(seed.s)) * z0,
+            z0,
+            ForwardScanConfig(max_periods=oracle.config.scan_periods),
+        )
+        scan.extend_to(oracle.config.scan_periods)
+        well = min(
+            scan.query(row["b"]).wells, key=lambda w: abs(w.zeta_in - seed.zeta_in)
+        )
+        independent = batched_bounce_integrals(scan, (well,))[0]
+        np.testing.assert_allclose(seed.action_length, independent.A, atol=2e-6, rtol=0)
+        result = oracle.query(seed)
+        assert result.status is expected, result.reason
+        if expected is ContourStatus.ACCESSIBLE:
+            assert result.witness is not None and result.witness.points[-1].s == 1
+        else:
+            assert len(result.paths) == 2 and all(path.closed for path in result.paths)
+
+
+def test_real_dmerc_event_discovery_continues_all_ports():
+    """A fixed ordinary child seed finds the real split at its own action (§23)."""
+    name = "boozmn_20260406-01-262-Ax_nfp4_Garabedian_mpol2_ntor2_minx0_allNfp_aspect10_DMercFail_m0p3_eval000323_low_resolution.nc"
+    f = BoozerField.from_boozmn(Path(DATA_DIR) / name)
+    b = 10.648368010778036
+    oracle = DirectContourOracle(
+        f,
+        b,
+        ContourConfig(
+            step=0.02,
+            max_steps=160,
+            max_certificate_boxes=4096,
+            max_certificate_depth=10,
+        ),
+    )
+    seed = oracle.seed(
+        0.7980685243065248,
+        -0.16013007426726095,
+        zeta_in_hint=-1.3559938733080594,
+    )
+    result = oracle.query(seed)  # No event parameter is supplied.
+    discovery = result.event_discovery
+    assert discovery is not None and discovery.status == "verified", result.reason
+    event = discovery.event
+    np.testing.assert_allclose(event.parameter, (0.8, -0.1577992744671513), atol=2e-5)
+    assert abs(discovery.marginal_residual_B) < 1e-8
+    assert abs(discovery.action_residual) < oracle.config.action_atol
+    z = event.marginal_zeta[0]
+    s, alpha = event.parameter
+    theta = alpha + float(f.iota(s)) * z
+    np.testing.assert_allclose(
+        [f.B(s, theta, z), f.D_B(s, theta, z)], [b, 0], atol=1e-8
+    )
+    actions = {port.role: port.action_length for port in event.ports}
+    np.testing.assert_allclose(
+        actions["parent"], actions["child_1"] + actions["child_3"], atol=1e-7
+    )
+    assert {role for role, _, _ in result.port_outcomes} == actions.keys()
+    assert {role for role, _ in discovery.one_sided_action_residuals} == actions.keys()
+    for port in event.ports:
+        continued = oracle._regular_seed_near_port(event, port)
+        assert continued is not None, port.role
+        assert (
+            abs(continued.action_length - port.action_length)
+            <= oracle.config.action_atol
+        )

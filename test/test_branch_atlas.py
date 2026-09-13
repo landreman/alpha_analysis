@@ -198,7 +198,7 @@ def test_barrier_crossing_creates_matched_additive_ports():
     assert all(port.event_parameter == event.parameter for port in event.ports)
 
 
-def test_cell_detects_or_encloses_closed_barrier_loop_and_two_crossings():
+def test_moving_root_certificate_retains_hidden_barriers():
     # At z=0, H(s,alpha)=1+s-s^2-.25 cos(2alpha). H=1.4 encloses
     # (s=.5,alpha=pi/2) wholly inside (0,1)x(0,pi), although all four
     # corners are below b. Along the s=.5 edge it crosses twice.
@@ -219,6 +219,53 @@ def test_cell_detects_or_encloses_closed_barrier_loop_and_two_crossings():
     assert loop_cell.multiplicity_upper is None
     assert crossing_cell.multiplicity_upper is None
     assert loop_cell.unknown_reason and crossing_cell.unknown_reason
+    # A shallow local maximum is shifted halfway between the 64 nodes per
+    # period. At the center alpha, both adjacent samples lie below b while
+    # the interior barrier lies above it. Across this small alpha cell the
+    # barrier crosses b, changing one first-return well into two. Coalesced
+    # scan brackets must retain the D-sign proof; a guessed sign would
+    # incorrectly certify the entire cell as one well.
+    shift = np.pi / 64
+    cosine = np.array([[2.0], [np.cos(shift)], [0.3 * np.cos(2 * shift)], [0.5]])
+    sine = np.array([[0.0], [-np.sin(shift)], [-0.3 * np.sin(2 * shift)], [0.0]])
+    narrow = SyntheticFourierField(
+        1,
+        np.array([0, 0, 0, 1]),
+        np.array([0, 1, 2, 0]),
+        cosine,
+        sine,
+        np.array([0.0]),
+        np.array([3.0]),
+        np.array([0.0]),
+    )
+    narrow_b = 1.2999
+    alpha_mid = np.pi / 2
+    barrier_z = np.pi + shift
+    assert all(
+        narrow.B(0.5, alpha_mid, z) < narrow_b for z in (np.pi, np.pi + np.pi / 32)
+    )
+    assert narrow.B(0.5, alpha_mid, barrier_z) > narrow_b
+    assert narrow.B(0.5, alpha_mid - 5e-4, barrier_z) > narrow_b
+    assert narrow.B(0.5, alpha_mid + 5e-4, barrier_z) < narrow_b
+    narrow_cell = classify_cell(
+        narrow,
+        narrow_b,
+        (0.4, 0.6),
+        (alpha_mid - 5e-4, alpha_mid + 5e-4),
+        periods=2,
+    )
+    assert narrow_cell.multiplicity_upper is None
+    assert "hidden barrier" in narrow_cell.unknown_reason
+    # An extrema fold wholly below b does not change the first-return well.
+    harmless = field(
+        [[2], [-1], [0.3], [0.015], [0.015]],
+        [0, 1, 2, 12, -12],
+        m=[0, 0, 0, 1, 1],
+    )
+    regular = classify_cell(
+        harmless, 1.4, (0.49, 0.51), (1.61, 1.63), periods=2, subdivisions=12
+    )
+    assert regular.multiplicity_lower == regular.multiplicity_upper == 1
 
 
 def test_unknown_multiplicity_remains_in_coverage_bound():
@@ -338,3 +385,41 @@ def test_real_spline_cell_has_one_certified_owned_branch():
     fine = classify_cell(f, b, (0.4, 0.4001), (0, 0.001), periods=2, subdivisions=12)
     assert coarse.multiplicity_upper == fine.multiplicity_upper == 1
     assert coarse.matched_local_branches == fine.matched_local_branches == (0,)
+
+
+def test_root_certificate_survives_scan_node_crossing():
+    """A translated well keeps one owned entry across arbitrary scan nodes (§23 R3.5)."""
+    f = field([[2], [1]], [0, 1], m=[0, 1])
+    for alpha_center in (0.0, 0.03):
+        for width in (1e-3, 1e-7):
+            cell = classify_cell(
+                f,
+                2.0,
+                (0.4, 0.6),
+                (alpha_center - width / 2, alpha_center + width / 2),
+                periods=2,
+                subdivisions=8,
+            )
+            assert cell.multiplicity_lower == cell.multiplicity_upper == 1, (
+                alpha_center,
+                width,
+                cell.unknown_reason,
+            )
+            assert cell.matched_local_branches == (0,)
+    reverse = field([[2], [1]], [0, 1], m=[0, 1], C=-3)
+    reverse_cell = classify_cell(reverse, 2.0, (0.4, 0.6), (-5e-4, 5e-4), periods=2)
+    assert reverse_cell.multiplicity_lower == reverse_cell.multiplicity_upper == 1
+    from alpha_analysis.j_connectivity.branch_atlas import _line, _owned
+
+    forward_well = _owned(_line(f, 0.5, 0.0, 2), 2.0, False)[0][0]
+    reverse_well = _owned(_line(reverse, 0.5, 0.0, 2), 2.0, False)[0][0]
+    np.testing.assert_allclose(
+        [forward_well.zeta_in, forward_well.zeta_out],
+        [np.pi / 2, 3 * np.pi / 2],
+        atol=1e-9,
+    )
+    np.testing.assert_allclose(
+        [reverse_well.zeta_in, reverse_well.zeta_out],
+        [3 * np.pi / 2, np.pi / 2],
+        atol=1e-9,
+    )

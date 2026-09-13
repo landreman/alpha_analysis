@@ -13,7 +13,7 @@ implementation milestone complete.
 
 ## Active plan
 
-**Next milestone: R3.5. R0–R3 are complete; R4 depends on R3.5.** Follow the
+**Next milestone: R4. R0–R3.5 are complete; R4 depends on R3.5.** Follow the
 dependencies in `DESIGN.md` §23; retired milestones are not prerequisites.
 
 | ID | Milestone | Goal | Done | PR |
@@ -22,7 +22,7 @@ dependencies in `DESIGN.md` §23; retired milestones are not prerequisites.
 | R1 | Efficient shared forward scans and bounce integrals | Share field-line scans, enumerate maximal wells, and evaluate batched \(A,K\) with error accounting | [x] | #27 |
 | R2 | Root-labelled atlas and barrier-height transitions | Build local well charts, explicit seam ownership and certified generic transition relations | [x] | #28 |
 | R3 | Independent continuous contour oracle | Follow constant-action contours and permitted branch transitions without relying on the atlas reachability implementation | [x] | #29 |
-| R3.5 | Practical root certification and contour feasibility | Improve seed coverage, certify moving roots and real atlas corridors, and automatically discover/continue local generic events before R4 | [ ] | |
+| R3.5 | Practical root certification and contour feasibility | Improve seed coverage, certify moving roots and real atlas corridors, and automatically discover/continue local generic events before R4 | [x] | #31 |
 | R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [ ] | |
 | R5 | Transitions, cycles and global uncertainty | Transfer through common-parameter ports and propagate uncertain connectivity globally with finite termination | [ ] | |
 | R6 | Weighted pitch-slice bounds and persistence | Produce restartable slice bounds with complete weighted-population accounting | [ ] | |
@@ -44,16 +44,26 @@ do not relax the fast/full test-suite budgets.
 
 ## Baseline and next-step notes
 
-- PR #29 is merged (`39c1efd`, implementation head `45f2d73`). The researcher
-  requested R3.5 before R4; [ADR 0011](adr/0011-pre-r4-feasibility.md) records the
-  insertion. Follow [DESIGN §23](DESIGN.md#r35--practical-root-certification-and-contour-feasibility)
-  and the [R3.5 implementation brief](plans/r3-5-feasibility.md). This planning
-  update implements no numerical machinery and does not mark R3.5 complete.
-  Preserve the R2/R3 matrices as baselines. The fixed R3 fine cohort contains
-  13 no-seed cases, seven uncertified numerical closures, one uncertified edge
-  query and nine continuation failures. Seed recovery alone cannot satisfy the
-  new gate: real classifications, event continuation and certified atlas corridors
-  are required. R4 must wait for R3.5 acceptance and green Tests.
+- R3.5 in PR #31 follows [ADR 0011](adr/0011-pre-r4-feasibility.md) and the
+  [implementation brief](plans/r3-5-feasibility.md). Its
+  [30-case matrix](validation/r3-5-feasibility-matrix.md) preserves the R2/R3
+  baselines. The expanded bounded search found seeds in all 13 originally
+  no-seed cases, while the unchanged fixed cohort now classifies seven
+  inaccessible and one accessible case at both resolutions; nine other fixed
+  queries remain unknown. The original DMercFail 0.8 interior closure and d23p4
+  0.1 interior edge path have independent root/action checks and disjoint
+  positive atlas corridors at both resolutions. A real DMercFail generic event
+  is discovered from an ordinary seed and all three ports are continued into
+  regular states. Local certified corridors occur on all five fields (22/30
+  cases); the longest guarded physical case took 221.5 s. R4 can use these two
+  classified paths as oracle comparisons, but must preserve the broad unknown
+  fixed-domain complement and the distinction between represented-field root
+  certificates and still-unbounded field/action/population errors. The present
+  negative terminals cover segment boxes around sampled contour chords; R4 must
+  enclose true arc excursions before using them as physical reachability bounds.
+  R5 must restore positive witnesses through transitions only after certifying
+  incidence with the event branch. R4–R8 retain the final accuracy contract;
+  R3.5 makes no f claim.
 - R0 verified the green plan-bearing `main` baseline and imported no implementation
   code from PR #24. That PR remains the incomplete milestone-10.3 branch, not an
   accepted redesign baseline, and must not be merged as-is. Its branch, validation

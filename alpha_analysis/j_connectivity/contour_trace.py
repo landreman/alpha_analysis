@@ -16,9 +16,15 @@ import warnings
 
 import numpy as np
 from scipy.integrate import IntegrationWarning, quad
-from scipy.optimize import newton
+from scipy.optimize import brentq, newton
 
-from .branch_atlas import AtlasPort, AtlasTransition, _certified_roots
+from .branch_atlas import (
+    AtlasPort,
+    AtlasTransition,
+    _certified_roots,
+    height_at,
+    transition_at,
+)
 from .field import BoozerFieldLike
 from .forward_catalogue import ForwardLineCatalogue, ForwardScanConfig
 
@@ -40,12 +46,16 @@ class ContourConfig:
     max_steps: int = 300
     max_branches: int = 16
     max_certificate_boxes: int = 64
+    max_certificate_depth: int = 10
     corrector_steps: int = 6
     action_atol: float = 2e-6
     closure_tol: float = 0.015
     root_shift_periods: float = 0.3
     gradient_floor: float = 2e-5
     event_tol: float = 0.015
+    event_search_radius_s: float = 0.02
+    event_height_fraction: float = 0.02
+    max_event_curve_samples: int = 9
     scan_periods: int = 4
 
     def __post_init__(self) -> None:
@@ -56,6 +66,8 @@ class ContourConfig:
             or self.max_branches < 1
             or self.corrector_steps < 1
             or self.max_certificate_boxes < 1
+            or self.max_certificate_depth < 1
+            or self.max_event_curve_samples < 3
         ):
             raise ValueError("work budgets must be positive")
         if self.scan_periods < 2:
@@ -66,6 +78,8 @@ class ContourConfig:
             self.root_shift_periods,
             self.gradient_floor,
             self.event_tol,
+            self.event_search_radius_s,
+            self.event_height_fraction,
         ):
             if not np.isfinite(value) or value <= 0:
                 raise ValueError("tolerances must be finite and positive")
@@ -105,6 +119,7 @@ class ContourResult:
     bound_scope: str = (
         "represented-field numerical query; estimated action quadrature error"
     )
+    event_discovery: EventDiscovery | None = None
 
     @property
     def witness(self) -> ContourPath | None:
@@ -115,6 +130,20 @@ class ContourResult:
 
 class _Unresolved(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class EventDiscovery:
+    """Bounded local marginal/action solve and one-sided numerical checks (§10.2)."""
+
+    status: str
+    reason: str
+    attempted_s: tuple[float, ...]
+    event: AtlasTransition | None = None
+    incoming_role: str | None = None
+    marginal_residual_B: float = np.nan
+    action_residual: float = np.nan
+    one_sided_action_residuals: tuple[tuple[str, float], ...] = ()
 
 
 class DirectContourOracle:
@@ -482,10 +511,6 @@ class DirectContourOracle:
                     scan_config = ForwardScanConfig(
                         max_periods=self.config.scan_periods
                     )
-                    # A scan node close to B=b can defeat an otherwise valid
-                    # transverse interval test. Shift the sampling phase of
-                    # the *same* lifted root window, and accept only a full
-                    # certificate with the correctly ordered root pair.
                     probe_z0 = midpoint.zeta_in - sigma * 0.35 * self.period
                     probe = ForwardLineCatalogue(
                         self.field,
@@ -494,68 +519,284 @@ class DirectContourOracle:
                         probe_z0,
                         scan_config,
                     )
-                    for phase in (0.0, 0.5):
-                        z0 = (
-                            probe_z0
-                            - sigma * phase * self.period / probe.steps_per_period
-                        )
-                        periods = max(
-                            2,
-                            int(
-                                np.ceil(
-                                    length / self.period
-                                    + 0.7
-                                    + phase / probe.steps_per_period
-                                )
-                            ),
-                        )
-                        if periods > self.config.scan_periods:
-                            return False
-                        scan = ForwardLineCatalogue(
-                            self.field,
-                            midpoint.s,
-                            self._coordinates(midpoint.s, midpoint.alpha, z0),
-                            z0,
-                            scan_config,
-                        )
-                        scan.extend_to(periods)
-                        roots, _ = _certified_roots(scan, self.b, bounds, 8)
-                        if roots is None:
-                            continue
-                        u_in = sigma * (midpoint.zeta_in - z0)
-                        u_out = sigma * (midpoint.zeta_out - z0)
-                        left_index = next(
-                            (
-                                i
-                                for i, (a, b, sign) in enumerate(roots)
-                                if sign < 0 and a - 1e-8 <= u_in <= b + 1e-8
-                            ),
-                            None,
-                        )
-                        right_index = next(
-                            (
-                                i
-                                for i, (a, b, sign) in enumerate(roots)
-                                if sign > 0 and a - 1e-8 <= u_out <= b + 1e-8
-                            ),
-                            None,
-                        )
-                        if left_index is not None and right_index == left_index + 1:
-                            break
-                    else:
-                        raise _Unresolved("scan phases did not certify root pattern")
+                    node_step = self.period / probe.steps_per_period
+                    guard = max(
+                        4 * node_step,
+                        min(0.15 * length, 0.04 * self.period),
+                    )
+                    span = length + 2 * guard
+                    if span > self.config.scan_periods * self.period:
+                        return False
+                    z0 = midpoint.zeta_in - sigma * guard
+                    scan = ForwardLineCatalogue(
+                        self.field,
+                        midpoint.s,
+                        self._coordinates(midpoint.s, midpoint.alpha, z0),
+                        z0,
+                        scan_config,
+                    ).local_root_window(0.0, span)
+                    roots, _ = _certified_roots(scan, self.b, bounds, 12)
+                    if roots is None:
+                        raise _Unresolved("selected root guards did not certify")
+                    u_in, u_out = guard, guard + length
+                    left_index = next(
+                        (
+                            i
+                            for i, (a, b, sign) in enumerate(roots)
+                            if sign < 0 and a - 1e-8 <= u_in <= b + 1e-8
+                        ),
+                        None,
+                    )
+                    right_index = next(
+                        (
+                            i
+                            for i, (a, b, sign) in enumerate(roots)
+                            if sign > 0 and a - 1e-8 <= u_out <= b + 1e-8
+                        ),
+                        None,
+                    )
+                    if left_index is None or right_index != left_index + 1:
+                        raise _Unresolved("selected roots are not a first-return pair")
                     continue
                 except (_Unresolved, ValueError, ArithmeticError):
                     pass
-                if depth >= 6 or midpoint is None:
+                if depth >= self.config.max_certificate_depth or midpoint is None:
                     return False
                 pending.extend(
                     ((first, midpoint, depth + 1), (midpoint, last, depth + 1))
                 )
         return True
 
+    def _event_on_height_curve(
+        self, s: float, alpha_guess: float, zeta_guess: float
+    ) -> AtlasTransition:
+        """Solve H(s,alpha)=b on one continued nondegenerate max (§10.1)."""
+        alpha, zeta = float(alpha_guess), float(zeta_guess)
+        for _ in range(12):
+            height = self._nearby_maximum(s, alpha, zeta)
+            if height.curvature >= 0:
+                raise _Unresolved("candidate marginal extremum is not a maximum")
+            zeta = height.zeta
+            residual = height.value - self.b
+            if abs(residual) <= 1e-10 * max(1.0, self.b):
+                event = transition_at(
+                    self.field,
+                    self.b,
+                    s,
+                    alpha,
+                    periods=2,
+                    tolerance_B=1e-8 * max(1.0, self.b),
+                )
+                if event.status != "generic":
+                    raise _Unresolved(event.reason or "marginal event is not generic")
+                return event
+            if abs(height.gradient_alpha) < 1e-10:
+                raise _Unresolved("height curve has unresolved alpha tangent")
+            step = np.clip(residual / height.gradient_alpha, -0.1, 0.1)
+            alpha -= float(step)
+        raise _Unresolved("height-curve solve budget exhausted")
+
+    def _nearby_maximum(self, s: float, alpha: float, zeta: float):
+        """Select one lifted nondegenerate max with bounded bracket retries."""
+        for fraction in (0.02, 0.05, 0.1, 0.2):
+            try:
+                height = height_at(
+                    self.field,
+                    s,
+                    alpha,
+                    zeta,
+                    bracket=fraction * self.period,
+                )
+            except (ValueError, ArithmeticError):
+                continue
+            if height.curvature < 0:
+                return height
+        raise _Unresolved("no nearby nondegenerate marginal maximum")
+
+    def _one_sided_action_checks(
+        self, event: AtlasTransition
+    ) -> tuple[tuple[str, float], ...]:
+        """Compare independent ordinary A limits with all pointwise ports.
+
+        These are convergence estimates in length units, not rigorous action
+        enclosures. The parent is approached from H<b, children from H>b.
+        """
+        height = height_at(
+            self.field,
+            event.parameter[0],
+            event.parameter[1],
+            event.marginal_zeta[0],
+            bracket=0.2 * self.period,
+        )
+        normal = np.array([height.gradient_s, 2 * np.pi * height.gradient_alpha])
+        norm = float(np.linalg.norm(normal))
+        if norm <= 1e-10:
+            raise _Unresolved("event height has no transverse normal")
+        normal /= norm
+        center = np.array([event.parameter[0], event.parameter[1] / (2 * np.pi)])
+        checks = []
+        for port in event.ports:
+            away = 0.02 * self.period * np.sign(float(self.field.C(center[0])))
+            reference = ContourPoint(
+                event.parameter[0],
+                event.parameter[1],
+                port.zeta_in + (away if port.role == "child_3" else 0.0),
+                port.zeta_out - (away if port.role == "child_1" else 0.0),
+                port.action_length,
+            )
+            side = -1 if port.role == "parent" else 1
+            values = []
+            for radius in (1.25e-4, 6.25e-5, 3.125e-5):
+                x = center + side * radius * normal
+                if not 0 < x[0] < 1:
+                    raise _Unresolved("one-sided event probe leaves radial support")
+                ordinary = self.sample(float(x[0]), float(2 * np.pi * x[1]), reference)
+                values.append(ordinary.action_length)
+            if not abs(values[-1] - port.action_length) < abs(
+                values[0] - port.action_length
+            ):
+                raise _Unresolved(f"{port.role} one-sided action does not converge")
+            extrapolated = 2 * values[-1] - values[-2]
+            residual = abs(extrapolated - port.action_length)
+            if residual > max(20 * self.config.action_atol, 5e-4):
+                raise _Unresolved(f"{port.role} one-sided action limit disagrees")
+            checks.append((port.role, float(residual)))
+        return tuple(checks)
+
+    def discover_generic_event(self, point: ContourPoint) -> EventDiscovery:
+        """Discover a nearby common-parameter generic event at adopted A (§23 R3.5).
+
+        A candidate must be a continued marginal maximum near a selected
+        endpoint. Its height curve is sampled within a fixed radial budget;
+        a sign-changing port-action residual is solved, with all incident
+        one-sided actions checked independently. Failure is explicitly unknown.
+        """
+        attempts: list[float] = []
+        candidates = []
+        for zeta in (point.zeta_in, point.zeta_out):
+            try:
+                height = self._nearby_maximum(point.s, point.alpha, zeta)
+            except (ValueError, RuntimeError, ArithmeticError):
+                continue
+            if height.curvature < 0 and abs(height.value - self.b) <= (
+                self.config.event_height_fraction * self.b
+            ):
+                candidates.append((abs(height.value - self.b), height.zeta))
+        if not candidates:
+            return EventDiscovery("not_near", "no nearby marginal maximum", ())
+        _, zeta = min(candidates)
+        try:
+            center = self._event_on_height_curve(point.s, point.alpha, zeta)
+            nearby = []
+            for port in center.ports:
+                for shift in range(
+                    -self.config.scan_periods, self.config.scan_periods + 1
+                ):
+                    expected_alpha = (
+                        center.parameter[1]
+                        + shift
+                        * float(self.field.iota(center.parameter[0]))
+                        * self.period
+                    )
+                    angular = np.angle(np.exp(1j * (point.alpha - expected_alpha)))
+                    distance = np.hypot(
+                        point.s - center.parameter[0], angular / (2 * np.pi)
+                    )
+                    root_distance = max(
+                        abs(point.zeta_in + shift * self.period - port.zeta_in),
+                        abs(point.zeta_out + shift * self.period - port.zeta_out),
+                    )
+                    if (
+                        distance <= self.config.event_tol
+                        and root_distance
+                        <= self.config.root_shift_periods * self.period
+                    ):
+                        nearby.append((root_distance, port.role))
+            if not nearby:
+                raise _Unresolved("candidate event lacks incident root-labelled port")
+            role = min(nearby)[1]
+            center_port = next(port for port in center.ports if port.role == role)
+            radius = self.config.event_search_radius_s
+            s_values = np.linspace(
+                max(1e-8, point.s - radius),
+                min(1 - 1e-8, point.s + radius),
+                self.config.max_event_curve_samples,
+            )
+            curve = []
+            for s in s_values:
+                attempts.append(float(s))
+                try:
+                    event = self._event_on_height_curve(
+                        float(s), center.parameter[1], center.marginal_zeta[0]
+                    )
+                    port = next(p for p in event.ports if p.role == role)
+                    if (
+                        max(
+                            abs(port.zeta_in - center_port.zeta_in),
+                            abs(port.zeta_out - center_port.zeta_out),
+                        )
+                        > self.config.root_shift_periods * self.period
+                    ):
+                        continue
+                    curve.append((float(s), port.action_length - point.action_length))
+                except (ValueError, RuntimeError, ArithmeticError, StopIteration):
+                    curve.append((float(s), np.nan))
+            bracket = next(
+                (
+                    (left[0], right[0])
+                    for left, right in zip(curve[:-1], curve[1:])
+                    if np.isfinite(left[1])
+                    and np.isfinite(right[1])
+                    and left[1] * right[1] <= 0
+                ),
+                None,
+            )
+            if bracket is None:
+                raise _Unresolved("event action has no certified local sign bracket")
+
+            def residual_at(s):
+                event = self._event_on_height_curve(
+                    float(s), center.parameter[1], center.marginal_zeta[0]
+                )
+                port = next(p for p in event.ports if p.role == role)
+                return port.action_length - point.action_length
+
+            root_s = brentq(residual_at, *bracket, xtol=1e-11)
+            event = self._event_on_height_curve(
+                root_s, center.parameter[1], center.marginal_zeta[0]
+            )
+            port = next(p for p in event.ports if p.role == role)
+            action_residual = abs(port.action_length - point.action_length)
+            if action_residual > self.config.action_atol + port.error_estimate:
+                raise _Unresolved("located event misses the adopted action")
+            one_sided = self._one_sided_action_checks(event)
+            marginal = abs(
+                height_at(
+                    self.field,
+                    event.parameter[0],
+                    event.parameter[1],
+                    event.marginal_zeta[0],
+                ).value
+                - self.b
+            )
+            return EventDiscovery(
+                "verified",
+                "generic marginal event at adopted action with one-sided port checks",
+                tuple(attempts),
+                event,
+                role,
+                float(marginal),
+                float(action_residual),
+                one_sided,
+            )
+        except (ValueError, RuntimeError, ArithmeticError, StopIteration) as error:
+            return EventDiscovery("unresolved", str(error), tuple(attempts))
+
     def query(
-        self, seed: ContourPoint, events: tuple[AtlasTransition, ...] = ()
+        self,
+        seed: ContourPoint,
+        events: tuple[AtlasTransition, ...] = (),
+        _discover_events: bool = True,
     ) -> ContourResult:
         """Follow one root-labelled contour to edge, certified closure, or unknown.
 
@@ -572,6 +813,20 @@ class DirectContourOracle:
             path = self._trace_one(seed, direction)
             if path.edge_reached:
                 if self._root_pattern_certified(path):
+                    if _discover_events and not events:
+                        discovery = self.discover_generic_event(seed)
+                        if discovery.status == "verified":
+                            branched = self.query_event(
+                                discovery.event, discovery.incoming_role
+                            )
+                            return ContourResult(
+                                ContourStatus.ACCESSIBLE,
+                                tuple(paths) + (path,) + branched.paths,
+                                "edge witness and discovered local event",
+                                branched.event_ports,
+                                branched.port_outcomes,
+                                event_discovery=discovery,
+                            )
                     return ContourResult(
                         ContourStatus.ACCESSIBLE, tuple(paths) + (path,), "edge witness"
                     )
@@ -677,6 +932,34 @@ class DirectContourOracle:
                 tuple(paths),
                 "closed regular contour in both orientations",
             )
+        if _discover_events and not events:
+            # A local marginal may be approached at either endpoint or before
+            # a numerical continuation failure. The finite candidate list is
+            # explicit; a failed search never becomes negative closure.
+            candidates = (seed,) + tuple(
+                path.points[-1] for path in paths if path.points
+            )
+            for point in candidates:
+                discovery = self.discover_generic_event(point)
+                if discovery.status == "verified":
+                    branched = self.query_event(
+                        discovery.event, discovery.incoming_role
+                    )
+                    return ContourResult(
+                        ContourStatus.UNKNOWN,
+                        tuple(paths) + branched.paths,
+                        "discovered local event; global branch incidence remains unresolved",
+                        branched.event_ports,
+                        branched.port_outcomes,
+                        event_discovery=discovery,
+                    )
+                if discovery.status == "unresolved":
+                    return ContourResult(
+                        ContourStatus.UNKNOWN,
+                        tuple(paths),
+                        f"local event discovery unresolved: {discovery.reason}",
+                        event_discovery=discovery,
+                    )
         reason = "; ".join(
             p.reason or "uncertified closure" for p in paths if not p.closed
         )
@@ -718,16 +1001,16 @@ class DirectContourOracle:
                     )
                 )
                 continue
-            branch = self.query(seed)
+            branch = self.query(seed, _discover_events=False)
             paths.extend(branch.paths)
             outcomes.append((port.role, branch.status, branch.reason))
             if branch.status is ContourStatus.ACCESSIBLE:
                 accessible_role = port.role
         if accessible_role is not None:
             return ContourResult(
-                ContourStatus.ACCESSIBLE,
+                ContourStatus.UNKNOWN,
                 tuple(paths),
-                f"edge witness through {accessible_role} at common event parameter",
+                f"edge path through {accessible_role} remains unbound to the incident event branch",
                 event.ports,
                 tuple(outcomes),
             )
@@ -761,6 +1044,10 @@ class DirectContourOracle:
                 (-1, 0),
                 (0, 1),
                 (0, -1),
+                (1, 0.1),
+                (1, 0.2),
+                (-1, -0.1),
+                (-1, -0.2),
                 (1, 0.4),
                 (-1, -0.4),
                 (1, 1),
