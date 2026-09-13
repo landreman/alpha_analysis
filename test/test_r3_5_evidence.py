@@ -181,5 +181,4 @@ def test_r3_5_feasibility_matrix_preserves_cases_and_gates():
                     <= 2 * np.pi
                 )
                 assert cell["multiplicity_lower"] == cell["multiplicity_upper"] == 1
-                assert cell["matched_local_branches"] == [corridor["branch_id"]]
                 assert all(_overlap_area(cell, other) <= 1e-14 for other in owned[:i])

@@ -77,6 +77,22 @@ def test_direct_contour_reaches_edge_with_constant_action():
     assert max(abs(p.action_length - seed.action_length) for p in witness.points) < 2e-5
 
 
+def test_uncertified_edge_path_has_no_accessibility_witness():
+    """An edge intersection without its root certificate stays unknown (§11.1)."""
+    f = field((0.0, 0.15), 0.1)
+    oracle = DirectContourOracle(
+        f, 2.0, ContourConfig(step=0.025, max_steps=300, max_certificate_boxes=1)
+    )
+    result = oracle.query(oracle.seed(0.5, 0.0))
+    assert result.status is ContourStatus.UNKNOWN
+    assert result.witness is None
+    assert all(path.edge_reached for path in result.paths)
+    assert all(
+        path.reason == "edge path has uncertified root topology"
+        for path in result.paths
+    )
+
+
 def test_direct_contour_branches_at_same_event_parameter():
     # The Γmax curve is transverse to child A-contours: a child can continue
     # at its new action only if the marginal root is approached from its side.

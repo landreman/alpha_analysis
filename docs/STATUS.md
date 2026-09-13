@@ -58,8 +58,12 @@ do not relax the fast/full test-suite budgets.
   cases); the longest guarded physical case took 221.5 s. R4 can use these two
   classified paths as oracle comparisons, but must preserve the broad unknown
   fixed-domain complement and the distinction between represented-field root
-  certificates and still-unbounded field/action/population errors. R4–R8 retain
-  the final accuracy contract; R3.5 makes no f claim.
+  certificates and still-unbounded field/action/population errors. The present
+  negative terminals cover segment boxes around sampled contour chords; R4 must
+  enclose true arc excursions before using them as physical reachability bounds.
+  R5 must restore positive witnesses through transitions only after certifying
+  incidence with the event branch. R4–R8 retain the final accuracy contract;
+  R3.5 makes no f claim.
 - R0 verified the green plan-bearing `main` baseline and imported no implementation
   code from PR #24. That PR remains the incomplete milestone-10.3 branch, not an
   accepted redesign baseline, and must not be merged as-is. Its branch, validation
