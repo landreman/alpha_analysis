@@ -120,6 +120,38 @@ class BounceIntegral:
     error_scope: str = "estimate"
 
 
+@dataclass(frozen=True)
+class LocalRootWindow:
+    """Sampled lifted subwindow for a selected-root certificate (§8.4).
+
+    Its u coordinate increases in the physical +B direction and has radian
+    units. It carries no completeness claim outside the sampled subwindow.
+    """
+
+    catalogue: ForwardLineCatalogue
+    u: np.ndarray
+    B_samples: np.ndarray
+    D_samples: np.ndarray
+
+    @property
+    def field(self):
+        return self.catalogue.field
+
+    @property
+    def zeta0(self):
+        return self.catalogue.zeta0
+
+    @property
+    def sigma(self):
+        return self.catalogue.sigma
+
+    def _B(self, u):
+        return self.catalogue._B(u)
+
+    def _D(self, u):
+        return self.catalogue._D(u)
+
+
 def _fourier_coefficients(field: BoozerFieldLike, s: float):
     """Return line Fourier coefficients, or None when no envelope is available."""
     if hasattr(field, "cosine_coefficients") and hasattr(field, "m"):
@@ -243,6 +275,28 @@ class ForwardLineCatalogue:
     def _D(self, u):
         theta, zeta = self.coordinates(u)
         return self.sigma * np.asarray(self.field.D_B(self.s, theta, zeta), dtype=float)
+
+    def local_root_window(self, u0: float, u1: float) -> LocalRootWindow:
+        """Sample a bounded selected-root interval without scanning unrelated lifts.
+
+        The caller must certify B=b roots and guards inside this local window;
+        this method alone does not assert root completeness (§8.4).
+        """
+        if not (np.isfinite(u0) and np.isfinite(u1) and 0 <= u0 < u1):
+            raise ValueError("invalid local root window")
+        samples = max(
+            3, int(np.ceil((u1 - u0) * self.steps_per_period / self.period)) + 1
+        )
+        u = np.linspace(u0, u1, samples)
+        B = self._B(u)
+        D = self._D(u)
+        if (
+            B.shape != u.shape
+            or D.shape != u.shape
+            or not (np.all(np.isfinite(B)) and np.all(np.isfinite(D)))
+        ):
+            raise ValueError("nonfinite field in local root window")
+        return LocalRootWindow(self, u, B, D)
 
     def extend_to(self, periods: int) -> None:
         """Append field-period windows up to the requested total coverage."""

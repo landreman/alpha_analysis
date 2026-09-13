@@ -386,27 +386,83 @@ def _certified_roots(
     b: float,
     q_bounds: tuple[float, float, float, float],
     subdivisions: int,
+    u_interval: tuple[float, float] | None = None,
 ):
-    """Interval-exclude or prove one monotone crossing for every q in a cell."""
+    """Enclose all finite-window B=b roots over a transverse cell (§8.4).
+
+    A root may move through any fixed scan node. Interior nodes whose B
+    envelope meets b are removed from the longitudinal partition, so their
+    neighboring intervals form a movable root bracket. Endpoint signs and the
+    bound on D inside that entire bracket still have to prove uniqueness and
+    orientation; any possible hidden barrier leaves the cell unknown.
+    """
     s0, s1, a0, a1 = q_bounds
+    if u_interval is None:
+        u, B_samples, D_samples = scan.u, scan.B_samples, scan.D_samples
+    else:
+        u0, u1 = u_interval
+        if not (scan.u[0] < u0 < u1 < scan.u[-1]):
+            return None, "selected root guards leave the scanned window"
+        first = max(0, int(np.searchsorted(scan.u, u0, side="right")) - 1)
+        last = min(len(scan.u) - 1, int(np.searchsorted(scan.u, u1, side="left")))
+        u = scan.u[first : last + 1]
+        B_samples = scan.B_samples[first : last + 1]
+        D_samples = scan.D_samples[first : last + 1]
     z_abs = max(
-        abs(scan.zeta0),
-        abs(scan.zeta0 + scan.sigma * scan.period * scan.scanned_periods),
+        abs(scan.zeta0 + scan.sigma * u[0]),
+        abs(scan.zeta0 + scan.sigma * u[-1]),
     )
     envelopes = _transverse_bounds(scan.field, s0, s1, a1 - a0, z_abs)
     if envelopes is None:
         return None, "no validated transverse field envelope"
     vB, vD, M = envelopes
-    rounding = (
-        128 * np.finfo(float).eps * max(1.0, abs(b), np.max(np.abs(scan.B_samples)))
-    )
-    if vB > 0 and np.any(np.abs(scan.B_samples - b) <= vB + rounding):
-        return (
-            None,
-            f"transverse B envelope (vB={vB:.3g} B units) overlaps b at a scan node; "
-            "narrow the s/alpha cell",
-        )
+    rounding = 128 * np.finfo(float).eps * max(1.0, abs(b), np.max(np.abs(B_samples)))
+    unstable = np.abs(B_samples - b) <= vB + rounding
+    if vB > 0 and (unstable[0] or unstable[-1]):
+        return None, "root may cross the certified scan-window boundary"
     roots = []
+    first_failure = []
+
+    def monotone_sign(l, r, Dl, Dr):
+        """Prove one D sign across a bracket using local curvature bounds."""
+
+        def segment_sign(x0, x1, d0, d1, depth):
+            width = x1 - x0
+            if min(d0, d1) - vD - M * width > 0:
+                return 1
+            if max(d0, d1) + vD + M * width < 0:
+                return -1
+            mid = (x0 + x1) / 2
+            dm = float(scan._D(mid))
+            if dm - vD - M * width / 2 > 0:
+                return 1
+            if dm + vD + M * width / 2 < 0:
+                return -1
+            if depth >= subdivisions:
+                return 0
+            left_sign = segment_sign(x0, mid, d0, dm, depth + 1)
+            if not left_sign:
+                return 0
+            right_sign = segment_sign(mid, x1, dm, d1, depth + 1)
+            return left_sign if left_sign == right_sign else 0
+
+        first = int(np.searchsorted(u, l, side="right"))
+        last = int(np.searchsorted(u, r, side="left"))
+        nodes = np.r_[l, u[first:last], r]
+        derivatives = np.r_[Dl, D_samples[first:last], Dr]
+        sign = 0
+        for index in range(len(nodes) - 1):
+            candidate = segment_sign(
+                nodes[index],
+                nodes[index + 1],
+                derivatives[index],
+                derivatives[index + 1],
+                0,
+            )
+            if candidate == 0 or (sign and candidate != sign):
+                return 0
+            sign = candidate
+        return sign
 
     def visit(l, r, Bl, Br, Dl, Dr, depth):
         h = r - l
@@ -415,39 +471,51 @@ def _certified_roots(
             return True
         low_d = min(Dl, Dr) - vD - M * h
         high_d = max(Dl, Dr) + vD + M * h
-        if low_d > 0 or high_d < 0:
+        sign = 1 if low_d > 0 else -1 if high_d < 0 else monotone_sign(l, r, Dl, Dr)
+        if sign:
             left_sign = np.sign(Bl - b) if abs(Bl - b) > vB + rounding else 0
             right_sign = np.sign(Br - b) if abs(Br - b) > vB + rounding else 0
             if vB == 0 and left_sign == 0 and right_sign:
-                roots.append((l, l, 1 if low_d > 0 else -1))
+                roots.append((l, l, sign))
                 return True
             if vB == 0 and right_sign == 0 and left_sign:
-                roots.append((r, r, 1 if low_d > 0 else -1))
+                roots.append((r, r, sign))
                 return True
             if left_sign and right_sign and left_sign != right_sign:
-                roots.append((l, r, 1 if low_d > 0 else -1))
+                roots.append((l, r, sign))
                 return True
             if left_sign and right_sign and left_sign == right_sign:
                 return True
         if depth >= subdivisions:
+            if not first_failure:
+                first_failure.append((l, r, Bl - b, Br - b, Dl, Dr))
             return False
         mid = (l + r) / 2
-        Bm, Dm = float(scan._B(mid)), float(scan._D(mid))
+        Bm = float(scan._B(mid))
+        Dm = float(scan._D(mid))
         return visit(l, mid, Bl, Bm, Dl, Dm, depth + 1) and visit(
             mid, r, Bm, Br, Dm, Dr, depth + 1
         )
 
-    for i in range(len(scan.u) - 1):
+    # Retain stable nodes as common endpoints for all q in the cell. Removing
+    # an unstable interior node coalesces its adjacent intervals; no root or
+    # measure is discarded. The visit proof uses the full coalesced width.
+    retained = np.flatnonzero(~unstable) if vB > 0 else np.arange(len(u))
+    for left_index, right_index in zip(retained[:-1], retained[1:]):
         if not visit(
-            scan.u[i],
-            scan.u[i + 1],
-            scan.B_samples[i],
-            scan.B_samples[i + 1],
-            scan.D_samples[i],
-            scan.D_samples[i + 1],
+            u[left_index],
+            u[right_index],
+            B_samples[left_index],
+            B_samples[right_index],
+            D_samples[left_index],
+            D_samples[right_index],
             0,
         ):
-            return None, "possible hidden barrier or transverse root change"
+            return (
+                None,
+                "possible hidden barrier or transverse root change at "
+                f"u={first_failure[0]}, envelope={(vB, vD, M)}",
+            )
     roots.sort()
     unique = []
     for root in roots:

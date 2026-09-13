@@ -35,6 +35,15 @@ from .branch_atlas import (
     seam_image,
     transition_at,
 )
+from .atlas_corridor import (
+    AtlasCorridor,
+    PathAtlasCorridor,
+    certify_contour_path_corridor,
+    certify_local_atlas_corridor,
+    embed_corridor_in_atlas,
+    plot_atlas_corridor,
+    plot_path_atlas_corridor,
+)
 from .config import ConnectivityConfig
 from .contour_trace import (
     ContourConfig,
@@ -44,6 +53,12 @@ from .contour_trace import (
     ContourStatus,
     DirectContourOracle,
     plot_contour_result,
+)
+from .seed_search import (
+    SeedAttempt,
+    SeedSearchConfig,
+    SeedSearchResult,
+    search_contour_seeds,
 )
 from .critical_curves import (
     CriticalCurveConfig,
@@ -176,7 +191,18 @@ __all__ = [
     "ContourStatus",
     "DirectContourOracle",
     "plot_contour_result",
+    "SeedAttempt",
+    "SeedSearchConfig",
+    "SeedSearchResult",
+    "search_contour_seeds",
     "AtlasCell",
+    "AtlasCorridor",
+    "PathAtlasCorridor",
+    "certify_contour_path_corridor",
+    "certify_local_atlas_corridor",
+    "embed_corridor_in_atlas",
+    "plot_atlas_corridor",
+    "plot_path_atlas_corridor",
     "AtlasConfig",
     "AtlasPort",
     "AtlasSample",
