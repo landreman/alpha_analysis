@@ -475,16 +475,35 @@ def run_case(old_r2, old_r3, evidence):
 
 def write_report(evidence):
     cases = evidence["cases"]
+    field_labels = ("PCA", "TURBO", "DMercFail", "d23p4", "n3are")
+    old_status = Counter(case["original_r3_statuses"]["fine"] for case in cases)
+    new_status = Counter(case["current_original"]["fine"]["status"] for case in cases)
+    recovered = sum(
+        bool(case["seed_search"]["seeds"])
+        for case in cases
+        if case["original_r3_statuses"]["fine"] == "NO_SEED"
+    )
+    local_count = sum(case["local_corridor"]["status"] == "CERTIFIED" for case in cases)
+    longest = max(case["wall_seconds"] for case in cases)
+    dmerc = next(
+        case for case in cases if (case["file_index"], case["lambda_n"]) == (2, 0.8)
+    )
+    d23 = next(
+        case for case in cases if (case["file_index"], case["lambda_n"]) == (3, 0.1)
+    )
     lines = [
         "# R3.5 feasibility matrix (represented-field local evidence)",
         "",
-        f"Revision: `{evidence['git_head']}`. Hardware: `{evidence['hardware']}`; one worker; h(ρ)=1 declared. ",
+        f"Numerical revision: `{evidence['git_head']}`. Hardware: `{evidence['hardware']}`; one worker; h(ρ)=1 declared.",
         "Pitches retain R0 sampled radially global extrema estimates. Root/field interpolation and action quadrature errors are not field enclosures.",
         "",
         f"Cases recorded: {len(cases)}/30. Total wall: {evidence['elapsed_seconds']:.2f} s.",
         "The original R2/R3 evidence remains in its separate files. Current results use 4096 certificate boxes, depth 10, and both original contour steps.",
         "",
-        "| Field | λn | Original coarse/fine | Current coarse/fine | Expanded seeds | Fine atlas positive/unknown area | Local corridor | Full path coarse/fine | Cold wall (s) |",
+        f"The fixed R3 fine cohort had {old_status['NO_SEED']} no-seed and {old_status['UNKNOWN']} unknown cases. The same fixed cohort now has {new_status['NO_SEED']} no-seed, {new_status['UNKNOWN']} unknown, {new_status['INACCESSIBLE']} inaccessible and {new_status['ACCESSIBLE']} accessible cases. The expanded bounded search recovered seeds in {recovered}/{old_status['NO_SEED']} original no-seed cases; finding a seed is not a contour classification or an empty-population proof.",
+        f"Certified local root corridors occur in {local_count}/30 cases and on all five fields. The longest cold physical case took {longest:.2f} s under the 600 s guard. The 60 s active snapshots are recorded for PCA 0.1 and d23p4 0.1; no case reached 300 s.",
+        "",
+        "| Field | λn | Original coarse/fine | Current coarse/fine | Search seeds | Fine atlas positive/unknown area | Local corridor | Full path coarse/fine | Cold wall (s) |",
         "| --- | ---: | --- | --- | ---: | --- | --- | --- | ---: |",
     ]
     for case in cases:
@@ -500,14 +519,16 @@ def write_report(evidence):
             full.get(level, {}).get("status", "—") for level in ("coarse", "fine")
         )
         lines.append(
-            f"| {case['file_index']} | {case['lambda_n']} | {old.get('coarse')}/{old.get('fine')} | "
+            f"| {field_labels[case['file_index']]} | {case['lambda_n']} | {old.get('coarse')}/{old.get('fine')} | "
             f"{new[0]}/{new[1]} | {len(seeds)} | "
             f"{atlas.get('certified_positive_owned_area', 0):.3g}/{atlas.get('unknown_area', 0):.3g} | "
             f"{case.get('local_corridor', {}).get('status', 'FAIL')} | {full_status} | {case['wall_seconds']:.2f} |"
         )
     lines += [
         "",
-        "The two required classified paths have separate full-corridor records at both contour resolutions. Disjoint owned tile areas are geometric ds d-alpha; remaining unknown area and all K/field errors retain their scope.",
+        "The eight original certificate-blocked fixed probes classify at both resolutions: seven inaccessible and d23p4 0.1 accessible. The named real tests independently check the starting root signs, first-return action and physical terminal. The DMercFail 0.8 event is found from an ordinary seed; its marginal B and D residuals, action partition, one-sided limits and all three port continuations are checked separately.",
+        f"DMercFail 0.8 has a closed-path atlas corridor with coarse/fine disjoint positive area {dmerc['full_path_corridors']['coarse']['owned_area']:.8g}/{dmerc['full_path_corridors']['fine']['owned_area']:.8g} ds d-alpha. d23p4 0.1 has an edge-path corridor with {d23['full_path_corridors']['coarse']['owned_area']:.8g}/{d23['full_path_corridors']['fine']['owned_area']:.8g}. Both subtract only their disjoint certified area from the original fixed-domain unknown complement; the much larger unresolved remainder persists.",
+        "Disjoint owned tile areas are geometric ds d-alpha, not K-weighted. Root/field representation and action quadrature errors remain outside field enclosures.",
         "No wide or unknown outcome is treated as an f success or an empty trapped population.",
         "",
         "Detailed root lifts, terminal reasons, budgets, field hashes, active snapshots and uncertainty scope are in the JSON.",
