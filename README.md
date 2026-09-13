@@ -12,7 +12,7 @@ transition tools remain available. The legacy milestone-10.3 matrix reached
 42/120 resolved-or-no-transition cases and failed its acceptance target; it is
 retired without being marked complete.
 
-- [Design and active milestones R0–R8](docs/DESIGN.md)
+- [Design and active milestones R0–R8, including R3.5 before R4](docs/DESIGN.md)
 - [Current status — R0 is next; all redesign milestones are unchecked](docs/STATUS.md)
 - [Accepted redesign decision, ADR 0010](docs/adr/0010-branch-atlas-and-bounded-f.md)
 - [Development environment, commands and validation rules](AGENTS.md)

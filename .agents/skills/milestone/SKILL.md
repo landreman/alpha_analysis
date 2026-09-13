@@ -6,9 +6,16 @@ description: Implement one active milestone from docs/DESIGN.md §23 through tes
 # Implement an active milestone
 
 Read `AGENTS.md`, `docs/STATUS.md` and the selected entry in `docs/DESIGN.md` §23.
-The active sequence is **R0–R8**. For "next", select the first unchecked active
-row whose listed dependencies are complete. Do not choose historical 10.3 or
-11–18, and do not treat retired work as an unfinished prerequisite.
+The active sequence is **R0–R8, including R3.5 between R3 and R4**. For "next",
+select the first unchecked active row whose listed dependencies are complete.
+Do not choose historical 10.3 or 11–18, and do not treat retired work as an
+unfinished prerequisite.
+
+For R3.5, also read `docs/plans/r3-5-feasibility.md`. Its DESIGN §23 real
+classification, root-certificate, discovered-event and atlas-corridor gates are
+prerequisites to R4; improved seed counts or an all-unknown matrix are insufficient.
+ADR 0011 records the already authorized insertion. When implementing R3.5, do not
+start R4 or change the final accuracy/runtime contract.
 
 If the user names an old number, explain its replacement using §23's mapping.
 Proceed with the matching active work when intent is clear; clarify only genuinely
@@ -93,6 +100,8 @@ fixes, wait for `Tests` to pass on that revision, then mark it ready again. Avoi
 repeatedly toggling readiness merely to solicit an unchanged review. Leave the PR
 ready when finished; do not merge. Claude review's absence or failure is not a
 dependency gate.
+However if the Claude review is running (in progress), and hasn't failed with an error, your work is not
+done: wait until the review is completed or failed before returning control to the user.
 
 ## New STOP conditions
 

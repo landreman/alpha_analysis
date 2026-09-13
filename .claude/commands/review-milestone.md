@@ -5,7 +5,10 @@ allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(gh pr:*), Bash(make*), Ba
 ---
 
 Review $ARGUMENTS against `docs/DESIGN.md`, active `docs/STATUS.md`, AGENTS and
-accepted ADR 0010. The active queue is **R0–R8**. Old 10.3 was retired without
+accepted ADRs 0010/0011. The active queue is **R0–R8, including R3.5 before R4**.
+For R3.5, check its DESIGN §23 real classification, certificate, event and atlas
+corridor gates; a better seed count or an all-unknown matrix cannot complete it.
+Old 10.3 was retired without
 passing; 11–18 were replaced. Historical documents are evidence, not current
 instructions. Planning-only changes do not claim any implementation milestone done.
 
