@@ -401,6 +401,7 @@ def test_dmerc_reference_closed_edge_and_transition_probes():
     assert all(port.event_parameter == event.parameter for port in branched.event_ports)
 
 
+@pytest.mark.parametrize("step,max_steps", [(0.04, 80), (0.02, 160)])
 @pytest.mark.parametrize(
     "file_index,pitch,expected,certificate_boxes",
     [
@@ -409,9 +410,9 @@ def test_dmerc_reference_closed_edge_and_transition_probes():
     ],
 )
 def test_real_contour_feasibility_regressions(
-    file_index, pitch, expected, certificate_boxes
+    file_index, pitch, expected, certificate_boxes, step, max_steps
 ):
-    """The original R3 interior seeds classify at both §23 R3.5 step sizes."""
+    """The original R3 seeds classify at each §23 R3.5 step size independently."""
     import json
 
     evidence = json.loads(
@@ -426,61 +427,58 @@ def test_real_contour_feasibility_regressions(
         if case["file_index"] == file_index and case["lambda_n"] == pitch
     )
     f = BoozerField.from_boozmn(Path(DATA_DIR) / row["file"])
-    for step, max_steps in ((0.04, 80), (0.02, 160)):
-        oracle = DirectContourOracle(
-            f,
-            row["b"],
-            ContourConfig(
-                step=step,
-                max_steps=max_steps,
-                max_certificate_boxes=certificate_boxes,
-                max_certificate_depth=10,
-            ),
-        )
-        seed = oracle.seed(0.3, 0.0, row["probes"][0]["seed"]["zeta_in"])
-        sigma = np.sign(float(f.C(seed.s)))
-        assert (
-            sigma
-            * float(
-                f.D_B(
-                    seed.s,
-                    seed.alpha + float(f.iota(seed.s)) * seed.zeta_in,
-                    seed.zeta_in,
-                )
+    oracle = DirectContourOracle(
+        f,
+        row["b"],
+        ContourConfig(
+            step=step,
+            max_steps=max_steps,
+            max_certificate_boxes=certificate_boxes,
+            max_certificate_depth=10,
+        ),
+    )
+    seed = oracle.seed(0.3, 0.0, row["probes"][0]["seed"]["zeta_in"])
+    sigma = np.sign(float(f.C(seed.s)))
+    assert (
+        sigma
+        * float(
+            f.D_B(
+                seed.s,
+                seed.alpha + float(f.iota(seed.s)) * seed.zeta_in,
+                seed.zeta_in,
             )
-            < 0
         )
-        assert (
-            sigma
-            * float(
-                f.D_B(
-                    seed.s,
-                    seed.alpha + float(f.iota(seed.s)) * seed.zeta_out,
-                    seed.zeta_out,
-                )
+        < 0
+    )
+    assert (
+        sigma
+        * float(
+            f.D_B(
+                seed.s,
+                seed.alpha + float(f.iota(seed.s)) * seed.zeta_out,
+                seed.zeta_out,
             )
-            > 0
         )
-        z0 = -sigma * oracle.period
-        scan = ForwardLineCatalogue(
-            f,
-            seed.s,
-            seed.alpha + float(f.iota(seed.s)) * z0,
-            z0,
-            ForwardScanConfig(max_periods=oracle.config.scan_periods),
-        )
-        scan.extend_to(oracle.config.scan_periods)
-        well = min(
-            scan.query(row["b"]).wells, key=lambda w: abs(w.zeta_in - seed.zeta_in)
-        )
-        independent = batched_bounce_integrals(scan, (well,))[0]
-        np.testing.assert_allclose(seed.action_length, independent.A, atol=2e-6, rtol=0)
-        result = oracle.query(seed)
-        assert result.status is expected, result.reason
-        if expected is ContourStatus.ACCESSIBLE:
-            assert result.witness is not None and result.witness.points[-1].s == 1
-        else:
-            assert len(result.paths) == 2 and all(path.closed for path in result.paths)
+        > 0
+    )
+    z0 = -sigma * oracle.period
+    scan = ForwardLineCatalogue(
+        f,
+        seed.s,
+        seed.alpha + float(f.iota(seed.s)) * z0,
+        z0,
+        ForwardScanConfig(max_periods=oracle.config.scan_periods),
+    )
+    scan.extend_to(oracle.config.scan_periods)
+    well = min(scan.query(row["b"]).wells, key=lambda w: abs(w.zeta_in - seed.zeta_in))
+    independent = batched_bounce_integrals(scan, (well,))[0]
+    np.testing.assert_allclose(seed.action_length, independent.A, atol=2e-6, rtol=0)
+    result = oracle.query(seed)
+    assert result.status is expected, result.reason
+    if expected is ContourStatus.ACCESSIBLE:
+        assert result.witness is not None and result.witness.points[-1].s == 1
+    else:
+        assert len(result.paths) == 2 and all(path.closed for path in result.paths)
 
 
 def test_real_dmerc_event_discovery_continues_all_ports():

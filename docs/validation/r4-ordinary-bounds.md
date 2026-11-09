@@ -137,7 +137,7 @@ coverage remain necessary; R5 must not hide them behind small local event weight
 | DESIGN R4 requirement | Named test |
 | --- | --- |
 | Bounds enclose independent regular contours | `test_ordinary_bounds_bracket_direct_contours`; `test_production_bounds_bracket_independent_synthetic_contours` |
-| Disconnected equal-action branches stay separate | `test_disconnected_equal_action_branches_do_not_connect` (coordinate-identical sheets); synthetic two-well adapter test |
+| Disconnected equal-action branches stay separate | `test_disconnected_equal_action_branches_do_not_connect` (overlapping charts, with the second sheet inside s=1); synthetic two-well adapter test |
 | A=s annulus has no interior radial escape | `test_connected_reeb_interval_is_not_radial_escape` |
 | Nested bins grow inner/shrink outer sets on fixed geometry | `test_nested_action_bins_tighten_fixed_geometry_bounds`; `test_certified_level_topology_and_uniform_errors_bracket_affine_field` |
 | Flat actions and saddles preserve measure | `test_flat_action_and_saddle_cases_preserve_measure` (analytic areas 0.9 and 0.5) |
@@ -160,12 +160,20 @@ A further adversarial regression first returned area `(0,0)` for explicitly
 uncertified geometry with no supplied incidence; the corrected global upper
 wildcard retains `(0,0.9)`, including distant states.
 
-Existing scientific tests, tolerances, public entry points and legacy geometry
-are unchanged. No new dependency or DESIGN deviation was introduced. The new
+A Python 3.12 CI fast run passed scientifically but took 124.83 s. The local
+adapter checks now retain an explicit unresolved background on both original
+grids instead of repeating failed global censuses; their owned root/action
+patches are still certified afresh. Actual global atlas inputs remain in the
+30-case matrix and CI replay. The existing R3.5 two-resolution regression is
+parameterized per resolution, preserving every field, resolution, control and
+assertion while avoiding a 42-second combined fast case. No scientific check or
+tolerance was removed, and no slow/skip/xfail marker was added. The disconnected
+sheet control keeps its second sheet strictly inside s=1, with overlapping chart
+vertices and actions. Public entry points and legacy geometry are unchanged. No new dependency or DESIGN deviation was introduced. The new
 [analytic action-bin diagnostic](r4-ordinary-plots/analytic-action-bins.png) and
 [coarse](r4-ordinary-plots/dmerc-coarse.png)/[fine](r4-ordinary-plots/dmerc-fine.png)
 real corridor diagnostics label the model scope and unweighted quantities.
 
-`make check`: 243 passed in 117.88s (0:01:57).
+`make check`: 245 passed in 98.90s (0:01:38).
 
-`make test`: 242 passed in 78.94s (0:01:18).
+`make test`: 244 passed in 74.24s (0:01:14).

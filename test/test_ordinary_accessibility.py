@@ -51,10 +51,12 @@ def test_connected_reeb_interval_is_not_radial_escape():
 
 
 def test_disconnected_equal_action_branches_do_not_connect():
-    # Coordinate-identical sheets deliberately have different vertex IDs.
+    # An interior sheet shares chart coordinates/actions with an EDGE sheet.
     first = grid(lambda s, a: a, ns=2, na=2)
+    interior = first.points.copy()
+    interior[interior[:, 0] == 1, 0] = 0.9
     mesh = OrdinaryMesh(
-        np.tile(first.points, (2, 1)),
+        np.vstack((first.points, interior)),
         np.vstack((first.triangles, first.triangles + 4)),
         np.tile(first.action, 2),
         edge_vertices=first.edge_vertices,

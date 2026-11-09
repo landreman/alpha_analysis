@@ -1,18 +1,27 @@
 """R4 production adapter checks against real roots and independent contours."""
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from alpha_analysis import BoozerField, DATA_DIR
-from alpha_analysis.j_connectivity.atlas_accessibility import ordinary_model_from_atlas
-from alpha_analysis.j_connectivity.atlas_corridor import (
-    certify_local_atlas_corridor,
-    embed_corridor_in_atlas,
+from alpha_analysis.j_connectivity.atlas_accessibility import (
+    ordinary_model_from_atlas,
+    overlay_certified_cells,
 )
-from alpha_analysis.j_connectivity.branch_atlas import AtlasConfig, build_atlas
+from alpha_analysis.j_connectivity.atlas_corridor import (
+    _canonical_alpha_boxes,
+    certify_local_atlas_corridor,
+)
+from alpha_analysis.j_connectivity.branch_atlas import (
+    AtlasCell,
+    AtlasConfig,
+    BranchAtlas,
+    build_atlas,
+)
 from alpha_analysis.j_connectivity.contour_trace import (
     ContourConfig,
     DirectContourOracle,
@@ -23,6 +32,30 @@ from alpha_analysis.j_connectivity.ordinary_accessibility import (
     reachable_area,
 )
 from alpha_analysis.j_connectivity.synthetic_fields import SyntheticFourierField
+
+
+def unresolved_background(field, b, n_s, n_alpha):
+    """Keep both grids while avoiding a redundant census of unknown exterior.
+
+    This local-adapter test needs an explicitly unresolved complement, not a
+    second full-field census. The real 30-case matrix and its CI replay retain
+    the actual global atlas inputs; the owned patch below is certified afresh.
+    """
+    ss = np.linspace(0, 1, n_s)
+    aa = np.linspace(0, 2 * np.pi, n_alpha + 1)
+    cells = tuple(
+        AtlasCell(
+            (s0, s1),
+            (a0, a1),
+            (s1 - s0) * (a1 - a0),
+            0,
+            None,
+            "unproved local-test exterior",
+        )
+        for s0, s1 in zip(ss[:-1], ss[1:])
+        for a0, a1 in zip(aa[:-1], aa[1:])
+    )
+    return BranchAtlas(field, b, (), cells, AtlasConfig(n_s, n_alpha, 2))
 
 
 def test_production_bounds_bracket_independent_synthetic_contours():
@@ -83,9 +116,18 @@ def test_real_ordinary_bounds_compare_classified_oracle_paths(file_index, pitch)
     seed = oracle.seed(seed_data["s"], seed_data["alpha"], seed_data["zeta_in"])
     corridor = certify_local_atlas_corridor(oracle, seed)
     assert corridor.certified, corridor.reason
+    canonical = tuple(
+        replace(
+            corridor.union,
+            s_interval=(s0, s1),
+            alpha_interval=(a0, a1),
+            area=(s1 - s0) * (a1 - a0),
+        )
+        for s0, s1, a0, a1 in _canonical_alpha_boxes(corridor.union)
+    )
     for n_s, n_alpha in ((3, 4), (5, 8)):
-        atlas = embed_corridor_in_atlas(
-            build_atlas(field, row["b"], AtlasConfig(n_s, n_alpha, 2)), corridor
+        atlas = overlay_certified_cells(
+            unresolved_background(field, row["b"], n_s, n_alpha), canonical
         )
         model = ordinary_model_from_atlas(atlas)
         assert model.mesh is not None and not model.failures

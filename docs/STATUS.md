@@ -13,7 +13,7 @@ implementation milestone complete.
 
 ## Active plan
 
-**Next milestone: R5. R0–R4, including R3.5, are complete; R5 depends on R4.** Follow the
+**Next milestone: R4. R0–R3.5 are complete; R4 depends on R3.5.** Follow the
 dependencies in `DESIGN.md` §23; retired milestones are not prerequisites.
 
 | ID | Milestone | Goal | Done | PR |
@@ -23,7 +23,7 @@ dependencies in `DESIGN.md` §23; retired milestones are not prerequisites.
 | R2 | Root-labelled atlas and barrier-height transitions | Build local well charts, explicit seam ownership and certified generic transition relations | [x] | #28 |
 | R3 | Independent continuous contour oracle | Follow constant-action contours and permitted branch transitions without relying on the atlas reachability implementation | [x] | #29 |
 | R3.5 | Practical root certification and contour feasibility | Improve seed coverage, certify moving roots and real atlas corridors, and automatically discover/continue local generic events before R4 | [x] | #31 |
-| R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [x] | #32 |
+| R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [ ] | #32 (draft: CI runtime gate) |
 | R5 | Transitions, cycles and global uncertainty | Transfer through common-parameter ports and propagate uncertain connectivity globally with finite termination | [ ] | |
 | R6 | Weighted pitch-slice bounds and persistence | Produce restartable slice bounds with complete weighted-population accounting | [ ] | |
 | R7 | Outer fraction and birth-space validation | Compute bounds on \(f\), validate independently from birth space, and optionally estimate within the unresolved gap statistically | [ ] | |
