@@ -177,3 +177,12 @@ real corridor diagnostics label the model scope and unweighted quantities.
 `make check`: 245 passed in 98.90s (0:01:38).
 
 `make test`: 244 passed in 74.24s (0:01:14).
+
+## Unresolved test-time acceptance
+
+All Tests jobs on `470e21a` pass, while same-revision fast CI runs range from
+89.76 to 189.09 s. The local clean environment meets §22.5 at 74.24 s fast and
+98.90 s full. [Proposed ADR 0012](../adr/0012-test-budget-reference-environment.md)
+records the missing reference-environment decision and all CI durations. R4 is
+not marked complete; its implementation PR remains draft. No budget interpretation,
+tolerance relaxation or test removal has been adopted.
