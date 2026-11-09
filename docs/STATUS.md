@@ -13,7 +13,7 @@ implementation milestone complete.
 
 ## Active plan
 
-**Next milestone: R4. R0–R3.5 are complete; R4 depends on R3.5.** Follow the
+**Next milestone: R5. R0–R4, including R3.5, are complete; R5 depends on R4.** Follow the
 dependencies in `DESIGN.md` §23; retired milestones are not prerequisites.
 
 | ID | Milestone | Goal | Done | PR |
@@ -23,7 +23,7 @@ dependencies in `DESIGN.md` §23; retired milestones are not prerequisites.
 | R2 | Root-labelled atlas and barrier-height transitions | Build local well charts, explicit seam ownership and certified generic transition relations | [x] | #28 |
 | R3 | Independent continuous contour oracle | Follow constant-action contours and permitted branch transitions without relying on the atlas reachability implementation | [x] | #29 |
 | R3.5 | Practical root certification and contour feasibility | Improve seed coverage, certify moving roots and real atlas corridors, and automatically discover/continue local generic events before R4 | [x] | #31 |
-| R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [ ] | |
+| R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [x] | #32 |
 | R5 | Transitions, cycles and global uncertainty | Transfer through common-parameter ports and propagate uncertain connectivity globally with finite termination | [ ] | |
 | R6 | Weighted pitch-slice bounds and persistence | Produce restartable slice bounds with complete weighted-population accounting | [ ] | |
 | R7 | Outer fraction and birth-space validation | Compute bounds on \(f\), validate independently from birth space, and optionally estimate within the unresolved gap statistically | [ ] | |
@@ -44,6 +44,29 @@ do not relax the fast/full test-suite budgets.
 
 ## Baseline and next-step notes
 
+- Accepted [ADR 0012](adr/0012-test-budget-reference-environment.md) uses the local
+  M1/clean-venv environment for §22.5. R4's fast/full gates pass at 74.24/98.90 s.
+  GitHub Tests correctness remains mandatory; CI timing is reported separately,
+  including the observed 89.76–189.09 s fast-run range. The decision does not
+  change scientific accuracy criteria or the final benchmark guards.
+- R4 in PR #32 adds finite ordinary action-bin lower/upper sets; see its
+  [30-case report](validation/r4-ordinary-bounds.md). The backend is replayed in
+  fast CI on saved owned meshes from all five fields (22/30 cases have meshes),
+  at two atlas/bin levels and with nested bins on each fixed geometry. The two
+  independently rerun classified R3.5 paths remain **UNKNOWN** in the PL bounds;
+  omitted geometry, unproved seams and nonconforming interfaces stay upper
+  frontiers. Explicitly uncertified geometry invokes a global upper wildcard,
+  never a closed-incidence assumption. Nonzero uniform action errors require
+  a separate connected-level-set proof for lower transfers. These inputs do
+  not yet have real field/action enclosures. `reachable_area` clips numerical
+  geometric area, not hK weight: R6 must integrate the weighted polygons and
+  use the independent population ledger. R5 must preserve ordinary A and the
+  common event parameter through every port; geometry changes need a transport
+  proof before claiming nested bounds. The replay reused R3.5 root certificates
+  and excluded their construction cost: 520.7 s total, 327.2 s for the largest
+  case at both resolutions, versus less than 0.4 s per mesh for bin work and its
+  area/nesting comparison. The final 600 s / width-0.01 f contract remains a
+  serious feasibility risk; this milestone makes no physical slice/f claim.
 - R3.5 in PR #31 follows [ADR 0011](adr/0011-pre-r4-feasibility.md) and the
   [implementation brief](plans/r3-5-feasibility.md). Its
   [30-case matrix](validation/r3-5-feasibility-matrix.md) preserves the R2/R3
