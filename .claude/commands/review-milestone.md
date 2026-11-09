@@ -110,3 +110,7 @@ preservation; do not demand fabricated scientific mutation or new runtime eviden
 Return a table of actionable findings: severity (blocking / should-fix / note),
 location, problem, and remedy. Then give **merge / fix first / needs ADR** with
 its scope. Do not invent findings, and do not call a failed CI run green.
+
+## Human-readable summary
+
+In your review, include a human-readable summary of what this PR is about and for, and any problems that arose. For this part, the text should not sound like AI slop. Do not assume the reader knows the jargon - explain any concepts in simple terms that the reader needs to know.

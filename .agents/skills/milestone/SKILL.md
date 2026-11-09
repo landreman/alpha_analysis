@@ -86,6 +86,9 @@ and open/update a **draft** PR with:
 - mutations verified and the tests that caught them;
 - fast/full durations and justified changes to existing tests;
 - relevant ADRs and any remaining blockers.
+- A human-readable summary of what this PR is about and for, and any problems that arose. For this part, the text should not sound like AI slop. Do not assume the reader knows the jargon - explain any concepts in simple terms that the reader needs to know. If the planned design seems unlikely to succeed, in terms of computing the metric f for the set of boozmn files in a
+reasonable wallclock time, such that we should re-think the overall design plan,
+let me know.
 
 Wait for GitHub `Tests`, fix failures and verify the final code revision. Do not
 claim CI passed because an earlier revision passed. Never merge without user
