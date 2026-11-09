@@ -1,6 +1,6 @@
 # ADR 0012: Define the test-budget reference environment
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-09
 - **Milestone:** R4
 - **Design sections:** §22.5, §23 R4, §28
@@ -10,8 +10,8 @@
 R4's finite ordinary action-bin implementation, named scientific tests, mutations,
 diagnostics and 30-case validation are in draft
 [PR #32](https://github.com/landreman/alpha_analysis/pull/32). Its code/test revision
-`470e21aed6744624f85f18e421b613564c6a8104` passes every GitHub Tests job. Completion
-remains unchecked because the environment for the test-time gate is unspecified.
+`470e21aed6744624f85f18e421b613564c6a8104` passes every GitHub Tests job. At proposal,
+completion remained unchecked because the test-time reference was unspecified.
 This is a test acceptance question, not a request to reapprove ADR 0010's algorithm.
 
 DESIGN §22.5 requires:
@@ -20,7 +20,7 @@ DESIGN §22.5 requires:
 >
 > full: `make test-full` — under 5 minutes; no single slow test over about 90 s
 
-It does not identify a reference machine or state whether the two-minute threshold
+It did not identify a reference machine or state whether the two-minute threshold
 must hold on every GitHub-hosted runner as well as the required local environment.
 AGENTS requires a green `make check` within the budget and separately requires a
 green GitHub Tests workflow. Choosing a local-only or an all-CI interpretation
@@ -79,16 +79,17 @@ real-model bin calculations take less than 0.4 s per mesh at the recorded sizes.
 
 ## Decision
 
+Option 1 accepted: Use the local M1 environment.
+
 ## Consequences
 
-No option has been selected. R4 stays unchecked and PR #32 stays draft under the
-AGENTS acceptance-ambiguity STOP rule. The researcher must identify the authoritative
-measurement environment before the completion decision can be made. After a
-decision, clarify §22.5 and the active handoff, verify the chosen gate and final
-revision's Tests, then use the normal ready/review workflow.
+DESIGN §22.5 identifies the local reference environment and keeps GitHub Tests
+correctness mandatory while reporting CI timings separately. The recorded local
+fast/full measurements satisfy the accepted timing gate. R4 completion can now
+follow the normal final-revision Tests and ready/review workflow.
 
-The physical metric, the five-file/six-level cohort, field-error obligations,
-full f width 0.01, 29/30 slice criterion, and final 600-second benchmark guards are
-unchanged. The replay's use of saved R3.5 root certificates remains explicit and
-is not final cold-start performance evidence. Existing R0–R3.5 completion and their
-historical evidence are preserved; this ADR does not relabel any legacy milestone.
+The physical metric, five-file/six-level cohort, field-error obligations, full f
+width 0.01, 29/30 slice criterion, and final 600-second benchmark guards are
+unchanged. Reusing saved R3.5 root certificates remains explicit and does not
+constitute final cold-start performance evidence. Historical evidence and prior
+milestone dispositions are preserved.

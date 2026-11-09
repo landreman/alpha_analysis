@@ -13,7 +13,7 @@ implementation milestone complete.
 
 ## Active plan
 
-**Next milestone: R4. R0–R3.5 are complete; R4 depends on R3.5.** Follow the
+**Next milestone: R5. R0–R4, including R3.5, are complete; R5 depends on R4.** Follow the
 dependencies in `DESIGN.md` §23; retired milestones are not prerequisites.
 
 | ID | Milestone | Goal | Done | PR |
@@ -23,7 +23,7 @@ dependencies in `DESIGN.md` §23; retired milestones are not prerequisites.
 | R2 | Root-labelled atlas and barrier-height transitions | Build local well charts, explicit seam ownership and certified generic transition relations | [x] | #28 |
 | R3 | Independent continuous contour oracle | Follow constant-action contours and permitted branch transitions without relying on the atlas reachability implementation | [x] | #29 |
 | R3.5 | Practical root certification and contour feasibility | Improve seed coverage, certify moving roots and real atlas corridors, and automatically discover/continue local generic events before R4 | [x] | #31 |
-| R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [ ] | #32 (draft: ADR 0012) |
+| R4 | Bounded ordinary action-bin accessibility | Compute finite lower and upper reachability sets on regular sheets without transitions | [x] | #32 |
 | R5 | Transitions, cycles and global uncertainty | Transfer through common-parameter ports and propagate uncertain connectivity globally with finite termination | [ ] | |
 | R6 | Weighted pitch-slice bounds and persistence | Produce restartable slice bounds with complete weighted-population accounting | [ ] | |
 | R7 | Outer fraction and birth-space validation | Compute bounds on \(f\), validate independently from birth space, and optionally estimate within the unresolved gap statistically | [ ] | |
@@ -44,11 +44,11 @@ do not relax the fast/full test-suite budgets.
 
 ## Baseline and next-step notes
 
-- R4 completion is stopped on [proposed ADR 0012](adr/0012-test-budget-reference-environment.md).
-  The clean local fast/full gates pass and all Tests jobs on code revision
-  `470e21a` are green, but identical-code CI fast times range from 89.76 to
-  189.09 s. DESIGN §22.5 does not specify the authoritative timing environment.
-  No interpretation has been selected; R4 remains unchecked and PR #32 draft.
+- Accepted [ADR 0012](adr/0012-test-budget-reference-environment.md) uses the local
+  M1/clean-venv environment for §22.5. R4's fast/full gates pass at 74.24/98.90 s.
+  GitHub Tests correctness remains mandatory; CI timing is reported separately,
+  including the observed 89.76–189.09 s fast-run range. The decision does not
+  change scientific accuracy criteria or the final benchmark guards.
 - R4 in PR #32 adds finite ordinary action-bin lower/upper sets; see its
   [30-case report](validation/r4-ordinary-bounds.md). The backend is replayed in
   fast CI on saved owned meshes from all five fields (22/30 cases have meshes),

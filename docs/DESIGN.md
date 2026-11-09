@@ -1418,6 +1418,14 @@ the guard, lower resolution or widen the accuracy target to claim success.
 | fast | `make test` | under 2 minutes; no single fast test over about 20 s |
 | full | `make test-full` | under 5 minutes; no single slow test over about 90 s |
 
+Per accepted [ADR 0012](adr/0012-test-budget-reference-environment.md), these
+test-time budgets apply to the local reference environment: Apple M1 MacBook Pro
+(8 CPU cores, 16 GB RAM), the required clean Python 3.10.5 `.venv`, three pytest
+workers, and numerical-library threads limited to one. GitHub `Tests` correctness
+remains mandatory on the final revision; CI timing is recorded separately and is
+not a portable two-minute deadline on every hosted runner. This clarification
+does not change the scientific accuracy criteria or §22.4's benchmark guards.
+
 `make check` remains lint plus full tests. Activate the clean `.venv` first.
 Real-matrix experiments are separate from the fast/full suite; CI retains small
 production-path physics tests and checks the saved acceptance evidence where useful.
